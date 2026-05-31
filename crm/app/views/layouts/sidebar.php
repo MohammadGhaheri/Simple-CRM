@@ -8,6 +8,7 @@
     </div>
     <nav>
         <a class="<?= ($page ?? '') === 'dashboard' ? 'active' : '' ?>" href="index.php">داشبورد</a>
+        <a class="<?= ($page ?? '') === 'my_tasks' ? 'active' : '' ?>" href="<?= e(url('my_tasks')) ?>">برنامه من</a>
         <a class="<?= ($page ?? '') === 'customers' ? 'active' : '' ?>" href="<?= e(url('customers')) ?>">مشتریان</a>
         <a class="<?= ($page ?? '') === 'deals' ? 'active' : '' ?>" href="<?= e(url('deals')) ?>">فرصت‌ها</a>
         <a class="<?= ($page ?? '') === 'activities' ? 'active' : '' ?>" href="<?= e(url('activities')) ?>">فعالیت‌ها</a>

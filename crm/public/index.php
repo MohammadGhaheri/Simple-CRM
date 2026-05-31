@@ -48,6 +48,23 @@ function delete_action(callable $delete, string $redirectTo): void
 }
 
 try {
+    if ($page === 'my_tasks') {
+        if ($action === 'done' && is_post()) {
+            verify_csrf();
+            Activity::markDoneForOwner($id, current_user_id());
+            redirect(url('my_tasks'));
+        }
+
+        render('my_tasks/index', [
+            'title' => 'برنامه کاری من',
+            'counts' => Activity::agendaCountsForOwner(current_user_id()),
+            'overdueActivities' => Activity::agendaForOwner(current_user_id(), 'overdue'),
+            'todayActivities' => Activity::agendaForOwner(current_user_id(), 'today'),
+            'upcomingActivities' => Activity::agendaForOwner(current_user_id(), 'upcoming'),
+        ]);
+        exit;
+    }
+
     if ($page === 'dashboard') {
         $stats = [
             'customers' => (int) db()->query('SELECT COUNT(*) FROM customers')->fetchColumn(),

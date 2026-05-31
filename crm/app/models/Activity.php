@@ -97,6 +97,62 @@ class Activity
         return (int) db()->query("SELECT COUNT(*) FROM activities WHERE next_followup_date < CURDATE() AND status <> 'Done'")->fetchColumn();
     }
 
+    public static function agendaForOwner(int $ownerId, string $bucket): array
+    {
+        $where = [
+            'a.owner_user_id = ?',
+            "a.status <> 'Done'",
+            'a.next_followup_date IS NOT NULL',
+        ];
+        $params = [$ownerId];
+
+        if ($bucket === 'overdue') {
+            $where[] = 'a.next_followup_date < CURDATE()';
+        } elseif ($bucket === 'today') {
+            $where[] = 'a.next_followup_date = CURDATE()';
+        } elseif ($bucket === 'upcoming') {
+            $where[] = 'a.next_followup_date > CURDATE()';
+            $where[] = 'a.next_followup_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)';
+        }
+
+        $sql = 'SELECT a.*, c.customer_name, d.deal_name
+                FROM activities a
+                JOIN customers c ON c.id = a.customer_id
+                LEFT JOIN deals d ON d.id = a.deal_id
+                WHERE ' . implode(' AND ', $where) . '
+                ORDER BY a.next_followup_date ASC, a.id ASC';
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public static function agendaCountsForOwner(int $ownerId): array
+    {
+        $stmt = db()->prepare("
+            SELECT
+                SUM(CASE WHEN next_followup_date < CURDATE() AND status <> 'Done' THEN 1 ELSE 0 END) AS overdue_count,
+                SUM(CASE WHEN next_followup_date = CURDATE() AND status <> 'Done' THEN 1 ELSE 0 END) AS today_count,
+                SUM(CASE WHEN next_followup_date > CURDATE() AND next_followup_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND status <> 'Done' THEN 1 ELSE 0 END) AS upcoming_count,
+                SUM(CASE WHEN status = 'Open' THEN 1 ELSE 0 END) AS open_count
+            FROM activities
+            WHERE owner_user_id = ?
+        ");
+        $stmt->execute([$ownerId]);
+        $row = $stmt->fetch() ?: [];
+        return [
+            'overdue' => (int) ($row['overdue_count'] ?? 0),
+            'today' => (int) ($row['today_count'] ?? 0),
+            'upcoming' => (int) ($row['upcoming_count'] ?? 0),
+            'open' => (int) ($row['open_count'] ?? 0),
+        ];
+    }
+
+    public static function markDoneForOwner(int $id, int $ownerId): void
+    {
+        $stmt = db()->prepare("UPDATE activities SET status = 'Done' WHERE id = ? AND owner_user_id = ?");
+        $stmt->execute([$id, $ownerId]);
+    }
+
     private static function payload(array $data): array
     {
         return [
