@@ -19,7 +19,7 @@ $settings = Setting::all();
 <body class="home-page">
     <main class="home-hero">
         <div class="home-brand">
-            <?php if (!empty($settings['app_icon'])): ?><img class="brand-icon large" src="<?= e($settings['app_icon']) ?>" alt=""><?php else: ?><div class="brand-mark">SC</div><?php endif; ?>
+            <?php if (!empty($settings['app_icon'])): ?><img class="brand-icon large" src="<?= e($settings['app_icon']) ?>" alt=""><?php else: ?><div class="brand-mark">Elm</div><?php endif; ?>
             <div>
                 <strong><?= e($settings['app_title']) ?></strong>
                 <span><?= e($settings['app_subtitle']) ?></span>

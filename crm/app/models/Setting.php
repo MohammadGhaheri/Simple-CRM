@@ -47,12 +47,12 @@ class Setting
     public static function defaults(): array
     {
         return [
-            'app_title' => 'Simple CRM',
+            'app_title' => 'Elm Simple CRM',
             'app_subtitle' => 'مدیریت مشتریان، فرصت‌ها و پیگیری‌های فروش',
             'primary_color' => '#155eef',
             'sidebar_color' => '#111827',
             'app_icon' => '',
-            'home_title' => 'Simple CRM',
+            'home_title' => 'Elm Simple CRM',
             'home_text' => 'یک سامانه سبک برای مدیریت مشتریان، مخاطبین، فرصت‌های فروش، پیگیری‌ها و تیکت‌های مشتریان.',
             'sms_enabled' => '0',
             'sms_ticket_created_enabled' => '0',

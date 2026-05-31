@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <?php $appSettings = class_exists('Setting') ? Setting::all() : ['app_title' => 'Simple CRM', 'primary_color' => '#155eef', 'sidebar_color' => '#111827']; ?>
+    <?php $appSettings = class_exists('Setting') ? Setting::all() : ['app_title' => 'Elm Simple CRM', 'primary_color' => '#155eef', 'sidebar_color' => '#111827']; ?>
     <title><?= e($title ?? $appSettings['app_title']) ?></title>
     <link rel="stylesheet" href="<?= e(asset('css/style.css')) ?>">
     <style>

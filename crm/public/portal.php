@@ -52,7 +52,7 @@ function portal_layout(string $title, callable $content): void
     <div class="portal-shell">
         <header class="portal-topbar">
             <div class="brand">
-                <?php if (!empty($appSettings['app_icon'])): ?><img class="brand-icon" src="<?= e($appSettings['app_icon']) ?>" alt=""><?php else: ?><div class="brand-mark">SC</div><?php endif; ?>
+                <?php if (!empty($appSettings['app_icon'])): ?><img class="brand-icon" src="<?= e($appSettings['app_icon']) ?>" alt=""><?php else: ?><div class="brand-mark">Elm</div><?php endif; ?>
                 <div><strong>پرتال مشتری</strong><span><?= e($appSettings['app_title']) ?></span></div>
             </div>
             <?php if ($contact): ?>
@@ -95,21 +95,49 @@ if ($action === 'login') {
         $errors[] = 'ایمیل یا رمز عبور اشتباه است یا دسترسی پرتال فعال نیست.';
     }
 
-    portal_layout('ورود', function () use ($errors) {
-        ?>
-        <form class="login-card" method="post">
-            <?= csrf_field() ?>
-            <h2>ورود به پرتال مشتری</h2>
-            <?php if ($errors): ?><div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
-            <label>ایمیل</label>
-            <input required type="email" name="email" value="<?= e($_POST['email'] ?? 'reza.mohammadi@example.com') ?>">
-            <label>رمز عبور</label>
-            <input required type="password" name="password">
-            <button class="btn btn-primary full" type="submit">ورود</button>
-            <p class="hint">نمونه تست: reza.mohammadi@example.com / Contact@12345</p>
-        </form>
-        <?php
-    });
+    $appSettings = Setting::all();
+    ?>
+    <!doctype html>
+    <html lang="fa" dir="rtl">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>ورود به پرتال مشتری - <?= e($appSettings['app_title']) ?></title>
+        <link rel="stylesheet" href="assets/css/style.css">
+        <style>:root { --primary: <?= e($appSettings['primary_color']) ?>; --primary-dark: <?= e($appSettings['primary_color']) ?>; --sidebar: <?= e($appSettings['sidebar_color']) ?>; }</style>
+    </head>
+    <body class="login-page">
+        <main class="auth-shell">
+            <section class="auth-visual">
+                <div class="auth-leaf"></div>
+                <div class="brand auth-brand">
+                    <?php if (!empty($appSettings['app_icon'])): ?><img class="brand-icon" src="<?= e($appSettings['app_icon']) ?>" alt=""><?php else: ?><div class="brand-mark">Elm</div><?php endif; ?>
+                    <div>
+                        <strong><?= e($appSettings['app_title']) ?></strong>
+                        <span>دسترسی مشتریان و مخاطبین</span>
+                    </div>
+                </div>
+                <h1>پرتال مشتری</h1>
+                <p>ثبت و پیگیری درخواست‌ها، مشاهده وضعیت تیکت‌ها و ارتباط مستقیم با تیم پشتیبانی.</p>
+            </section>
+            <form class="auth-card" method="post">
+                <?= csrf_field() ?>
+                <div class="auth-card-head">
+                    <span>ورود مخاطبین</span>
+                    <h2>ورود به پرتال مشتری</h2>
+                </div>
+                <?php if ($errors): ?><div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
+                <label>ایمیل</label>
+                <input required type="email" name="email" value="<?= e($_POST['email'] ?? 'reza.mohammadi@example.com') ?>">
+                <label>رمز عبور</label>
+                <input required type="password" name="password">
+                <button class="btn btn-primary full" type="submit">ورود</button>
+                <p class="hint">نمونه تست: reza.mohammadi@example.com / Contact@12345</p>
+            </form>
+        </main>
+    </body>
+    </html>
+    <?php
     exit;
 }
 

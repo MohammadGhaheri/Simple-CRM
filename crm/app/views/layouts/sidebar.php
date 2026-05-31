@@ -1,10 +1,10 @@
 <aside class="sidebar">
     <div class="brand">
-        <?php $appSettings = class_exists('Setting') ? Setting::all() : ['app_title' => 'Simple CRM', 'app_subtitle' => 'مدیریت فروش', 'app_icon' => '']; ?>
+        <?php $appSettings = class_exists('Setting') ? Setting::all() : ['app_title' => 'Elm Simple CRM', 'app_subtitle' => 'مدیریت فروش', 'app_icon' => '']; ?>
         <?php if (!empty($appSettings['app_icon'])): ?>
             <img class="brand-icon" src="<?= e($appSettings['app_icon']) ?>" alt="">
         <?php else: ?>
-            <div class="brand-mark">SC</div>
+            <div class="brand-mark">Elm</div>
         <?php endif; ?>
         <div>
             <strong><?= e($appSettings['app_title']) ?></strong>

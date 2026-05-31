@@ -13,5 +13,10 @@ crm/app/config/database.local.php
 crm/public/uploads/*
 !crm/public/uploads/avatars/
 !crm/public/uploads/settings/
+crm/public/uploads/avatars/*
+crm/public/uploads/settings/*
 !crm/public/uploads/avatars/.gitkeep
 !crm/public/uploads/settings/.gitkeep
+
+# Local PHP CLI sessions
+sess_*
