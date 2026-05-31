@@ -20,7 +20,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: Tahoma, Arial, sans-serif;
+  font-family: Calibri, Tahoma, Arial, sans-serif;
   font-size: 14px;
 }
 
@@ -180,7 +180,7 @@ input, select, textarea {
 .date-input {
   direction: ltr;
   text-align: left;
-  font-family: Tahoma, Arial, sans-serif;
+  font-family: Calibri, Tahoma, Arial, sans-serif;
 }
 .jalali-datepicker {
   position: absolute;
