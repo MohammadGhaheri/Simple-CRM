@@ -8,6 +8,7 @@ require __DIR__ . '/../app/core/helpers.php';
 require __DIR__ . '/../app/core/csrf.php';
 require __DIR__ . '/../app/core/auth.php';
 require __DIR__ . '/../app/models/User.php';
+require __DIR__ . '/../app/models/Setting.php';
 
 if (auth_check()) {
     redirect('index.php');

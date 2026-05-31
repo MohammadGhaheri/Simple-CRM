@@ -7,7 +7,7 @@
     <table>
         <thead>
             <tr>
-                <th>نام</th>
+                <th>کاربر</th>
                 <th>ایمیل</th>
                 <th>نقش</th>
                 <th>وضعیت</th>
@@ -17,7 +17,10 @@
         <tbody>
         <?php foreach ($usersList as $user): ?>
             <tr>
-                <td><strong><?= e($user['name']) ?></strong></td>
+                <td class="user-cell">
+                    <?php if (!empty($user['avatar_path'])): ?><img class="user-avatar" src="<?= e($user['avatar_path']) ?>" alt=""><?php endif; ?>
+                    <strong><?= e($user['name']) ?></strong>
+                </td>
                 <td><?= e($user['email']) ?></td>
                 <td><span class="badge badge-primary"><?= e(User::roleLabel($user['role'])) ?></span></td>
                 <td>

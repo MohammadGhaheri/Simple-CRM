@@ -8,6 +8,7 @@ require __DIR__ . '/../app/core/helpers.php';
 require __DIR__ . '/../app/core/csrf.php';
 require __DIR__ . '/../app/models/Contact.php';
 require __DIR__ . '/../app/models/Ticket.php';
+require __DIR__ . '/../app/models/Setting.php';
 
 $action = $_GET['action'] ?? 'dashboard';
 $errors = [];
@@ -34,21 +35,23 @@ function require_portal_auth(): array
 function portal_layout(string $title, callable $content): void
 {
     $contact = portal_contact();
+    $appSettings = Setting::all();
     ?>
     <!doctype html>
     <html lang="fa" dir="rtl">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title><?= e($title) ?> - پرتال مشتری Simple CRM</title>
+        <title><?= e($title) ?> - پرتال مشتری <?= e($appSettings['app_title']) ?></title>
         <link rel="stylesheet" href="assets/css/style.css">
+        <style>:root { --primary: <?= e($appSettings['primary_color']) ?>; --primary-dark: <?= e($appSettings['primary_color']) ?>; --sidebar: <?= e($appSettings['sidebar_color']) ?>; }</style>
     </head>
     <body>
     <div class="portal-shell">
         <header class="portal-topbar">
             <div class="brand">
-                <div class="brand-mark">SC</div>
-                <div><strong>پرتال مشتری</strong><span>Simple CRM</span></div>
+                <?php if (!empty($appSettings['app_icon'])): ?><img class="brand-icon" src="<?= e($appSettings['app_icon']) ?>" alt=""><?php else: ?><div class="brand-mark">SC</div><?php endif; ?>
+                <div><strong>پرتال مشتری</strong><span><?= e($appSettings['app_title']) ?></span></div>
             </div>
             <?php if ($contact): ?>
                 <div class="user-menu">

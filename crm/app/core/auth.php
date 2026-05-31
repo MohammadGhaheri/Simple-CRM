@@ -22,6 +22,7 @@ function login_user(array $user): void
         'name' => $user['name'],
         'email' => $user['email'],
         'role' => $user['role'] ?? 'sales',
+        'avatar_path' => $user['avatar_path'] ?? '',
     ];
 }
 

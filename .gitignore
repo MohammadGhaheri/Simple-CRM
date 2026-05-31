@@ -8,3 +8,10 @@ Thumbs.db
 # Local environment overrides
 .env
 crm/app/config/database.local.php
+
+# Runtime uploads
+crm/public/uploads/*
+!crm/public/uploads/avatars/
+!crm/public/uploads/settings/
+!crm/public/uploads/avatars/.gitkeep
+!crm/public/uploads/settings/.gitkeep

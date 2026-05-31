@@ -7,6 +7,15 @@ USE simple_crm;
 INSERT INTO users (id, name, email, password_hash, role, is_active) VALUES
 (1, 'مدیر سیستم', 'admin@simple-crm.local', '$2y$10$MA2Q2PucE9mu9SvnsuoY.e96PJM.qzV/LHTxwMuFRJHqHX.xAAE3S', 'admin', 1);
 
+INSERT INTO app_settings (setting_key, setting_value) VALUES
+('app_title', 'Simple CRM'),
+('app_subtitle', 'مدیریت مشتریان، فرصت‌ها و پیگیری‌های فروش'),
+('primary_color', '#155eef'),
+('sidebar_color', '#111827'),
+('app_icon', ''),
+('home_title', 'Simple CRM'),
+('home_text', 'یک سامانه سبک برای مدیریت مشتریان، مخاطبین، فرصت‌های فروش، پیگیری‌ها و تیکت‌های مشتریان.');
+
 INSERT INTO customers (id, customer_code, customer_name, customer_type, industry, city, lead_source, interested_product, vehicle_count, estimated_contract_value, sales_status, owner_user_id, last_followup_date, next_followup_date, notes) VALUES
 (1, 'SC-1001', 'ناوگان لجستیک آریا ترابر', 'B2B Fleet', 'حمل و نقل و پخش', 'تهران', 'نمایشگاه حمل و نقل و لجستیک', 'FMS', 180, 12500000000, 'Negotiation', 1, '2026-05-20', '2026-06-03', 'نیاز اصلی مشتری پایش لحظه‌ای ناوگان، کنترل مصرف سوخت، هشدار توقف غیرمجاز و گزارش رفتار راننده است.'),
 (2, 'SC-1002', 'گروه خودروسازی البرز موتور', 'OEM', 'خودروسازی', 'کرج', 'معرفی از واحد توسعه محصول', 'Connected Vehicle Platform', 5000, 85000000000, 'Proposal Sent', 1, '2026-05-18', '2026-06-05', 'در حال بررسی معماری پلتفرم خودروی متصل، نصب TBox و اتصال API به سامانه‌های داخلی خودروساز.'),

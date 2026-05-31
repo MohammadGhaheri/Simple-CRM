@@ -1,9 +1,14 @@
 <aside class="sidebar">
     <div class="brand">
-        <div class="brand-mark">SC</div>
+        <?php $appSettings = class_exists('Setting') ? Setting::all() : ['app_title' => 'Simple CRM', 'app_subtitle' => 'مدیریت فروش', 'app_icon' => '']; ?>
+        <?php if (!empty($appSettings['app_icon'])): ?>
+            <img class="brand-icon" src="<?= e($appSettings['app_icon']) ?>" alt="">
+        <?php else: ?>
+            <div class="brand-mark">SC</div>
+        <?php endif; ?>
         <div>
-            <strong>Simple CRM</strong>
-            <span>مدیریت فروش</span>
+            <strong><?= e($appSettings['app_title']) ?></strong>
+            <span><?= e($appSettings['app_subtitle']) ?></span>
         </div>
     </div>
     <nav>
@@ -22,6 +27,7 @@
         </a>
         <?php if (is_admin()): ?>
             <a class="<?= ($page ?? '') === 'users' ? 'active' : '' ?>" href="<?= e(url('users')) ?>">کاربران</a>
+            <a class="<?= ($page ?? '') === 'settings' ? 'active' : '' ?>" href="<?= e(url('settings')) ?>">تنظیمات</a>
         <?php endif; ?>
     </nav>
 </aside>
@@ -32,6 +38,7 @@
             <p>مدیریت مشتریان، فرصت‌ها و پیگیری‌های فروش تلماتیک</p>
         </div>
         <div class="user-menu">
+            <?php if (!empty($_SESSION['user']['avatar_path'])): ?><img class="user-avatar" src="<?= e($_SESSION['user']['avatar_path']) ?>" alt=""><?php endif; ?>
             <span><?= e($_SESSION['user']['name'] ?? '') ?></span>
             <a class="btn btn-light" href="logout.php">خروج</a>
         </div>

@@ -13,8 +13,11 @@ require __DIR__ . '/../app/models/Contact.php';
 require __DIR__ . '/../app/models/Deal.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
+require __DIR__ . '/../app/models/Setting.php';
 
-require_auth();
+if (!auth_check()) {
+    redirect('home.php');
+}
 
 $page = $_GET['page'] ?? 'dashboard';
 $action = $_GET['action'] ?? 'index';
@@ -31,6 +34,7 @@ function render(string $view, array $data = []): void
             $_SESSION['user']['name'] = $freshUser['name'];
             $_SESSION['user']['email'] = $freshUser['email'];
             $_SESSION['user']['role'] = $freshUser['role'];
+            $_SESSION['user']['avatar_path'] = $freshUser['avatar_path'] ?? '';
         }
     }
     $data['page'] = $page;
@@ -49,7 +53,61 @@ function delete_action(callable $delete, string $redirectTo): void
     redirect($redirectTo);
 }
 
+function upload_image(string $field, string $folder): ?string
+{
+    if (empty($_FILES[$field]['tmp_name']) || !is_uploaded_file($_FILES[$field]['tmp_name'])) {
+        return null;
+    }
+
+    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+    $mime = mime_content_type($_FILES[$field]['tmp_name']);
+    if (!isset($allowed[$mime])) {
+        throw new RuntimeException('فرمت تصویر مجاز نیست. فقط jpg، png، webp یا gif قابل قبول است.');
+    }
+    if ((int) ($_FILES[$field]['size'] ?? 0) > 2 * 1024 * 1024) {
+        throw new RuntimeException('حجم تصویر نباید بیشتر از ۲ مگابایت باشد.');
+    }
+
+    $dir = __DIR__ . '/uploads/' . $folder;
+    if (!is_dir($dir)) {
+        mkdir($dir, 0775, true);
+    }
+
+    $filename = bin2hex(random_bytes(12)) . '.' . $allowed[$mime];
+    if (!move_uploaded_file($_FILES[$field]['tmp_name'], $dir . '/' . $filename)) {
+        throw new RuntimeException('آپلود تصویر ناموفق بود.');
+    }
+
+    return 'uploads/' . $folder . '/' . $filename;
+}
+
 try {
+    if ($page === 'settings') {
+        require_admin();
+        $settings = Setting::all();
+        if (is_post()) {
+            verify_csrf();
+            try {
+                $uploadedIcon = upload_image('app_icon_file', 'settings');
+                Setting::saveMany([
+                    'app_title' => trim($_POST['app_title'] ?? ''),
+                    'app_subtitle' => trim($_POST['app_subtitle'] ?? ''),
+                    'primary_color' => trim($_POST['primary_color'] ?? '#155eef'),
+                    'sidebar_color' => trim($_POST['sidebar_color'] ?? '#111827'),
+                    'app_icon' => $uploadedIcon ?: ($settings['app_icon'] ?? ''),
+                    'home_title' => trim($_POST['home_title'] ?? ''),
+                    'home_text' => trim($_POST['home_text'] ?? ''),
+                ]);
+                redirect(url('settings'));
+            } catch (RuntimeException $e) {
+                $errors[] = $e->getMessage();
+                $settings = array_merge($settings, $_POST);
+            }
+        }
+        render('settings/index', ['title' => 'تنظیمات سامانه', 'settings' => $settings, 'errors' => $errors]);
+        exit;
+    }
+
     if ($page === 'users') {
         require_admin();
 
@@ -66,6 +124,13 @@ try {
                 }
                 if (User::emailExists(trim($_POST['email'] ?? ''))) {
                     $errors[] = 'این ایمیل قبلا ثبت شده است.';
+                }
+                if (!$errors) {
+                    try {
+                        $_POST['avatar_path'] = upload_image('avatar_file', 'avatars') ?: '';
+                    } catch (RuntimeException $e) {
+                        $errors[] = $e->getMessage();
+                    }
                 }
                 if (!$errors) {
                     User::create($_POST);
@@ -99,6 +164,13 @@ try {
                 }
                 if ($id === current_user_id() && !isset($_POST['is_active'])) {
                     $errors[] = 'مدیر سیستم نمی‌تواند حساب خودش را غیرفعال کند.';
+                }
+                if (!$errors) {
+                    try {
+                        $_POST['avatar_path'] = upload_image('avatar_file', 'avatars') ?: ($user['avatar_path'] ?? '');
+                    } catch (RuntimeException $e) {
+                        $errors[] = $e->getMessage();
+                    }
                 }
                 if (!$errors) {
                     User::update($id, $_POST);

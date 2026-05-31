@@ -6,12 +6,12 @@ class User
 {
     public static function all(): array
     {
-        return db()->query('SELECT id, name, email, role, is_active FROM users ORDER BY name')->fetchAll();
+        return db()->query('SELECT id, name, email, role, avatar_path, is_active FROM users ORDER BY name')->fetchAll();
     }
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT id, name, email, role, is_active FROM users WHERE id = ?');
+        $stmt = db()->prepare('SELECT id, name, email, role, avatar_path, is_active FROM users WHERE id = ?');
         $stmt->execute([$id]);
         return $stmt->fetch() ?: null;
     }
@@ -25,12 +25,13 @@ class User
 
     public static function create(array $data): int
     {
-        $sql = 'INSERT INTO users (name, email, password_hash, role, is_active) VALUES (:name, :email, :password_hash, :role, :is_active)';
+        $sql = 'INSERT INTO users (name, email, password_hash, role, avatar_path, is_active) VALUES (:name, :email, :password_hash, :role, :avatar_path, :is_active)';
         db()->prepare($sql)->execute([
             'name' => trim($data['name'] ?? ''),
             'email' => trim($data['email'] ?? ''),
             'password_hash' => password_hash((string) $data['password'], PASSWORD_DEFAULT),
             'role' => self::validRole($data['role'] ?? 'sales'),
+            'avatar_path' => trim($data['avatar_path'] ?? '') ?: null,
             'is_active' => isset($data['is_active']) ? 1 : 0,
         ]);
         return (int) db()->lastInsertId();
@@ -42,6 +43,7 @@ class User
             'name' => trim($data['name'] ?? ''),
             'email' => trim($data['email'] ?? ''),
             'role' => self::validRole($data['role'] ?? 'sales'),
+            'avatar_path' => trim($data['avatar_path'] ?? ''),
             'is_active' => isset($data['is_active']) ? 1 : 0,
             'id' => $id,
         ];
@@ -51,7 +53,7 @@ class User
             $payload['password_hash'] = password_hash((string) $data['password'], PASSWORD_DEFAULT);
         }
 
-        $sql = "UPDATE users SET name = :name, email = :email, role = :role, is_active = :is_active $passwordSql WHERE id = :id";
+        $sql = "UPDATE users SET name = :name, email = :email, role = :role, avatar_path = :avatar_path, is_active = :is_active $passwordSql WHERE id = :id";
         db()->prepare($sql)->execute($payload);
     }
 

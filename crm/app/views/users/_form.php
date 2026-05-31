@@ -23,6 +23,11 @@
             <?php endforeach; ?>
         </select>
     </div>
+    <div>
+        <label>تصویر کاربر</label>
+        <input type="file" name="avatar_file" accept="image/*">
+        <?php if (!empty($user['avatar_path'])): ?><img class="avatar-preview" src="<?= e($user['avatar_path']) ?>" alt=""><?php endif; ?>
+    </div>
 </div>
 
 <p>
