@@ -4,8 +4,8 @@ SET character_set_connection = utf8mb4;
 SET character_set_results = utf8mb4;
 USE simple_crm;
 
-INSERT INTO users (id, name, email, password_hash, is_active) VALUES
-(1, 'مدیر سیستم', 'admin@simple-crm.local', '$2y$10$MA2Q2PucE9mu9SvnsuoY.e96PJM.qzV/LHTxwMuFRJHqHX.xAAE3S', 1);
+INSERT INTO users (id, name, email, password_hash, role, is_active) VALUES
+(1, 'مدیر سیستم', 'admin@simple-crm.local', '$2y$10$MA2Q2PucE9mu9SvnsuoY.e96PJM.qzV/LHTxwMuFRJHqHX.xAAE3S', 'admin', 1);
 
 INSERT INTO customers (id, customer_code, customer_name, customer_type, industry, city, lead_source, interested_product, vehicle_count, estimated_contract_value, sales_status, owner_user_id, last_followup_date, next_followup_date, notes) VALUES
 (1, 'SC-1001', 'ناوگان لجستیک آریا ترابر', 'B2B Fleet', 'حمل و نقل و پخش', 'تهران', 'نمایشگاه حمل و نقل و لجستیک', 'FMS', 180, 12500000000, 'Negotiation', 1, '2026-05-20', '2026-06-03', 'نیاز اصلی مشتری پایش لحظه‌ای ناوگان، کنترل مصرف سوخت، هشدار توقف غیرمجاز و گزارش رفتار راننده است.'),

@@ -29,6 +29,7 @@ function render(string $view, array $data = []): void
         if ($freshUser) {
             $_SESSION['user']['name'] = $freshUser['name'];
             $_SESSION['user']['email'] = $freshUser['email'];
+            $_SESSION['user']['role'] = $freshUser['role'];
         }
     }
     $data['page'] = $page;
@@ -48,6 +49,70 @@ function delete_action(callable $delete, string $redirectTo): void
 }
 
 try {
+    if ($page === 'users') {
+        require_admin();
+
+        if ($action === 'create') {
+            $user = ['role' => 'sales', 'is_active' => 1];
+            if (is_post()) {
+                verify_csrf();
+                $errors = required_fields($_POST, ['name' => 'نام', 'email' => 'ایمیل', 'password' => 'رمز عبور']);
+                if (!filter_var($_POST['email'] ?? '', FILTER_VALIDATE_EMAIL)) {
+                    $errors[] = 'ایمیل معتبر نیست.';
+                }
+                if (strlen((string) ($_POST['password'] ?? '')) < 8) {
+                    $errors[] = 'رمز عبور باید حداقل ۸ کاراکتر باشد.';
+                }
+                if (User::emailExists(trim($_POST['email'] ?? ''))) {
+                    $errors[] = 'این ایمیل قبلا ثبت شده است.';
+                }
+                if (!$errors) {
+                    User::create($_POST);
+                    redirect(url('users'));
+                }
+                $user = $_POST;
+            }
+            render('users/create', ['title' => 'کاربر جدید', 'user' => $user, 'errors' => $errors]);
+            exit;
+        }
+
+        if ($action === 'edit') {
+            $user = User::find($id);
+            if (!$user) {
+                redirect(url('users'));
+            }
+            if (is_post()) {
+                verify_csrf();
+                $errors = required_fields($_POST, ['name' => 'نام', 'email' => 'ایمیل']);
+                if (!filter_var($_POST['email'] ?? '', FILTER_VALIDATE_EMAIL)) {
+                    $errors[] = 'ایمیل معتبر نیست.';
+                }
+                if (trim((string) ($_POST['password'] ?? '')) !== '' && strlen((string) $_POST['password']) < 8) {
+                    $errors[] = 'رمز عبور باید حداقل ۸ کاراکتر باشد.';
+                }
+                if (User::emailExists(trim($_POST['email'] ?? ''), $id)) {
+                    $errors[] = 'این ایمیل قبلا ثبت شده است.';
+                }
+                if ($id === current_user_id() && ($_POST['role'] ?? '') !== 'admin') {
+                    $errors[] = 'مدیر سیستم نمی‌تواند نقش خودش را از مدیر سیستم خارج کند.';
+                }
+                if ($id === current_user_id() && !isset($_POST['is_active'])) {
+                    $errors[] = 'مدیر سیستم نمی‌تواند حساب خودش را غیرفعال کند.';
+                }
+                if (!$errors) {
+                    User::update($id, $_POST);
+                    redirect(url('users'));
+                }
+                $user = array_merge($user, $_POST);
+            }
+            render('users/edit', ['title' => 'ویرایش کاربر', 'user' => $user, 'errors' => $errors]);
+            exit;
+        }
+
+        render('users/index', ['title' => 'مدیریت کاربران', 'usersList' => User::all()]);
+        exit;
+    }
+
     if ($page === 'my_tasks') {
         if ($action === 'done' && is_post()) {
             verify_csrf();
