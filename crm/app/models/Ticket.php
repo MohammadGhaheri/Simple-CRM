@@ -58,7 +58,9 @@ class Ticket
 
     public static function createFromPortal(array $contact, array $data): int
     {
-        $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description) VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description)';
+        $settings = class_exists('Setting') ? Setting::all() : [];
+        $assignedUserId = !empty($settings['sms_default_assigned_user_id']) ? (int) $settings['sms_default_assigned_user_id'] : null;
+        $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description, assigned_user_id) VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description, :assigned_user_id)';
         db()->prepare($sql)->execute([
             'ticket_code' => self::nextCode(),
             'customer_id' => (int) $contact['customer_id'],
@@ -67,6 +69,7 @@ class Ticket
             'category' => self::validCategory($data['category'] ?? 'Support'),
             'priority' => self::validPriority($data['priority'] ?? 'Normal'),
             'description' => trim($data['description'] ?? ''),
+            'assigned_user_id' => $assignedUserId,
         ]);
         return (int) db()->lastInsertId();
     }

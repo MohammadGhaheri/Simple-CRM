@@ -9,6 +9,8 @@ require __DIR__ . '/../app/core/csrf.php';
 require __DIR__ . '/../app/models/Contact.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/Setting.php';
+require __DIR__ . '/../app/models/UsageReport.php';
+require __DIR__ . '/../app/services/SmsService.php';
 
 $action = $_GET['action'] ?? 'dashboard';
 $errors = [];
@@ -87,6 +89,7 @@ if ($action === 'login') {
                 'name' => $contact['contact_name'],
                 'customer_id' => (int) $contact['customer_id'],
             ];
+            UsageReport::logLogin('contact', (int) $contact['id']);
             redirect('portal.php');
         }
         $errors[] = 'ایمیل یا رمز عبور اشتباه است یا دسترسی پرتال فعال نیست.';
@@ -111,13 +114,18 @@ if ($action === 'login') {
 }
 
 $contact = require_portal_auth();
+UsageReport::logUsage('contact', (int) $contact['id'], 'portal_' . $action, $_SERVER['REQUEST_METHOD'] ?? 'GET');
 
 if ($action === 'create_ticket') {
     if (is_post()) {
         verify_csrf();
         $errors = required_fields($_POST, ['subject' => 'موضوع', 'description' => 'شرح درخواست']);
         if (!$errors) {
-            Ticket::createFromPortal($contact, $_POST);
+            $ticketId = Ticket::createFromPortal($contact, $_POST);
+            $ticket = Ticket::find($ticketId);
+            if ($ticket) {
+                SmsService::notifyTicketCreated($ticket);
+            }
             redirect('portal.php');
         }
     }

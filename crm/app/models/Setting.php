@@ -54,6 +54,14 @@ class Setting
             'app_icon' => '',
             'home_title' => 'Simple CRM',
             'home_text' => 'یک سامانه سبک برای مدیریت مشتریان، مخاطبین، فرصت‌های فروش، پیگیری‌ها و تیکت‌های مشتریان.',
+            'sms_enabled' => '0',
+            'sms_ticket_created_enabled' => '0',
+            'sms_ticket_answered_enabled' => '0',
+            'sms_daily_summary_enabled' => '0',
+            'sms_api_key' => '',
+            'sms_line_number' => '',
+            'sms_admin_mobile' => '',
+            'sms_default_assigned_user_id' => '',
         ];
     }
 }

@@ -26,6 +26,7 @@
             <?php endif; ?>
         </a>
         <?php if (is_admin()): ?>
+            <a class="<?= ($page ?? '') === 'reports' ? 'active' : '' ?>" href="<?= e(url('reports')) ?>">گزارش‌ها</a>
             <a class="<?= ($page ?? '') === 'users' ? 'active' : '' ?>" href="<?= e(url('users')) ?>">کاربران</a>
             <a class="<?= ($page ?? '') === 'settings' ? 'active' : '' ?>" href="<?= e(url('settings')) ?>">تنظیمات</a>
         <?php endif; ?>

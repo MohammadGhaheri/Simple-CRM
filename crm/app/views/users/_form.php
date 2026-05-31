@@ -11,6 +11,10 @@
         <input required type="email" name="email" value="<?= e($user['email'] ?? '') ?>">
     </div>
     <div>
+        <label>موبایل</label>
+        <input name="mobile" value="<?= e($user['mobile'] ?? '') ?>" placeholder="مثلا 09120000000">
+    </div>
+    <div>
         <label class="<?= empty($user['id']) ? 'required' : '' ?>">رمز عبور</label>
         <input <?= empty($user['id']) ? 'required' : '' ?> type="password" name="password" autocomplete="new-password">
         <?php if (!empty($user['id'])): ?><span class="muted">برای حفظ رمز فعلی خالی بگذارید.</span><?php endif; ?>

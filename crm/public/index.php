@@ -14,6 +14,8 @@ require __DIR__ . '/../app/models/Deal.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/Setting.php';
+require __DIR__ . '/../app/models/UsageReport.php';
+require __DIR__ . '/../app/services/SmsService.php';
 
 if (!auth_check()) {
     redirect('home.php');
@@ -82,6 +84,20 @@ function upload_image(string $field, string $folder): ?string
 }
 
 try {
+    UsageReport::logUsage('user', current_user_id(), $page, $action);
+
+    if ($page === 'reports') {
+        require_admin();
+        render('reports/index', [
+            'title' => 'گزارش استفاده',
+            'summary' => UsageReport::summary(),
+            'userLogins' => UsageReport::loginsByActor('user'),
+            'contactLogins' => UsageReport::loginsByActor('contact'),
+            'usageByArea' => UsageReport::usageByArea(),
+        ]);
+        exit;
+    }
+
     if ($page === 'settings') {
         require_admin();
         $settings = Setting::all();
@@ -97,6 +113,14 @@ try {
                     'app_icon' => $uploadedIcon ?: ($settings['app_icon'] ?? ''),
                     'home_title' => trim($_POST['home_title'] ?? ''),
                     'home_text' => trim($_POST['home_text'] ?? ''),
+                    'sms_enabled' => isset($_POST['sms_enabled']) ? '1' : '0',
+                    'sms_ticket_created_enabled' => isset($_POST['sms_ticket_created_enabled']) ? '1' : '0',
+                    'sms_ticket_answered_enabled' => isset($_POST['sms_ticket_answered_enabled']) ? '1' : '0',
+                    'sms_daily_summary_enabled' => isset($_POST['sms_daily_summary_enabled']) ? '1' : '0',
+                    'sms_api_key' => trim($_POST['sms_api_key'] ?? ''),
+                    'sms_line_number' => trim($_POST['sms_line_number'] ?? ''),
+                    'sms_admin_mobile' => trim($_POST['sms_admin_mobile'] ?? ''),
+                    'sms_default_assigned_user_id' => trim($_POST['sms_default_assigned_user_id'] ?? ''),
                 ]);
                 redirect(url('settings'));
             } catch (RuntimeException $e) {
@@ -104,7 +128,7 @@ try {
                 $settings = array_merge($settings, $_POST);
             }
         }
-        render('settings/index', ['title' => 'تنظیمات سامانه', 'settings' => $settings, 'errors' => $errors]);
+        render('settings/index', ['title' => 'تنظیمات سامانه', 'settings' => $settings, 'users' => $users, 'errors' => $errors]);
         exit;
     }
 
@@ -341,7 +365,12 @@ try {
             }
             if (is_post()) {
                 verify_csrf();
+                $before = Ticket::find($id);
                 Ticket::update($id, $_POST);
+                $after = Ticket::find($id);
+                if ($after && trim((string) ($_POST['response'] ?? '')) !== '' && (($before['response'] ?? '') !== ($_POST['response'] ?? '') || ($before['status'] ?? '') !== ($_POST['status'] ?? ''))) {
+                    SmsService::notifyTicketAnswered($after);
+                }
                 redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
             }
             render('tickets/edit', ['title' => 'جزئیات تیکت', 'ticket' => $ticket, 'users' => $users]);
