@@ -234,21 +234,32 @@ try {
             delete_action(fn() => Activity::delete($id), url('activities'));
         }
         if ($action === 'create') {
+            $completeId = (int) ($_GET['complete_id'] ?? ($_POST['complete_id'] ?? 0));
+            $sourceActivity = $completeId > 0 ? Activity::findForOwner($completeId, current_user_id()) : null;
             $activity = [
-                'customer_id' => (int) ($_GET['customer_id'] ?? 0),
-                'deal_id' => (int) ($_GET['deal_id'] ?? 0),
+                'customer_id' => (int) ($sourceActivity['customer_id'] ?? ($_GET['customer_id'] ?? 0)),
+                'deal_id' => (int) ($sourceActivity['deal_id'] ?? ($_GET['deal_id'] ?? 0)),
                 'activity_date' => fa_date(date('Y-m-d')),
                 'status' => 'Open',
+                'activity_type' => $sourceActivity['activity_type'] ?? 'Follow-up',
+                'complete_id' => $sourceActivity ? $completeId : 0,
             ];
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'activity_date' => 'تاریخ فعالیت', 'summary' => 'خلاصه']);
                 if (!$errors) {
                     Activity::create($_POST);
+                    if ($sourceActivity) {
+                        Activity::markDoneForOwner($completeId, current_user_id());
+                    }
+                    if ($sourceActivity) {
+                        redirect(url('my_tasks'));
+                    }
                     $target = !empty($_POST['deal_id']) ? url('deals', ['action' => 'show', 'id' => (int) $_POST['deal_id']]) : url('customers', ['action' => 'show', 'id' => (int) $_POST['customer_id']]);
                     redirect($target);
                 }
                 $activity = $_POST;
+                $activity['complete_id'] = $sourceActivity ? $completeId : 0;
             }
             render('activities/create', ['title' => 'فعالیت جدید', 'activity' => $activity, 'customers' => Customer::search(), 'deals' => Deal::search(), 'users' => $users, 'errors' => $errors]);
             exit;

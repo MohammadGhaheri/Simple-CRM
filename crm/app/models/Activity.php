@@ -54,6 +54,13 @@ class Activity
         return $stmt->fetch() ?: null;
     }
 
+    public static function findForOwner(int $id, int $ownerId): ?array
+    {
+        $stmt = db()->prepare('SELECT * FROM activities WHERE id = ? AND owner_user_id = ?');
+        $stmt->execute([$id, $ownerId]);
+        return $stmt->fetch() ?: null;
+    }
+
     public static function create(array $data): int
     {
         $sql = 'INSERT INTO activities (customer_id, deal_id, activity_date, activity_type, summary, next_action, next_followup_date, owner_user_id, status, notes) VALUES (:customer_id, :deal_id, :activity_date, :activity_type, :summary, :next_action, :next_followup_date, :owner_user_id, :status, :notes)';

@@ -231,6 +231,7 @@ tr:last-child td { border-bottom: 0; }
 
 .alert { padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; }
 .alert-danger { background: #fee2e2; color: var(--danger); }
+.alert-info { background: #e0f2fe; color: var(--info); }
 
 .detail-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .detail-list div { background: #f9fafb; border-radius: 8px; padding: 12px; }

@@ -35,10 +35,7 @@ function render_agenda_items(array $activities, string $type): void
             </div>
             <div class="task-actions">
                 <a class="btn btn-small btn-light" href="<?= e(url('activities', ['action' => 'edit', 'id' => $activity['id']])) ?>">ویرایش</a>
-                <form method="post" action="<?= e(url('my_tasks', ['action' => 'done', 'id' => $activity['id']])) ?>" data-confirm="این فعالیت به عنوان انجام شده ثبت شود؟">
-                    <?= csrf_field() ?>
-                    <button class="btn btn-small btn-primary" type="submit">انجام شد</button>
-                </form>
+                <a class="btn btn-small btn-primary" href="<?= e(url('activities', ['action' => 'create', 'complete_id' => $activity['id']])) ?>">ثبت نتیجه</a>
             </div>
         </div>
     <?php endforeach;
