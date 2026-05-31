@@ -13,11 +13,11 @@ INSERT INTO customers (id, customer_code, customer_name, customer_type, industry
 (3, 'SC-1003', 'نمایندگی مرکزی شرق خودرو', 'B2D Dealer', 'فروش و خدمات پس از فروش', 'مشهد', 'فرم درخواست وب‌سایت', 'Owner App', 320, 6800000000, 'Contacted', 1, '2026-05-23', '2026-06-02', 'مشتری به اپلیکیشن مالک، اعلان وضعیت خودرو و سرویس‌های ارزش افزوده برای خریداران خودرو علاقه‌مند است.'),
 (4, 'SC-1004', 'همراه داده هوشمند ایرانیان', 'Strategic Partner', 'فناوری اطلاعات و تحلیل داده', 'تهران', 'شبکه همکاران راهبردی', 'API Integration', 0, 18000000000, 'Meeting Scheduled', 1, '2026-05-25', '2026-06-01', 'پتانسیل همکاری در یکپارچه‌سازی داده‌های تلماتیک، داشبورد BI و ارائه API به مشتریان سازمانی.');
 
-INSERT INTO contacts (customer_id, contact_name, position, mobile, phone, email, is_primary, notes) VALUES
-(1, 'رضا محمدی', 'مدیر عملیات ناوگان', '09120000001', '02144000001', 'reza.mohammadi@example.com', 1, 'تصمیم‌گیر اصلی برای نیازهای عملیاتی ناوگان.'),
-(2, 'سارا احمدی', 'مدیر محصول خودروهای متصل', '09120000002', '02634000002', 'sara.ahmadi@example.com', 1, 'هماهنگ‌کننده جلسه‌های فنی با تیم نرم‌افزار و سخت‌افزار.'),
-(3, 'مهدی کریمی', 'مدیر فروش نمایندگی', '09120000003', '05137000003', 'mahdi.karimi@example.com', 1, 'پیگیر سرویس‌های قابل فروش به مشتری نهایی.'),
-(4, 'نسترن رضایی', 'مدیر توسعه کسب‌وکار', '09120000004', '02188000004', 'nastaran.rezaei@example.com', 1, 'مسئول مذاکره چارچوب همکاری و مدل درآمدی.');
+INSERT INTO contacts (customer_id, contact_name, position, mobile, phone, email, portal_enabled, password_hash, is_primary, notes) VALUES
+(1, 'رضا محمدی', 'مدیر عملیات ناوگان', '09120000001', '02144000001', 'reza.mohammadi@example.com', 1, '$2y$10$mnF.X3Ttd5vSqxYfNny61ePYeI9Ox30SCuUD69XkszHS8Z/jGteWi', 1, 'تصمیم‌گیر اصلی برای نیازهای عملیاتی ناوگان.'),
+(2, 'سارا احمدی', 'مدیر محصول خودروهای متصل', '09120000002', '02634000002', 'sara.ahmadi@example.com', 1, '$2y$10$mnF.X3Ttd5vSqxYfNny61ePYeI9Ox30SCuUD69XkszHS8Z/jGteWi', 1, 'هماهنگ‌کننده جلسه‌های فنی با تیم نرم‌افزار و سخت‌افزار.'),
+(3, 'مهدی کریمی', 'مدیر فروش نمایندگی', '09120000003', '05137000003', 'mahdi.karimi@example.com', 0, NULL, 1, 'پیگیر سرویس‌های قابل فروش به مشتری نهایی.'),
+(4, 'نسترن رضایی', 'مدیر توسعه کسب‌وکار', '09120000004', '02188000004', 'nastaran.rezaei@example.com', 0, NULL, 1, 'مسئول مذاکره چارچوب همکاری و مدل درآمدی.');
 
 INSERT INTO deals (id, deal_name, customer_id, product, vehicle_count, estimated_amount, probability, weighted_amount, deal_stage, expected_close_date, owner_user_id, win_loss_reason, notes) VALUES
 (1, 'استقرار سامانه FMS برای ناوگان آریا', 1, 'FMS', 180, 12500000000, 65, 8125000000, 'Negotiation', '2026-06-25', 1, '', 'پیشنهاد onCloud همراه با داشبورد مدیر ناوگان و گزارش مصرف سوخت ارائه شده است.'),
@@ -30,3 +30,7 @@ INSERT INTO activities (customer_id, deal_id, activity_date, activity_type, summ
 (2, 2, '2026-05-18', 'Proposal Sent', 'پیشنهاد اولیه پلتفرم خودروی متصل ارسال شد.', 'هماهنگی دمو فنی برای تیم محصول و IT', '2026-06-05', 1, 'Waiting', 'در جلسه بعدی باید سناریوی تبادل داده API مرور شود.'),
 (3, 3, '2026-05-23', 'Call', 'تماس اولیه با مدیر فروش نمایندگی انجام شد.', 'ارسال معرفی اپ مالک و بسته پیشنهادی فروش', '2026-06-02', 1, 'Open', 'مشتری نمونه صفحه وضعیت خودرو و اعلان سرویس دوره‌ای می‌خواهد.'),
 (4, 4, '2026-05-25', 'Email', 'معرفی API، داشبورد BI و مدل همکاری ارسال شد.', 'برگزاری جلسه مشترک فنی و تجاری', '2026-06-01', 1, 'Open', 'احتمال همکاری در پروژه‌های سازمانی مشترک وجود دارد.');
+
+INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, status, description, assigned_user_id) VALUES
+('TCK-1001', 1, 1, 'درخواست بررسی گزارش مصرف سوخت', 'Support', 'Normal', 'Open', 'در گزارش مصرف سوخت برخی خودروها داده روز گذشته دیده نمی‌شود. لطفا بررسی شود.', 1),
+('TCK-1002', 2, 2, 'درخواست جلسه آموزشی API', 'Training', 'High', 'In Progress', 'برای تیم فنی نیاز به یک جلسه آموزشی درباره endpointهای اصلی API داریم.', 1);

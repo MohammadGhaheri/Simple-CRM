@@ -3,6 +3,7 @@ CREATE DATABASE IF NOT EXISTS simple_crm CHARACTER SET utf8mb4 COLLATE utf8mb4_u
 USE simple_crm;
 
 DROP TABLE IF EXISTS activities;
+DROP TABLE IF EXISTS tickets;
 DROP TABLE IF EXISTS deals;
 DROP TABLE IF EXISTS contacts;
 DROP TABLE IF EXISTS customers;
@@ -48,11 +49,32 @@ CREATE TABLE contacts (
   mobile VARCHAR(40) NULL,
   phone VARCHAR(40) NULL,
   email VARCHAR(190) NULL,
+  portal_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  password_hash VARCHAR(255) NULL,
   is_primary TINYINT(1) NOT NULL DEFAULT 0,
   notes TEXT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_contacts_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE tickets (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  ticket_code VARCHAR(40) NOT NULL UNIQUE,
+  customer_id INT UNSIGNED NOT NULL,
+  contact_id INT UNSIGNED NOT NULL,
+  subject VARCHAR(190) NOT NULL,
+  category ENUM('Support','Request','Bug','Training','Billing','Other') NOT NULL DEFAULT 'Support',
+  priority ENUM('Low','Normal','High','Urgent') NOT NULL DEFAULT 'Normal',
+  status ENUM('Open','In Progress','Waiting Customer','Resolved','Closed') NOT NULL DEFAULT 'Open',
+  description TEXT NOT NULL,
+  response TEXT NULL,
+  assigned_user_id INT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_tickets_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tickets_contact FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tickets_assigned_user FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE deals (

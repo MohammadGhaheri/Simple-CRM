@@ -1,0 +1,143 @@
+<?php
+
+declare(strict_types=1);
+
+class Ticket
+{
+    public static function search(array $filters = []): array
+    {
+        $sql = 'SELECT t.*, c.customer_name, ct.contact_name, u.name AS assigned_name
+                FROM tickets t
+                JOIN customers c ON c.id = t.customer_id
+                JOIN contacts ct ON ct.id = t.contact_id
+                LEFT JOIN users u ON u.id = t.assigned_user_id
+                WHERE 1=1';
+        $params = [];
+        if (!empty($filters['q'])) {
+            $sql .= ' AND (t.ticket_code LIKE ? OR t.subject LIKE ? OR c.customer_name LIKE ? OR ct.contact_name LIKE ?)';
+            $q = '%' . $filters['q'] . '%';
+            array_push($params, $q, $q, $q, $q);
+        }
+        foreach (['status', 'priority', 'category'] as $field) {
+            if (!empty($filters[$field])) {
+                $sql .= " AND t.$field = ?";
+                $params[] = $filters[$field];
+            }
+        }
+        $sql .= ' ORDER BY t.updated_at DESC, t.id DESC';
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public static function byContact(int $contactId): array
+    {
+        $stmt = db()->prepare('SELECT * FROM tickets WHERE contact_id = ? ORDER BY updated_at DESC, id DESC');
+        $stmt->execute([$contactId]);
+        return $stmt->fetchAll();
+    }
+
+    public static function find(int $id): ?array
+    {
+        $stmt = db()->prepare('SELECT t.*, c.customer_name, ct.contact_name, u.name AS assigned_name
+            FROM tickets t
+            JOIN customers c ON c.id = t.customer_id
+            JOIN contacts ct ON ct.id = t.contact_id
+            LEFT JOIN users u ON u.id = t.assigned_user_id
+            WHERE t.id = ?');
+        $stmt->execute([$id]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public static function findForContact(int $id, int $contactId): ?array
+    {
+        $stmt = db()->prepare('SELECT * FROM tickets WHERE id = ? AND contact_id = ?');
+        $stmt->execute([$id, $contactId]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public static function createFromPortal(array $contact, array $data): int
+    {
+        $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description) VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description)';
+        db()->prepare($sql)->execute([
+            'ticket_code' => self::nextCode(),
+            'customer_id' => (int) $contact['customer_id'],
+            'contact_id' => (int) $contact['id'],
+            'subject' => trim($data['subject'] ?? ''),
+            'category' => self::validCategory($data['category'] ?? 'Support'),
+            'priority' => self::validPriority($data['priority'] ?? 'Normal'),
+            'description' => trim($data['description'] ?? ''),
+        ]);
+        return (int) db()->lastInsertId();
+    }
+
+    public static function update(int $id, array $data): void
+    {
+        $sql = 'UPDATE tickets SET status=:status, priority=:priority, category=:category, assigned_user_id=:assigned_user_id, response=:response WHERE id=:id';
+        db()->prepare($sql)->execute([
+            'status' => self::validStatus($data['status'] ?? 'Open'),
+            'priority' => self::validPriority($data['priority'] ?? 'Normal'),
+            'category' => self::validCategory($data['category'] ?? 'Support'),
+            'assigned_user_id' => !empty($data['assigned_user_id']) ? (int) $data['assigned_user_id'] : null,
+            'response' => trim($data['response'] ?? ''),
+            'id' => $id,
+        ]);
+    }
+
+    public static function statuses(): array
+    {
+        return ['Open', 'In Progress', 'Waiting Customer', 'Resolved', 'Closed'];
+    }
+
+    public static function priorities(): array
+    {
+        return ['Low', 'Normal', 'High', 'Urgent'];
+    }
+
+    public static function categories(): array
+    {
+        return ['Support', 'Request', 'Bug', 'Training', 'Billing', 'Other'];
+    }
+
+    public static function label(string $value): string
+    {
+        $labels = [
+            'Open' => 'باز',
+            'In Progress' => 'در حال بررسی',
+            'Waiting Customer' => 'در انتظار مشتری',
+            'Resolved' => 'حل شده',
+            'Closed' => 'بسته',
+            'Low' => 'کم',
+            'Normal' => 'عادی',
+            'High' => 'زیاد',
+            'Urgent' => 'فوری',
+            'Support' => 'پشتیبانی',
+            'Request' => 'درخواست',
+            'Bug' => 'خطا',
+            'Training' => 'آموزش',
+            'Billing' => 'مالی',
+            'Other' => 'سایر',
+        ];
+        return $labels[$value] ?? $value;
+    }
+
+    private static function nextCode(): string
+    {
+        return 'TCK-' . date('ymd') . '-' . random_int(1000, 9999);
+    }
+
+    private static function validStatus(string $value): string
+    {
+        return in_array($value, self::statuses(), true) ? $value : 'Open';
+    }
+
+    private static function validPriority(string $value): string
+    {
+        return in_array($value, self::priorities(), true) ? $value : 'Normal';
+    }
+
+    private static function validCategory(string $value): string
+    {
+        return in_array($value, self::categories(), true) ? $value : 'Support';
+    }
+}

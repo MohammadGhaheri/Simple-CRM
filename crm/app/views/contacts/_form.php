@@ -7,7 +7,13 @@
     <div><label>موبایل</label><input name="mobile" value="<?= e($contact['mobile'] ?? '') ?>"></div>
     <div><label>تلفن</label><input name="phone" value="<?= e($contact['phone'] ?? '') ?>"></div>
     <div><label>ایمیل</label><input type="email" name="email" value="<?= e($contact['email'] ?? '') ?>"></div>
+    <div>
+        <label>رمز پرتال مشتری</label>
+        <input type="password" name="portal_password" autocomplete="new-password">
+        <?php if (!empty($contact['password_hash'])): ?><span class="muted">برای حفظ رمز فعلی خالی بگذارید.</span><?php endif; ?>
+    </div>
 </div>
 <p><label><input type="checkbox" name="is_primary" value="1" <?= checked($contact['is_primary'] ?? false) ?> style="width:auto"> مخاطب اصلی</label></p>
+<p><label><input type="checkbox" name="portal_enabled" value="1" <?= checked($contact['portal_enabled'] ?? false) ?> style="width:auto"> دسترسی به پرتال مشتری فعال باشد</label></p>
 <div><label>یادداشت</label><textarea name="notes"><?= e($contact['notes'] ?? '') ?></textarea></div>
 <div class="form-actions"><button class="btn btn-primary">ذخیره</button><a class="btn btn-light" href="<?= e(url('customers')) ?>">انصراف</a></div>

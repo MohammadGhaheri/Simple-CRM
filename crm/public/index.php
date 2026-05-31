@@ -12,6 +12,7 @@ require __DIR__ . '/../app/models/Customer.php';
 require __DIR__ . '/../app/models/Contact.php';
 require __DIR__ . '/../app/models/Deal.php';
 require __DIR__ . '/../app/models/Activity.php';
+require __DIR__ . '/../app/models/Ticket.php';
 
 require_auth();
 
@@ -219,6 +220,9 @@ try {
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'contact_name' => 'نام مخاطب']);
+                if (!empty($_POST['portal_enabled']) && trim((string) ($_POST['portal_password'] ?? '')) === '') {
+                    $errors[] = 'برای فعال کردن پرتال، رمز عبور مخاطب الزامی است.';
+                }
                 if (!$errors) {
                     Contact::create($_POST);
                     redirect(url('customers', ['action' => 'show', 'id' => (int) $_POST['customer_id']]));
@@ -236,6 +240,9 @@ try {
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'contact_name' => 'نام مخاطب']);
+                if (!empty($_POST['portal_enabled']) && empty($contact['password_hash']) && trim((string) ($_POST['portal_password'] ?? '')) === '') {
+                    $errors[] = 'برای فعال کردن پرتال، رمز عبور مخاطب الزامی است.';
+                }
                 if (!$errors) {
                     Contact::update($id, $_POST);
                     redirect(url('customers', ['action' => 'show', 'id' => (int) $_POST['customer_id']]));
@@ -245,6 +252,35 @@ try {
             render('contacts/edit', ['title' => 'ویرایش مخاطب', 'contact' => $contact, 'customers' => Customer::search(), 'errors' => $errors]);
             exit;
         }
+        render('contacts/index', [
+            'title' => 'مخاطبین',
+            'contacts' => Contact::search($_GET),
+            'customers' => Customer::search(),
+            'filters' => $_GET,
+        ]);
+        exit;
+    }
+
+    if ($page === 'tickets') {
+        if ($action === 'edit') {
+            $ticket = Ticket::find($id);
+            if (!$ticket) {
+                redirect(url('tickets'));
+            }
+            if (is_post()) {
+                verify_csrf();
+                Ticket::update($id, $_POST);
+                redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
+            }
+            render('tickets/edit', ['title' => 'جزئیات تیکت', 'ticket' => $ticket, 'users' => $users]);
+            exit;
+        }
+        render('tickets/index', [
+            'title' => 'تیکت‌ها',
+            'tickets' => Ticket::search($_GET),
+            'filters' => $_GET,
+        ]);
+        exit;
     }
 
     if ($page === 'deals') {

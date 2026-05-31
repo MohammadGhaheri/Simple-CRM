@@ -10,8 +10,10 @@
         <a class="<?= ($page ?? '') === 'dashboard' ? 'active' : '' ?>" href="index.php">داشبورد</a>
         <a class="<?= ($page ?? '') === 'my_tasks' ? 'active' : '' ?>" href="<?= e(url('my_tasks')) ?>">برنامه من</a>
         <a class="<?= ($page ?? '') === 'customers' ? 'active' : '' ?>" href="<?= e(url('customers')) ?>">مشتریان</a>
+        <a class="<?= ($page ?? '') === 'contacts' ? 'active' : '' ?>" href="<?= e(url('contacts')) ?>">مخاطبین</a>
         <a class="<?= ($page ?? '') === 'deals' ? 'active' : '' ?>" href="<?= e(url('deals')) ?>">فرصت‌ها</a>
         <a class="<?= ($page ?? '') === 'activities' ? 'active' : '' ?>" href="<?= e(url('activities')) ?>">فعالیت‌ها</a>
+        <a class="<?= ($page ?? '') === 'tickets' ? 'active' : '' ?>" href="<?= e(url('tickets')) ?>">تیکت‌ها</a>
         <?php if (is_admin()): ?>
             <a class="<?= ($page ?? '') === 'users' ? 'active' : '' ?>" href="<?= e(url('users')) ?>">کاربران</a>
         <?php endif; ?>
