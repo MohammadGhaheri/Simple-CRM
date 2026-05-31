@@ -42,7 +42,7 @@ app/config/database.php
 
 ```php
 'host' => '127.0.0.1',
-'dbname' => 'mammut_connect_crm',
+'dbname' => 'simple_crm',
 'username' => 'root',
 'password' => '',
 ```
@@ -55,7 +55,7 @@ http://localhost/crm/public/login.php
 
 ## ورود پیش‌فرض
 
-- Email: `admin@mammutconnect.local`
+- Email: `admin@simple-crm.local`
 - Password: `Admin@12345`
 
 رمز در `seed.sql` فقط به صورت hash شده ذخیره شده است.

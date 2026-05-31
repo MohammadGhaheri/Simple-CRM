@@ -1,6 +1,6 @@
 SET NAMES utf8mb4;
-CREATE DATABASE IF NOT EXISTS mammut_connect_crm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE mammut_connect_crm;
+CREATE DATABASE IF NOT EXISTS simple_crm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE simple_crm;
 
 DROP TABLE IF EXISTS activities;
 DROP TABLE IF EXISTS deals;

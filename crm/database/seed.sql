@@ -2,16 +2,16 @@ SET NAMES utf8mb4;
 SET character_set_client = utf8mb4;
 SET character_set_connection = utf8mb4;
 SET character_set_results = utf8mb4;
-USE mammut_connect_crm;
+USE simple_crm;
 
 INSERT INTO users (id, name, email, password_hash, is_active) VALUES
-(1, 'مدیر سیستم', 'admin@mammutconnect.local', '$2y$10$MA2Q2PucE9mu9SvnsuoY.e96PJM.qzV/LHTxwMuFRJHqHX.xAAE3S', 1);
+(1, 'مدیر سیستم', 'admin@simple-crm.local', '$2y$10$MA2Q2PucE9mu9SvnsuoY.e96PJM.qzV/LHTxwMuFRJHqHX.xAAE3S', 1);
 
 INSERT INTO customers (id, customer_code, customer_name, customer_type, industry, city, lead_source, interested_product, vehicle_count, estimated_contract_value, sales_status, owner_user_id, last_followup_date, next_followup_date, notes) VALUES
-(1, 'MC-1001', 'ناوگان لجستیک آریا ترابر', 'B2B Fleet', 'حمل و نقل و پخش', 'تهران', 'نمایشگاه حمل و نقل و لجستیک', 'FMS', 180, 12500000000, 'Negotiation', 1, '2026-05-20', '2026-06-03', 'نیاز اصلی مشتری پایش لحظه‌ای ناوگان، کنترل مصرف سوخت، هشدار توقف غیرمجاز و گزارش رفتار راننده است.'),
-(2, 'MC-1002', 'گروه خودروسازی البرز موتور', 'OEM', 'خودروسازی', 'کرج', 'معرفی از واحد توسعه محصول', 'Connected Vehicle Platform', 5000, 85000000000, 'Proposal Sent', 1, '2026-05-18', '2026-06-05', 'در حال بررسی معماری پلتفرم خودروی متصل، نصب TBox و اتصال API به سامانه‌های داخلی خودروساز.'),
-(3, 'MC-1003', 'نمایندگی مرکزی شرق خودرو', 'B2D Dealer', 'فروش و خدمات پس از فروش', 'مشهد', 'فرم درخواست وب‌سایت', 'Owner App', 320, 6800000000, 'Contacted', 1, '2026-05-23', '2026-06-02', 'مشتری به اپلیکیشن مالک، اعلان وضعیت خودرو و سرویس‌های ارزش افزوده برای خریداران خودرو علاقه‌مند است.'),
-(4, 'MC-1004', 'همراه داده هوشمند ایرانیان', 'Strategic Partner', 'فناوری اطلاعات و تحلیل داده', 'تهران', 'شبکه همکاران راهبردی', 'API Integration', 0, 18000000000, 'Meeting Scheduled', 1, '2026-05-25', '2026-06-01', 'پتانسیل همکاری در یکپارچه‌سازی داده‌های تلماتیک، داشبورد BI و ارائه API به مشتریان سازمانی.');
+(1, 'SC-1001', 'ناوگان لجستیک آریا ترابر', 'B2B Fleet', 'حمل و نقل و پخش', 'تهران', 'نمایشگاه حمل و نقل و لجستیک', 'FMS', 180, 12500000000, 'Negotiation', 1, '2026-05-20', '2026-06-03', 'نیاز اصلی مشتری پایش لحظه‌ای ناوگان، کنترل مصرف سوخت، هشدار توقف غیرمجاز و گزارش رفتار راننده است.'),
+(2, 'SC-1002', 'گروه خودروسازی البرز موتور', 'OEM', 'خودروسازی', 'کرج', 'معرفی از واحد توسعه محصول', 'Connected Vehicle Platform', 5000, 85000000000, 'Proposal Sent', 1, '2026-05-18', '2026-06-05', 'در حال بررسی معماری پلتفرم خودروی متصل، نصب TBox و اتصال API به سامانه‌های داخلی خودروساز.'),
+(3, 'SC-1003', 'نمایندگی مرکزی شرق خودرو', 'B2D Dealer', 'فروش و خدمات پس از فروش', 'مشهد', 'فرم درخواست وب‌سایت', 'Owner App', 320, 6800000000, 'Contacted', 1, '2026-05-23', '2026-06-02', 'مشتری به اپلیکیشن مالک، اعلان وضعیت خودرو و سرویس‌های ارزش افزوده برای خریداران خودرو علاقه‌مند است.'),
+(4, 'SC-1004', 'همراه داده هوشمند ایرانیان', 'Strategic Partner', 'فناوری اطلاعات و تحلیل داده', 'تهران', 'شبکه همکاران راهبردی', 'API Integration', 0, 18000000000, 'Meeting Scheduled', 1, '2026-05-25', '2026-06-01', 'پتانسیل همکاری در یکپارچه‌سازی داده‌های تلماتیک، داشبورد BI و ارائه API به مشتریان سازمانی.');
 
 INSERT INTO contacts (customer_id, contact_name, position, mobile, phone, email, is_primary, notes) VALUES
 (1, 'رضا محمدی', 'مدیر عملیات ناوگان', '09120000001', '02144000001', 'reza.mohammadi@example.com', 1, 'تصمیم‌گیر اصلی برای نیازهای عملیاتی ناوگان.'),

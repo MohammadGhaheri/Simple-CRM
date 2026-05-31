@@ -2,11 +2,11 @@ SET NAMES utf8mb4;
 SET character_set_client = utf8mb4;
 SET character_set_connection = utf8mb4;
 SET character_set_results = utf8mb4;
-USE mammut_connect_crm;
+USE simple_crm;
 
 UPDATE users
 SET name = 'مدیر سیستم'
-WHERE id = 1 AND email = 'admin@mammutconnect.local';
+WHERE id = 1 AND email = 'admin@simple-crm.local';
 
 UPDATE customers SET
   customer_name = 'ناوگان لجستیک آریا ترابر',
@@ -14,7 +14,7 @@ UPDATE customers SET
   city = 'تهران',
   lead_source = 'نمایشگاه حمل و نقل و لجستیک',
   notes = 'نیاز اصلی مشتری پایش لحظه‌ای ناوگان، کنترل مصرف سوخت، هشدار توقف غیرمجاز و گزارش رفتار راننده است.'
-WHERE customer_code = 'MC-1001';
+WHERE customer_code = 'SC-1001';
 
 UPDATE customers SET
   customer_name = 'گروه خودروسازی البرز موتور',
@@ -22,7 +22,7 @@ UPDATE customers SET
   city = 'کرج',
   lead_source = 'معرفی از واحد توسعه محصول',
   notes = 'در حال بررسی معماری پلتفرم خودروی متصل، نصب TBox و اتصال API به سامانه‌های داخلی خودروساز.'
-WHERE customer_code = 'MC-1002';
+WHERE customer_code = 'SC-1002';
 
 UPDATE customers SET
   customer_name = 'نمایندگی مرکزی شرق خودرو',
@@ -30,7 +30,7 @@ UPDATE customers SET
   city = 'مشهد',
   lead_source = 'فرم درخواست وب‌سایت',
   notes = 'مشتری به اپلیکیشن مالک، اعلان وضعیت خودرو و سرویس‌های ارزش افزوده برای خریداران خودرو علاقه‌مند است.'
-WHERE customer_code = 'MC-1003';
+WHERE customer_code = 'SC-1003';
 
 UPDATE customers SET
   customer_name = 'همراه داده هوشمند ایرانیان',
@@ -38,7 +38,7 @@ UPDATE customers SET
   city = 'تهران',
   lead_source = 'شبکه همکاران راهبردی',
   notes = 'پتانسیل همکاری در یکپارچه‌سازی داده‌های تلماتیک، داشبورد BI و ارائه API به مشتریان سازمانی.'
-WHERE customer_code = 'MC-1004';
+WHERE customer_code = 'SC-1004';
 
 UPDATE contacts SET position = 'مدیر عملیات ناوگان', notes = 'تصمیم‌گیر اصلی برای نیازهای عملیاتی ناوگان.' WHERE customer_id = 1;
 UPDATE contacts SET position = 'مدیر محصول خودروهای متصل', notes = 'هماهنگ‌کننده جلسه‌های فنی با تیم نرم‌افزار و سخت‌افزار.' WHERE customer_id = 2;
