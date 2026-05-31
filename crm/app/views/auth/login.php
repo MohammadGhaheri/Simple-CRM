@@ -3,16 +3,16 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ورود به Mammut Connect CRM</title>
+    <title>ورود به Simple CRM</title>
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="login-page">
     <form class="login-card" method="post">
         <?= csrf_field() ?>
         <div class="brand login-brand">
-            <div class="brand-mark">MC</div>
+            <div class="brand-mark">SC</div>
             <div>
-                <strong>ماموت کانکت</strong>
+                <strong>Simple CRM</strong>
                 <span>ورود به CRM</span>
             </div>
         </div>

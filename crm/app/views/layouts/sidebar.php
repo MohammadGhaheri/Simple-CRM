@@ -1,9 +1,9 @@
 <aside class="sidebar">
     <div class="brand">
-        <div class="brand-mark">MC</div>
+        <div class="brand-mark">SC</div>
         <div>
-            <strong>ماموت کانکت</strong>
-            <span>CRM فروش</span>
+            <strong>Simple CRM</strong>
+            <span>مدیریت فروش</span>
         </div>
     </div>
     <nav>
