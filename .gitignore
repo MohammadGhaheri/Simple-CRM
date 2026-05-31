@@ -20,3 +20,6 @@ crm/public/uploads/settings/*
 
 # Local PHP CLI sessions
 sess_*
+
+# Installer runtime lock
+crm/database/install.lock

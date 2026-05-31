@@ -446,6 +446,31 @@ tr:last-child td { border-bottom: 0; }
   margin: 0;
   font-size: 26px;
 }
+.install-shell {
+  width: min(1120px, 100%);
+  grid-template-columns: .82fr 1.18fr;
+}
+.install-card {
+  overflow-y: auto;
+  max-height: calc(100vh - 56px);
+}
+.install-card h3 {
+  margin: 22px 0 14px;
+  font-size: 16px;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  color: var(--text);
+}
+.check-row input {
+  width: auto;
+}
+.danger-check {
+  color: var(--danger);
+}
 .hint { color: var(--muted); font-size: 12px; text-align: center; }
 .portal-shell { min-height: 100vh; }
 .portal-topbar {

@@ -19,11 +19,27 @@
 
 ## نصب با XAMPP یا Laragon
 
+### روش پیشنهادی: نصب‌کننده تحت وب
+
 1. پوشه `crm` را داخل مسیر وب‌سرور قرار دهید.
    - XAMPP: `C:\xampp\htdocs\crm`
    - Laragon: `C:\laragon\www\crm`
 
-2. MySQL را اجرا کنید و فایل‌های دیتابیس را وارد کنید:
+2. Apache و MySQL را اجرا کنید.
+
+3. نصب‌کننده را باز کنید:
+
+```text
+http://localhost/crm/public/install.php
+```
+
+4. اطلاعات دیتابیس، حساب مدیر سیستم و تنظیمات ظاهری اولیه را وارد کنید.
+
+5. بعد از نصب، فایل `database/install.lock` ساخته می‌شود و نصب‌کننده غیرفعال خواهد شد.
+
+### روش دستی
+
+اگر نصب دستی می‌خواهید، MySQL را اجرا کنید و فایل‌های دیتابیس را وارد کنید:
 
 ```sql
 SOURCE C:/xampp/htdocs/crm/database/schema.sql;
@@ -36,7 +52,7 @@ SOURCE C:/xampp/htdocs/crm/database/seed.sql;
 2. فایل `database/schema.sql` را Import کنید.
 3. سپس فایل `database/seed.sql` را Import کنید.
 
-3. اگر نام کاربری یا رمز MySQL شما متفاوت است، فایل زیر را تغییر دهید:
+اگر نام کاربری یا رمز MySQL شما متفاوت است، فایل زیر را تغییر دهید:
 
 ```text
 app/config/database.php
