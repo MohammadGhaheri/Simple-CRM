@@ -9,14 +9,14 @@
     <div class="card">
         <h3>لاگین کاربران داخلی</h3>
         <?php foreach ($userLogins as $row): ?>
-            <p><strong><?= e($row['name']) ?></strong><br><span class="muted">تعداد: <?= e((string) $row['total']) ?> | آخرین ورود: <?= e($row['last_login']) ?></span></p>
+            <p><strong><?= e($row['name']) ?></strong><br><span class="muted">تعداد: <?= e((string) $row['total']) ?> | آخرین ورود: <?= e(fa_datetime($row['last_login'])) ?></span></p>
         <?php endforeach; ?>
         <?php if (!$userLogins): ?><div class="empty">هنوز لاگینی ثبت نشده است.</div><?php endif; ?>
     </div>
     <div class="card">
         <h3>لاگین مخاطبین مشتری</h3>
         <?php foreach ($contactLogins as $row): ?>
-            <p><strong><?= e($row['name']) ?></strong><br><span class="muted">تعداد: <?= e((string) $row['total']) ?> | آخرین ورود: <?= e($row['last_login']) ?></span></p>
+            <p><strong><?= e($row['name']) ?></strong><br><span class="muted">تعداد: <?= e((string) $row['total']) ?> | آخرین ورود: <?= e(fa_datetime($row['last_login'])) ?></span></p>
         <?php endforeach; ?>
         <?php if (!$contactLogins): ?><div class="empty">هنوز لاگینی ثبت نشده است.</div><?php endif; ?>
     </div>

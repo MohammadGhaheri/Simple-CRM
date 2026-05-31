@@ -9,7 +9,7 @@
         <div class="detail-list">
             <div><span>مشتری</span><?= e($ticket['customer_name']) ?></div>
             <div><span>مخاطب</span><?= e($ticket['contact_name']) ?></div>
-            <div><span>ایجاد</span><?= e($ticket['created_at']) ?></div>
+            <div><span>ایجاد</span><?= e(fa_datetime($ticket['created_at'])) ?></div>
             <div><span>دسته</span><?= e(Ticket::label($ticket['category'])) ?></div>
             <div><span>اولویت</span><?= e(Ticket::label($ticket['priority'])) ?></div>
             <div><span>وضعیت</span><?= e(Ticket::label($ticket['status'])) ?></div>

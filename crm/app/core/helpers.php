@@ -177,6 +177,21 @@ function fa_date(?string $gregorianDate): string
     return sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
 }
 
+function fa_datetime(?string $gregorianDateTime): string
+{
+    if (!$gregorianDateTime) {
+        return '';
+    }
+
+    $date = fa_date($gregorianDateTime);
+    $time = '';
+    if (preg_match('/\b(\d{2}:\d{2})(?::\d{2})?\b/', $gregorianDateTime, $matches)) {
+        $time = $matches[1];
+    }
+
+    return trim($date . ($time !== '' ? ' ساعت ' . $time : ''));
+}
+
 function db_date(?string $input): ?string
 {
     $input = trim(normalize_digits((string) $input));

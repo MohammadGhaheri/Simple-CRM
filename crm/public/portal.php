@@ -197,6 +197,8 @@ if ($action === 'ticket') {
                 <div><span>وضعیت</span><?= e(Ticket::label($ticket['status'])) ?></div>
                 <div><span>اولویت</span><?= e(Ticket::label($ticket['priority'])) ?></div>
                 <div><span>دسته</span><?= e(Ticket::label($ticket['category'])) ?></div>
+                <div><span>ایجاد</span><?= e(fa_datetime($ticket['created_at'])) ?></div>
+                <div><span>آخرین تغییر</span><?= e(fa_datetime($ticket['updated_at'])) ?></div>
             </div>
             <h3>شرح درخواست</h3>
             <p><?= nl2br(e($ticket['description'])) ?></p>
@@ -228,7 +230,7 @@ portal_layout('داشبورد', function () use ($tickets) {
                     <td><?= e(Ticket::label($ticket['category'])) ?></td>
                     <td><?= e(Ticket::label($ticket['priority'])) ?></td>
                     <td><span class="badge badge-info"><?= e(Ticket::label($ticket['status'])) ?></span></td>
-                    <td><?= e($ticket['updated_at']) ?></td>
+                    <td><?= e(fa_datetime($ticket['updated_at'])) ?></td>
                     <td><a class="btn btn-small btn-light" href="portal.php?action=ticket&id=<?= e((string) $ticket['id']) ?>">نمایش</a></td>
                 </tr>
             <?php endforeach; ?>
