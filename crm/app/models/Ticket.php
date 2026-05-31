@@ -84,6 +84,11 @@ class Ticket
         ]);
     }
 
+    public static function needsReviewCount(): int
+    {
+        return (int) db()->query("SELECT COUNT(*) FROM tickets WHERE status NOT IN ('Resolved','Closed')")->fetchColumn();
+    }
+
     public static function statuses(): array
     {
         return ['Open', 'In Progress', 'Waiting Customer', 'Resolved', 'Closed'];
