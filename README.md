@@ -53,27 +53,23 @@
 
 ## نصب سریع با نصب‌کننده
 
-1. پروژه را داخل مسیر وب‌سرور قرار دهید.
+1. فایل‌های پروژه را روی هاست یا سرور خود آپلود کنید.
 
-برای XAMPP:
-
-```text
-C:\xampp\htdocs\crm
-```
-
-برای Laragon:
+پوشه `crm/public` باید به عنوان document root وب‌سایت یا ساب‌دامین تنظیم شود. اگر هاست شما اجازه تنظیم document root نمی‌دهد، می‌توانید پروژه را در یک پوشه مثل `crm` قرار دهید و آدرس نصب را از همان مسیر باز کنید.
 
 ```text
-C:\laragon\www\crm
+https://your-domain.com/install.php
 ```
 
-2. Apache و MySQL را اجرا کنید.
-
-3. نصب‌کننده را باز کنید:
+یا اگر پروژه داخل پوشه `crm` قرار گرفته است:
 
 ```text
-http://localhost/crm/public/install.php
+https://your-domain.com/crm/public/install.php
 ```
+
+2. مطمئن شوید PHP 8+ و MySQL/MariaDB روی سرور فعال است.
+
+3. نصب‌کننده را در مرورگر باز کنید.
 
 4. اطلاعات دیتابیس، حساب مدیر سیستم و تنظیمات اولیه سامانه را وارد کنید.
 
@@ -87,27 +83,37 @@ crm/database/install.lock
 
 برای اجرای دوباره نصب در محیط امن، این فایل را حذف کنید.
 
-## اجرای محلی با PHP Built-in Server
+## نصب روی هاست اشتراکی
 
-اگر نمی‌خواهید پروژه را داخل `htdocs` قرار دهید، می‌توانید از داخل ریشه repository این دستور را اجرا کنید:
+اگر از هاست اشتراکی استفاده می‌کنید:
 
-```powershell
-C:\xampp\php\php.exe -S 127.0.0.1:8000 -t C:\Users\moham\Documents\MammutConnectCRM\crm\public
-```
+- محتوای پروژه را در مسیر دلخواه آپلود کنید.
+- اگر امکان تنظیم document root دارید، آن را روی `crm/public` بگذارید.
+- اگر امکان تنظیم document root ندارید، آدرس‌های سامانه از مسیر `crm/public` در دسترس خواهند بود.
+- فایل `crm/app/config/database.php` خارج از مسیر public قرار دارد و مستقیما از وب قابل دسترسی نیست.
 
-سپس آدرس زیر را باز کنید:
+## نصب روی سرور اختصاصی یا VPS
+
+برای Apache یا Nginx، document root دامنه یا ساب‌دامین را روی مسیر زیر تنظیم کنید:
 
 ```text
-http://127.0.0.1:8000/login.php
+crm/public
 ```
+
+بعد از نصب، آدرس‌های اصلی به شکل زیر خواهند بود:
+
+- صفحه خانه: `https://your-domain.com/home.php`
+- ورود کاربران داخلی: `https://your-domain.com/login.php`
+- پرتال مشتری: `https://your-domain.com/portal.php`
+- نصب اولیه: `https://your-domain.com/install.php`
 
 ## نصب دستی دیتابیس
 
 اگر نمی‌خواهید از نصب‌کننده استفاده کنید، فایل‌های SQL را به ترتیب import کنید:
 
 ```sql
-SOURCE C:/xampp/htdocs/crm/database/schema.sql;
-SOURCE C:/xampp/htdocs/crm/database/seed.sql;
+SOURCE /path/to/crm/database/schema.sql;
+SOURCE /path/to/crm/database/seed.sql;
 ```
 
 یا از phpMyAdmin:
@@ -125,7 +131,7 @@ crm/app/config/database.php
 
 ```php
 return [
-    'host' => '127.0.0.1',
+    'host' => 'your-db-host',
     'port' => 3306,
     'dbname' => 'simple_crm',
     'username' => 'root',
@@ -139,7 +145,7 @@ return [
 اگر هنگام نصب، داده نمونه ساخته‌اید یا از `seed.sql` استفاده کرده‌اید و بعدا خواستید داده‌های نمونه را حذف کنید، فایل زیر را در phpMyAdmin یا MySQL اجرا کنید:
 
 ```sql
-SOURCE C:/xampp/htdocs/crm/database/remove_sample_data.sql;
+SOURCE /path/to/crm/database/remove_sample_data.sql;
 ```
 
 این فایل فقط مشتریان نمونه با کدهای `ELM-1001`, `ELM-1002`, `SC-1001`, `SC-1002`, `SC-1003`, `SC-1004` و اطلاعات وابسته به آن‌ها را حذف می‌کند. حساب مدیر و تنظیمات سامانه باقی می‌ماند.
@@ -160,7 +166,7 @@ Password: Admin@12345
 مخاطب‌هایی که دسترسی پرتال برای آن‌ها فعال شده باشد، می‌توانند از مسیر زیر وارد شوند:
 
 ```text
-http://localhost/crm/public/portal.php
+https://your-domain.com/portal.php
 ```
 
 حساب نمونه پرتال:
@@ -203,7 +209,7 @@ Password: Contact@12345
 برای خلاصه روزانه، فایل زیر را با Task Scheduler ویندوز یا cron سرور اجرا کنید:
 
 ```text
-php C:\xampp\htdocs\crm\cron\daily_summary.php
+php /path/to/crm/cron/daily_summary.php
 ```
 
 ## ساختار پروژه

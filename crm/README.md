@@ -17,20 +17,28 @@
 - ذخیره تاریخ‌ها به صورت میلادی در MySQL
 - بدون Laravel یا فریم‌ورک سنگین
 
-## نصب با XAMPP یا Laragon
+## نصب روی هاست یا سرور
 
 ### روش پیشنهادی: نصب‌کننده تحت وب
 
-1. پوشه `crm` را داخل مسیر وب‌سرور قرار دهید.
-   - XAMPP: `C:\xampp\htdocs\crm`
-   - Laragon: `C:\laragon\www\crm`
+1. فایل‌های پروژه را روی هاست یا سرور خود آپلود کنید.
 
-2. Apache و MySQL را اجرا کنید.
+2. در حالت پیشنهادی، document root دامنه یا ساب‌دامین را روی پوشه زیر تنظیم کنید:
+
+```text
+crm/public
+```
 
 3. نصب‌کننده را باز کنید:
 
 ```text
-http://localhost/crm/public/install.php
+https://your-domain.com/install.php
+```
+
+اگر document root قابل تنظیم نیست، ممکن است آدرس نصب به شکل زیر باشد:
+
+```text
+https://your-domain.com/crm/public/install.php
 ```
 
 4. اطلاعات دیتابیس، حساب مدیر سیستم و تنظیمات ظاهری اولیه را وارد کنید.
@@ -42,8 +50,8 @@ http://localhost/crm/public/install.php
 اگر نصب دستی می‌خواهید، MySQL را اجرا کنید و فایل‌های دیتابیس را وارد کنید:
 
 ```sql
-SOURCE C:/xampp/htdocs/crm/database/schema.sql;
-SOURCE C:/xampp/htdocs/crm/database/seed.sql;
+SOURCE /path/to/crm/database/schema.sql;
+SOURCE /path/to/crm/database/seed.sql;
 ```
 
 یا از phpMyAdmin:
@@ -61,7 +69,7 @@ app/config/database.php
 تنظیم پیش‌فرض:
 
 ```php
-'host' => '127.0.0.1',
+'host' => 'your-db-host',
 'dbname' => 'simple_crm',
 'username' => 'root',
 'password' => '',
@@ -70,7 +78,7 @@ app/config/database.php
 4. پروژه را باز کنید:
 
 ```text
-http://localhost/crm/public/home.php
+https://your-domain.com/home.php
 ```
 
 ## ورود پیش‌فرض
@@ -85,7 +93,7 @@ http://localhost/crm/public/home.php
 مخاطب‌هایی که دسترسی پرتال برای آن‌ها فعال شده باشد می‌توانند از مسیر زیر وارد شوند:
 
 ```text
-http://localhost/crm/public/portal.php
+https://your-domain.com/portal.php
 ```
 
 حساب نمونه پرتال:
@@ -112,7 +120,7 @@ Contact@12345
 برای ارسال خلاصه روزانه CRM و تیکت‌ها به مدیر، فایل زیر را روزانه با Task Scheduler ویندوز یا cron سرور اجرا کنید:
 
 ```text
-php C:\xampp\htdocs\crm\cron\daily_summary.php
+php /path/to/crm/cron/daily_summary.php
 ```
 
 ## ساختار پروژه
