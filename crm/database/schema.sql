@@ -1,4 +1,8 @@
 SET NAMES utf8mb4;
+-- Elm Simple CRM
+-- Author: Mohammad Ghaheri Najafabadi
+-- Email: mohammad.ghaheri@gmail.com
+
 CREATE DATABASE IF NOT EXISTS simple_crm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE simple_crm;
 

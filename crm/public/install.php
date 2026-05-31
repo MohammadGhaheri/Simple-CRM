@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/*
+ * Elm Simple CRM
+ * Author: Mohammad Ghaheri Najafabadi
+ * Email: mohammad.ghaheri@gmail.com
+ */
+
 session_start();
 
 $rootPath = dirname(__DIR__);

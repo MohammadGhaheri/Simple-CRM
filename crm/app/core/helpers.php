@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/*
+ * Elm Simple CRM core helpers
+ * Author: Mohammad Ghaheri Najafabadi
+ * Email: mohammad.ghaheri@gmail.com
+ */
+
 function db(): PDO
 {
     static $pdo = null;
