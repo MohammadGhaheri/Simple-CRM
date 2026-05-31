@@ -1,0 +1,10 @@
+/.idea/
+/.vscode/
+*.log
+*.tmp
+Thumbs.db
+.DS_Store
+
+# Local environment overrides
+.env
+crm/app/config/database.local.php
