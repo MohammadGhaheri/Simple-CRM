@@ -27,6 +27,7 @@ $page = $_GET['page'] ?? 'dashboard';
 $action = $_GET['action'] ?? 'index';
 $id = (int) ($_GET['id'] ?? 0);
 $errors = [];
+$notice = '';
 $users = User::all();
 
 function render(string $view, array $data = []): void
@@ -143,21 +144,41 @@ try {
                     'sms_default_assigned_user_id' => trim($_POST['sms_default_assigned_user_id'] ?? ''),
                     'portal_public_url' => trim($_POST['portal_public_url'] ?? ''),
                     'email_enabled' => isset($_POST['email_enabled']) ? '1' : '0',
+                    'email_transport' => ($_POST['email_transport'] ?? 'mail') === 'smtp' ? 'smtp' : 'mail',
                     'email_from_name' => trim($_POST['email_from_name'] ?? ''),
                     'email_from_address' => trim($_POST['email_from_address'] ?? ''),
+                    'email_smtp_host' => trim($_POST['email_smtp_host'] ?? ''),
+                    'email_smtp_port' => trim($_POST['email_smtp_port'] ?? '587'),
+                    'email_smtp_username' => trim($_POST['email_smtp_username'] ?? ''),
+                    'email_smtp_password' => trim($_POST['email_smtp_password'] ?? ''),
+                    'email_smtp_encryption' => in_array(($_POST['email_smtp_encryption'] ?? 'tls'), ['none', 'ssl', 'tls'], true) ? $_POST['email_smtp_encryption'] : 'tls',
+                    'email_test_recipient' => trim($_POST['email_test_recipient'] ?? ''),
                     'email_portal_credentials_enabled' => isset($_POST['email_portal_credentials_enabled']) ? '1' : '0',
                     'email_ticket_answered_enabled' => isset($_POST['email_ticket_answered_enabled']) ? '1' : '0',
                     'email_activity_reminder_enabled' => isset($_POST['email_activity_reminder_enabled']) ? '1' : '0',
                     'email_portal_credentials_subject' => trim($_POST['email_portal_credentials_subject'] ?? ''),
                     'email_portal_credentials_template' => trim($_POST['email_portal_credentials_template'] ?? ''),
                 ]);
-                redirect(url('settings'));
+                if (isset($_POST['send_test_email'])) {
+                    $recipient = trim($_POST['email_test_recipient'] ?? '');
+                    if ($recipient === '') {
+                        throw new RuntimeException('برای ارسال ایمیل تست، گیرنده تست را وارد کنید.');
+                    }
+                    $sent = EmailService::send($recipient, 'تست ارسال ایمیل Elm Simple CRM', "سلام\nاین یک ایمیل تست از Elm Simple CRM است.");
+                    if (!$sent) {
+                        throw new RuntimeException('ارسال ایمیل تست ناموفق بود. لاگ ایمیل را بررسی کنید.');
+                    }
+                    $notice = 'ایمیل تست با موفقیت ارسال شد.';
+                    $settings = Setting::all();
+                } else {
+                    redirect(url('settings'));
+                }
             } catch (RuntimeException $e) {
                 $errors[] = $e->getMessage();
                 $settings = array_merge($settings, $_POST);
             }
         }
-        render('settings/index', ['title' => 'تنظیمات سامانه', 'settings' => $settings, 'users' => $users, 'errors' => $errors]);
+        render('settings/index', ['title' => 'تنظیمات سامانه', 'settings' => $settings, 'users' => $users, 'errors' => $errors, 'notice' => $notice]);
         exit;
     }
 

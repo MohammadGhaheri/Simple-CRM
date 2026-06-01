@@ -300,6 +300,32 @@ tr:last-child td { border-bottom: 0; }
 .alert { padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; }
 .alert-danger { background: #fee2e2; color: var(--danger); }
 .alert-info { background: #e0f2fe; color: var(--info); }
+.alert-success { background: #dcfce7; color: var(--success); }
+
+.settings-group-title {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  background: #f8fafc;
+}
+.settings-group-title.advanced {
+  margin-top: 28px;
+  background: #fff7ed;
+}
+.settings-group-title span {
+  display: block;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+.settings-group-title small,
+.section-subtitle {
+  color: var(--muted);
+}
+.section-subtitle {
+  margin: 18px 0 10px;
+}
 
 .detail-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .detail-list div { background: #f9fafb; border-radius: 8px; padding: 12px; }

@@ -1,7 +1,12 @@
 <?php if (!empty($errors)): ?><div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
+<?php if (!empty($notice)): ?><div class="alert alert-success"><?= e($notice) ?></div><?php endif; ?>
 
 <form class="card" method="post" enctype="multipart/form-data">
     <?= csrf_field() ?>
+    <div class="settings-group-title">
+        <span>تنظیمات پایه</span>
+        <small>مواردی که معمولا برای راه‌اندازی و کار روزانه کافی هستند.</small>
+    </div>
     <h2>تنظیمات عمومی</h2>
     <div class="grid grid-2">
         <div><label class="required">عنوان سامانه</label><input required name="app_title" value="<?= e($settings['app_title'] ?? '') ?>"></div>
@@ -49,6 +54,11 @@
         <div><label>دسته‌بندی تیکت</label><textarea name="options_ticket_categories"><?= e($settings['options_ticket_categories'] ?? '') ?></textarea></div>
     </div>
 
+    <div class="settings-group-title advanced">
+        <span>تنظیمات پیشرفته</span>
+        <small>اتصال‌ها، پیام‌رسانی، قالب‌ها و ابزارهای مدیریتی.</small>
+    </div>
+
     <h2 style="margin-top:22px">تنظیمات پیامک sms.ir</h2>
     <div class="grid grid-2">
         <div><label>توکن API</label><input name="sms_api_key" value="<?= e($settings['sms_api_key'] ?? '') ?>"></div>
@@ -78,9 +88,32 @@
 
     <h2 style="margin-top:22px">تنظیمات ایمیل</h2>
     <div class="grid grid-2">
+        <div>
+            <label>روش ارسال ایمیل</label>
+            <select name="email_transport">
+                <option value="mail" <?= selected($settings['email_transport'] ?? 'mail', 'mail') ?>>PHP mail</option>
+                <option value="smtp" <?= selected($settings['email_transport'] ?? 'mail', 'smtp') ?>>SMTP</option>
+            </select>
+        </div>
         <div><label>نام فرستنده</label><input name="email_from_name" value="<?= e($settings['email_from_name'] ?? '') ?>"></div>
         <div><label>ایمیل فرستنده</label><input type="email" name="email_from_address" value="<?= e($settings['email_from_address'] ?? '') ?>"></div>
+        <div><label>گیرنده ایمیل تست</label><input type="email" name="email_test_recipient" value="<?= e($settings['email_test_recipient'] ?? '') ?>"></div>
         <div><label>عنوان ایمیل اطلاعات ورود پرتال</label><input name="email_portal_credentials_subject" value="<?= e($settings['email_portal_credentials_subject'] ?? '') ?>"></div>
+    </div>
+    <h3 class="section-subtitle">SMTP</h3>
+    <div class="grid grid-2">
+        <div><label>SMTP Host</label><input name="email_smtp_host" placeholder="mail.example.com" value="<?= e($settings['email_smtp_host'] ?? '') ?>"></div>
+        <div><label>SMTP Port</label><input name="email_smtp_port" inputmode="numeric" placeholder="587" value="<?= e($settings['email_smtp_port'] ?? '587') ?>"></div>
+        <div><label>SMTP Username</label><input name="email_smtp_username" value="<?= e($settings['email_smtp_username'] ?? '') ?>"></div>
+        <div><label>SMTP Password</label><input type="password" name="email_smtp_password" value="<?= e($settings['email_smtp_password'] ?? '') ?>"></div>
+        <div>
+            <label>Encryption</label>
+            <select name="email_smtp_encryption">
+                <option value="tls" <?= selected($settings['email_smtp_encryption'] ?? 'tls', 'tls') ?>>TLS</option>
+                <option value="ssl" <?= selected($settings['email_smtp_encryption'] ?? 'tls', 'ssl') ?>>SSL</option>
+                <option value="none" <?= selected($settings['email_smtp_encryption'] ?? 'tls', 'none') ?>>بدون رمزنگاری</option>
+            </select>
+        </div>
     </div>
     <p><label><input type="checkbox" name="email_enabled" value="1" <?= checked(($settings['email_enabled'] ?? '0') === '1') ?> style="width:auto"> فعال‌سازی ارسال ایمیل</label></p>
     <p><label><input type="checkbox" name="email_portal_credentials_enabled" value="1" <?= checked(($settings['email_portal_credentials_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال ایمیل اطلاعات ورود پرتال برای مخاطب</label></p>
@@ -92,7 +125,10 @@
         <p class="muted">Placeholderهای قابل استفاده: <code>{app_title}</code>، <code>{contact_name}</code>، <code>{customer_name}</code>، <code>{email}</code>، <code>{password}</code>، <code>{portal_url}</code></p>
     </div>
 
-    <div class="form-actions"><button class="btn btn-primary">ذخیره تنظیمات</button></div>
+    <div class="form-actions">
+        <button class="btn btn-primary">ذخیره تنظیمات</button>
+        <button class="btn btn-light" name="send_test_email" value="1">ذخیره و ارسال ایمیل تست</button>
+    </div>
 </form>
 
 <div class="grid grid-2" style="margin-top:16px">

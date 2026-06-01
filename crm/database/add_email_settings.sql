@@ -13,8 +13,15 @@ CREATE TABLE IF NOT EXISTS email_logs (
 
 INSERT INTO app_settings (setting_key, setting_value) VALUES
 ('email_enabled', '0'),
+('email_transport', 'mail'),
 ('email_from_name', 'Elm Simple CRM'),
 ('email_from_address', ''),
+('email_smtp_host', ''),
+('email_smtp_port', '587'),
+('email_smtp_username', ''),
+('email_smtp_password', ''),
+('email_smtp_encryption', 'tls'),
+('email_test_recipient', ''),
 ('email_portal_credentials_enabled', '1'),
 ('email_ticket_answered_enabled', '1'),
 ('email_activity_reminder_enabled', '1'),
