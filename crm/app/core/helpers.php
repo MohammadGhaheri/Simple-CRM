@@ -270,7 +270,7 @@ function option_pairs(string $key): array
 {
     $raw = class_exists('Setting') ? Setting::get($key) : '';
     $pairs = [];
-    foreach (preg_split('/\R/', trim($raw)) ?: [] as $line) {
+    foreach (preg_split('/\r\n|\r|\n/u', trim($raw)) ?: [] as $line) {
         $line = trim($line);
         if ($line === '') {
             continue;
