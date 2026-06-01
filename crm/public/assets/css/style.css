@@ -261,6 +261,8 @@ textarea { min-height: 96px; resize: vertical; }
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-primary:hover { background: var(--primary-dark); }
 .btn-light { background: #eef2f7; color: #263241; }
+.btn-portal { background: #0f766e; color: #fff; }
+.btn-portal:hover { background: #115e59; }
 .btn-danger { background: #fee4e2; color: var(--danger); }
 .btn-small { padding: 6px 9px; font-size: 12px; }
 .full { width: 100%; }
@@ -434,6 +436,14 @@ tr:last-child td { border-bottom: 0; }
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+.auth-card > input,
+.auth-card > select,
+.auth-card > textarea {
+  margin-bottom: 16px;
+}
+.auth-card > .btn.full {
+  margin-top: 4px;
 }
 .auth-card-head { margin-bottom: 26px; }
 .auth-card-head span {

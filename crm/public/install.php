@@ -81,6 +81,20 @@ function table_exists(PDO $pdo, string $databaseName, string $tableName): bool
     return (int) $stmt->fetchColumn() > 0;
 }
 
+function normalize_database_charset(PDO $pdo, string $databaseName): void
+{
+    $pdo->exec("ALTER DATABASE `$databaseName` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+    $stmt = $pdo->prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'");
+    $stmt->execute([$databaseName]);
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $tableName) {
+        if (!is_string($tableName) || !preg_match('/^[A-Za-z0-9_]+$/', $tableName)) {
+            continue;
+        }
+        $pdo->exec("ALTER TABLE `$databaseName`.`$tableName` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    }
+}
+
 function execute_sql_file(PDO $pdo, string $sql): void
 {
     $statement = '';
@@ -212,8 +226,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isLocked) {
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci',
             ]);
             $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$data['dbname']}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $pdo->exec("ALTER DATABASE `{$data['dbname']}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 
             if (!$data['reset_database'] && table_exists($pdo, $data['dbname'], 'users')) {
                 throw new RuntimeException('این دیتابیس قبلا نصب شده یا جدول users دارد. برای نصب مجدد، گزینه پاکسازی دیتابیس را فعال کنید.');
@@ -222,6 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isLocked) {
             $schemaSql = schema_for_database((string) file_get_contents($schemaPath), $data['dbname']);
             execute_sql_file($pdo, $schemaSql);
             $pdo->exec("USE `{$data['dbname']}`");
+            normalize_database_charset($pdo, $data['dbname']);
             seed_initial_data($pdo, $data);
             file_put_contents($configPath, create_database_config($data));
             file_put_contents($lockPath, 'Installed at ' . date('c') . PHP_EOL);

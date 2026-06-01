@@ -32,11 +32,10 @@
                 <div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div>
             <?php endif; ?>
             <label>ایمیل</label>
-            <input required type="email" name="email" value="<?= e($_POST['email'] ?? 'admin@simple-crm.local') ?>">
+            <input required type="email" name="email" value="<?= e($_POST['email'] ?? '') ?>">
             <label>رمز عبور</label>
             <input required type="password" name="password" value="">
             <button class="btn btn-primary full" type="submit">ورود</button>
-            <p class="hint">کاربر پیش‌فرض: admin@simple-crm.local / Admin@12345</p>
         </form>
     </main>
 </body>

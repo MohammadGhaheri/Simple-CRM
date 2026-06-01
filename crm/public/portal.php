@@ -128,11 +128,10 @@ if ($action === 'login') {
                 </div>
                 <?php if ($errors): ?><div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
                 <label>ایمیل</label>
-                <input required type="email" name="email" value="<?= e($_POST['email'] ?? 'reza.mohammadi@example.com') ?>">
+                <input required type="email" name="email" value="<?= e($_POST['email'] ?? '') ?>">
                 <label>رمز عبور</label>
                 <input required type="password" name="password">
                 <button class="btn btn-primary full" type="submit">ورود</button>
-                <p class="hint">نمونه تست: reza.mohammadi@example.com / Contact@12345</p>
             </form>
         </main>
     </body>

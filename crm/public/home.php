@@ -29,7 +29,7 @@ $settings = Setting::all();
         <p><?= nl2br(e($settings['home_text'])) ?></p>
         <div class="home-actions">
             <a class="btn btn-primary" href="login.php">ورود به سامانه داخلی</a>
-            <a class="btn btn-light" href="portal.php?action=login">ورود به پرتال مشتری</a>
+            <a class="btn btn-portal" href="portal.php?action=login">ورود به پرتال مشتری</a>
         </div>
     </main>
 </body>
