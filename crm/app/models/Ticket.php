@@ -94,21 +94,30 @@ class Ticket
 
     public static function statuses(): array
     {
-        return ['Open', 'In Progress', 'Waiting Customer', 'Resolved', 'Closed'];
+        return function_exists('option_values') ? option_values('options_ticket_statuses') : ['Open', 'In Progress', 'Waiting Customer', 'Resolved', 'Closed'];
     }
 
     public static function priorities(): array
     {
-        return ['Low', 'Normal', 'High', 'Urgent'];
+        return function_exists('option_values') ? option_values('options_ticket_priorities') : ['Low', 'Normal', 'High', 'Urgent'];
     }
 
     public static function categories(): array
     {
-        return ['Support', 'Request', 'Bug', 'Training', 'Billing', 'Other'];
+        return function_exists('option_values') ? option_values('options_ticket_categories') : ['Support', 'Request', 'Bug', 'Training', 'Billing', 'Other'];
     }
 
     public static function label(string $value): string
     {
+        if (function_exists('option_pairs')) {
+            foreach (['options_ticket_statuses', 'options_ticket_priorities', 'options_ticket_categories'] as $key) {
+                $pairs = option_pairs($key);
+                if (isset($pairs[$value])) {
+                    return $pairs[$value];
+                }
+            }
+        }
+
         $labels = [
             'Open' => 'باز',
             'In Progress' => 'در حال بررسی',
@@ -136,16 +145,16 @@ class Ticket
 
     private static function validStatus(string $value): string
     {
-        return in_array($value, self::statuses(), true) ? $value : 'Open';
+        return in_array($value, self::statuses(), true) ? $value : (self::statuses()[0] ?? 'Open');
     }
 
     private static function validPriority(string $value): string
     {
-        return in_array($value, self::priorities(), true) ? $value : 'Normal';
+        return in_array($value, self::priorities(), true) ? $value : (self::priorities()[0] ?? 'Normal');
     }
 
     private static function validCategory(string $value): string
     {
-        return in_array($value, self::categories(), true) ? $value : 'Support';
+        return in_array($value, self::categories(), true) ? $value : (self::categories()[0] ?? 'Support');
     }
 }

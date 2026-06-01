@@ -37,7 +37,11 @@ class Customer
     public static function create(array $data): int
     {
         $sql = 'INSERT INTO customers (customer_code, customer_name, customer_type, industry, city, lead_source, interested_product, vehicle_count, estimated_contract_value, sales_status, owner_user_id, last_followup_date, next_followup_date, notes) VALUES (:customer_code, :customer_name, :customer_type, :industry, :city, :lead_source, :interested_product, :vehicle_count, :estimated_contract_value, :sales_status, :owner_user_id, :last_followup_date, :next_followup_date, :notes)';
-        db()->prepare($sql)->execute(self::payload($data));
+        $payload = self::payload($data);
+        if ($payload['customer_code'] === '' && class_exists('Setting') && Setting::get('customer_code_mode') === 'auto') {
+            $payload['customer_code'] = self::nextCode();
+        }
+        db()->prepare($sql)->execute($payload);
         return (int) db()->lastInsertId();
     }
 
@@ -72,6 +76,36 @@ class Customer
             'next_followup_date' => db_date($data['next_followup_date'] ?? null),
             'notes' => trim($data['notes'] ?? ''),
         ];
+    }
+
+    private static function nextCode(): string
+    {
+        $format = class_exists('Setting') ? trim(Setting::get('customer_code_format')) : '';
+        $format = $format !== '' ? $format : 'CUS-{YYYY}-{SEQ4}';
+        $next = (int) db()->query('SELECT COALESCE(MAX(id), 0) + 1 FROM customers')->fetchColumn();
+        $replacements = [
+            '{YYYY}' => date('Y'),
+            '{YY}' => date('y'),
+            '{MM}' => date('m'),
+            '{DD}' => date('d'),
+            '{SEQ}' => (string) $next,
+            '{SEQ3}' => str_pad((string) $next, 3, '0', STR_PAD_LEFT),
+            '{SEQ4}' => str_pad((string) $next, 4, '0', STR_PAD_LEFT),
+            '{SEQ5}' => str_pad((string) $next, 5, '0', STR_PAD_LEFT),
+        ];
+
+        $code = strtr($format, $replacements);
+        $base = $code;
+        $suffix = 1;
+        $stmt = db()->prepare('SELECT COUNT(*) FROM customers WHERE customer_code = ?');
+        while (true) {
+            $stmt->execute([$code]);
+            if ((int) $stmt->fetchColumn() === 0) {
+                return $code;
+            }
+            $suffix++;
+            $code = $base . '-' . $suffix;
+        }
     }
 
     public static function statsByType(): array

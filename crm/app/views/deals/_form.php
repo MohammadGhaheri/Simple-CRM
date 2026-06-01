@@ -7,7 +7,7 @@
     <div><label>تعداد خودرو</label><input type="number" min="0" name="vehicle_count" value="<?= e((string) ($deal['vehicle_count'] ?? 0)) ?>"></div>
     <div><label>مبلغ تخمینی</label><input type="number" min="0" step="1000" name="estimated_amount" value="<?= e((string) ($deal['estimated_amount'] ?? 0)) ?>"></div>
     <div><label>احتمال موفقیت</label><input type="number" min="0" max="100" name="probability" value="<?= e((string) ($deal['probability'] ?? 20)) ?>"></div>
-    <div><label>ارزش وزنی</label><div class="card" data-weighted>0 ریال</div></div>
+    <div><label>ارزش وزنی</label><div class="card" data-weighted data-currency="<?= e(class_exists('Setting') ? (Setting::get('currency_unit') ?: 'ریال') : 'ریال') ?>">0 <?= e(class_exists('Setting') ? (Setting::get('currency_unit') ?: 'ریال') : 'ریال') ?></div></div>
     <div><label>مرحله</label><select name="deal_stage"><?php foreach (deal_stage_options() as $option): ?><option value="<?= e($option) ?>" <?= selected($deal['deal_stage'] ?? 'Lead', $option) ?>><?= e(fa_label($option)) ?></option><?php endforeach; ?></select></div>
     <div><label>تاریخ بسته شدن مورد انتظار</label><input class="date-input" name="expected_close_date" placeholder="مثلا 1405/04/10" title="تاریخ را به شمسی و با فرمت 1405/04/10 وارد کنید" value="<?= e(fa_date($deal['expected_close_date'] ?? '')) ?>"></div>
     <div><label>مالک</label><select name="owner_user_id"><?php foreach ($users as $user): ?><option value="<?= e((string) $user['id']) ?>" <?= selected($deal['owner_user_id'] ?? current_user_id(), $user['id']) ?>><?= e($user['name']) ?></option><?php endforeach; ?></select></div>

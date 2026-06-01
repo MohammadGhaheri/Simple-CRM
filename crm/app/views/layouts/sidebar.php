@@ -30,6 +30,7 @@
             <a class="<?= ($page ?? '') === 'users' ? 'active' : '' ?>" href="<?= e(url('users')) ?>">کاربران</a>
             <a class="<?= ($page ?? '') === 'settings' ? 'active' : '' ?>" href="<?= e(url('settings')) ?>">تنظیمات</a>
         <?php endif; ?>
+        <a class="<?= ($page ?? '') === 'help' ? 'active' : '' ?>" href="<?= e(url('help')) ?>">راهنما</a>
     </nav>
 </aside>
 <main class="main">

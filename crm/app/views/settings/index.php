@@ -6,6 +6,7 @@
     <div class="grid grid-2">
         <div><label class="required">عنوان سامانه</label><input required name="app_title" value="<?= e($settings['app_title'] ?? '') ?>"></div>
         <div><label>زیرعنوان سامانه</label><input name="app_subtitle" value="<?= e($settings['app_subtitle'] ?? '') ?>"></div>
+        <div><label>واحد پول</label><input name="currency_unit" value="<?= e($settings['currency_unit'] ?? 'ریال') ?>"></div>
         <div><label>رنگ اصلی</label><input type="color" name="primary_color" value="<?= e($settings['primary_color'] ?? '#155eef') ?>"></div>
         <div><label>رنگ نوار کناری</label><input type="color" name="sidebar_color" value="<?= e($settings['sidebar_color'] ?? '#111827') ?>"></div>
         <div>
@@ -20,6 +21,33 @@
         <div><label>عنوان هوم‌پیج</label><input name="home_title" value="<?= e($settings['home_title'] ?? '') ?>"></div>
     </div>
     <div style="margin-top:14px"><label>متن هوم‌پیج</label><textarea name="home_text"><?= e($settings['home_text'] ?? '') ?></textarea></div>
+
+    <h2 style="margin-top:22px">کدگذاری مشتری</h2>
+    <div class="grid grid-2">
+        <div>
+            <label>روش ثبت کد مشتری</label>
+            <select name="customer_code_mode">
+                <option value="manual" <?= selected($settings['customer_code_mode'] ?? 'manual', 'manual') ?>>دستی</option>
+                <option value="auto" <?= selected($settings['customer_code_mode'] ?? 'manual', 'auto') ?>>خودکار</option>
+            </select>
+        </div>
+        <div><label>فرمت کد خودکار</label><input name="customer_code_format" value="<?= e($settings['customer_code_format'] ?? 'CUS-{YYYY}-{SEQ4}') ?>"></div>
+    </div>
+    <p class="muted">Placeholderهای فرمت کد: <code>{YYYY}</code>، <code>{YY}</code>، <code>{MM}</code>، <code>{DD}</code>، <code>{SEQ}</code>، <code>{SEQ3}</code>، <code>{SEQ4}</code>، <code>{SEQ5}</code></p>
+
+    <h2 style="margin-top:22px">گزینه‌های چندانتخابی فرم‌ها</h2>
+    <p class="muted">هر گزینه را در یک خط بنویسید. قالب پیشنهادی: <code>value|label</code>. مقدار سمت چپ در دیتابیس ذخیره می‌شود و متن سمت راست در رابط نمایش داده می‌شود.</p>
+    <div class="grid grid-2">
+        <div><label>نوع مشتری</label><textarea name="options_customer_types"><?= e($settings['options_customer_types'] ?? '') ?></textarea></div>
+        <div><label>وضعیت فروش مشتری</label><textarea name="options_sales_statuses"><?= e($settings['options_sales_statuses'] ?? '') ?></textarea></div>
+        <div><label>محصولات</label><textarea name="options_products"><?= e($settings['options_products'] ?? '') ?></textarea></div>
+        <div><label>مراحل فرصت فروش</label><textarea name="options_deal_stages"><?= e($settings['options_deal_stages'] ?? '') ?></textarea></div>
+        <div><label>نوع فعالیت</label><textarea name="options_activity_types"><?= e($settings['options_activity_types'] ?? '') ?></textarea></div>
+        <div><label>وضعیت فعالیت</label><textarea name="options_activity_statuses"><?= e($settings['options_activity_statuses'] ?? '') ?></textarea></div>
+        <div><label>وضعیت تیکت</label><textarea name="options_ticket_statuses"><?= e($settings['options_ticket_statuses'] ?? '') ?></textarea></div>
+        <div><label>اولویت تیکت</label><textarea name="options_ticket_priorities"><?= e($settings['options_ticket_priorities'] ?? '') ?></textarea></div>
+        <div><label>دسته‌بندی تیکت</label><textarea name="options_ticket_categories"><?= e($settings['options_ticket_categories'] ?? '') ?></textarea></div>
+    </div>
 
     <h2 style="margin-top:22px">تنظیمات پیامک sms.ir</h2>
     <div class="grid grid-2">
@@ -50,3 +78,18 @@
 
     <div class="form-actions"><button class="btn btn-primary">ذخیره تنظیمات</button></div>
 </form>
+
+<div class="grid grid-2" style="margin-top:16px">
+    <div class="card">
+        <h2>پشتیبان‌گیری</h2>
+        <p class="muted">یک فایل SQL از ساختار و داده‌های سیستم دریافت کنید.</p>
+        <a class="btn btn-primary" href="<?= e(url('backup', ['action' => 'download'])) ?>">دانلود فایل بکاپ</a>
+    </div>
+    <form class="card" method="post" enctype="multipart/form-data" data-confirm="بازگردانی بکاپ داده‌های فعلی را تغییر می‌دهد. ادامه می‌دهید؟">
+        <?= csrf_field() ?>
+        <h2>بازگردانی بکاپ</h2>
+        <p class="muted">فقط فایل بکاپ تولیدشده توسط Elm Simple CRM را بارگذاری کنید.</p>
+        <input type="file" name="backup_file" accept=".sql" required>
+        <div class="form-actions"><button class="btn btn-danger" name="restore_backup" value="1">بازگردانی بکاپ</button></div>
+    </form>
+</div>

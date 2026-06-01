@@ -16,6 +16,7 @@ require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/services/SmsService.php';
+require __DIR__ . '/../app/services/BackupService.php';
 
 if (!auth_check()) {
     redirect('home.php');
@@ -104,6 +105,10 @@ try {
         if (is_post()) {
             verify_csrf();
             try {
+                if (isset($_POST['restore_backup'])) {
+                    BackupService::restoreUploaded($_FILES['backup_file'] ?? []);
+                    redirect(url('settings'));
+                }
                 $uploadedIcon = upload_image('app_icon_file', 'settings');
                 Setting::saveMany([
                     'app_title' => trim($_POST['app_title'] ?? ''),
@@ -113,6 +118,18 @@ try {
                     'app_icon' => $uploadedIcon ?: ($settings['app_icon'] ?? ''),
                     'home_title' => trim($_POST['home_title'] ?? ''),
                     'home_text' => trim($_POST['home_text'] ?? ''),
+                    'currency_unit' => trim($_POST['currency_unit'] ?? 'ریال'),
+                    'customer_code_mode' => ($_POST['customer_code_mode'] ?? 'manual') === 'auto' ? 'auto' : 'manual',
+                    'customer_code_format' => trim($_POST['customer_code_format'] ?? 'CUS-{YYYY}-{SEQ4}'),
+                    'options_customer_types' => trim($_POST['options_customer_types'] ?? ''),
+                    'options_sales_statuses' => trim($_POST['options_sales_statuses'] ?? ''),
+                    'options_products' => trim($_POST['options_products'] ?? ''),
+                    'options_deal_stages' => trim($_POST['options_deal_stages'] ?? ''),
+                    'options_activity_types' => trim($_POST['options_activity_types'] ?? ''),
+                    'options_activity_statuses' => trim($_POST['options_activity_statuses'] ?? ''),
+                    'options_ticket_statuses' => trim($_POST['options_ticket_statuses'] ?? ''),
+                    'options_ticket_priorities' => trim($_POST['options_ticket_priorities'] ?? ''),
+                    'options_ticket_categories' => trim($_POST['options_ticket_categories'] ?? ''),
                     'sms_enabled' => isset($_POST['sms_enabled']) ? '1' : '0',
                     'sms_ticket_created_enabled' => isset($_POST['sms_ticket_created_enabled']) ? '1' : '0',
                     'sms_ticket_answered_enabled' => isset($_POST['sms_ticket_answered_enabled']) ? '1' : '0',
@@ -133,6 +150,19 @@ try {
         }
         render('settings/index', ['title' => 'تنظیمات سامانه', 'settings' => $settings, 'users' => $users, 'errors' => $errors]);
         exit;
+    }
+
+    if ($page === 'help') {
+        render('help/index', ['title' => 'راهنمای سیستم']);
+        exit;
+    }
+
+    if ($page === 'backup') {
+        require_admin();
+        if ($action === 'download') {
+            BackupService::download();
+        }
+        redirect(url('settings'));
     }
 
     if ($page === 'users') {
@@ -259,7 +289,11 @@ try {
             $customer = [];
             if (is_post()) {
                 verify_csrf();
-                $errors = required_fields($_POST, ['customer_code' => 'کد مشتری', 'customer_name' => 'نام مشتری']);
+                $required = ['customer_name' => 'نام مشتری'];
+                if (Setting::get('customer_code_mode') !== 'auto') {
+                    $required['customer_code'] = 'کد مشتری';
+                }
+                $errors = required_fields($_POST, $required);
                 if (!$errors) {
                     $newId = Customer::create($_POST);
                     redirect(url('customers', ['action' => 'show', 'id' => $newId]));

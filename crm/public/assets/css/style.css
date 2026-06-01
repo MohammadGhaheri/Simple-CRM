@@ -563,6 +563,36 @@ tr:last-child td { border-bottom: 0; }
   color: #14532d;
 }
 .about-license span { color: #166534; }
+.help-hero p { max-width: 780px; line-height: 2; color: var(--muted); }
+.process-map {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+  margin-top: 16px;
+}
+.process-step {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+}
+.process-step span {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.process-step strong { display: block; margin-bottom: 8px; }
+.process-step p { margin: 0; color: var(--muted); line-height: 1.8; }
+.process-arrow {
+  display: none;
+}
 
 @media (max-width: 980px) {
   .app-shell { display: block; }
@@ -577,4 +607,5 @@ tr:last-child td { border-bottom: 0; }
   .auth-shell { grid-template-columns: 1fr; min-height: auto; }
   .auth-visual { min-height: 310px; padding: 34px; }
   .auth-card, .login-card { padding: 28px; }
+  .process-map { grid-template-columns: 1fr; }
 }

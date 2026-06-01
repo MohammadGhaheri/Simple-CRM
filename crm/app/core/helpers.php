@@ -67,7 +67,14 @@ function current_user_id(): int
 
 function format_money($value): string
 {
-    return number_format((float) $value) . ' ریال';
+    $unit = 'ریال';
+    if (class_exists('Setting')) {
+        $configured = trim(Setting::get('currency_unit'));
+        if ($configured !== '') {
+            $unit = $configured;
+        }
+    }
+    return number_format((float) $value) . ' ' . $unit;
 }
 
 function selected($actual, $expected): string
@@ -259,38 +266,84 @@ function badge_class(string $value): string
     return $map[$value] ?? 'badge-muted';
 }
 
+function option_pairs(string $key): array
+{
+    $raw = class_exists('Setting') ? Setting::get($key) : '';
+    $pairs = [];
+    foreach (preg_split('/\R/', trim($raw)) ?: [] as $line) {
+        $line = trim($line);
+        if ($line === '') {
+            continue;
+        }
+        [$value, $label] = array_pad(array_map('trim', explode('|', $line, 2)), 2, '');
+        if ($value === '') {
+            continue;
+        }
+        $pairs[$value] = $label !== '' ? $label : $value;
+    }
+    return $pairs;
+}
+
+function option_values(string $key): array
+{
+    return array_keys(option_pairs($key));
+}
+
+function option_label(string $key, string $value): string
+{
+    $pairs = option_pairs($key);
+    return $pairs[$value] ?? fa_label($value);
+}
+
 function customer_type_options(): array
 {
-    return ['B2B Fleet', 'B2C Owner', 'B2D Dealer', 'OEM', 'Strategic Partner', 'Other'];
+    return option_values('options_customer_types');
 }
 
 function sales_status_options(): array
 {
-    return ['New', 'Contacted', 'Meeting Scheduled', 'Proposal Sent', 'Negotiation', 'Won', 'Lost', 'Inactive'];
+    return option_values('options_sales_statuses');
 }
 
 function product_options(): array
 {
-    return ['FMS', 'TBox', 'Connected Vehicle Platform', 'Owner App', 'API Integration', 'Dashboard / BI', 'onCloud', 'onPremises', 'Other'];
+    return option_values('options_products');
 }
 
 function deal_stage_options(): array
 {
-    return ['Lead', 'Qualified', 'Proposal', 'Negotiation', 'Won', 'Lost'];
+    return option_values('options_deal_stages');
 }
 
 function activity_type_options(): array
 {
-    return ['Call', 'Meeting', 'WhatsApp / Message', 'Email', 'Proposal Sent', 'Demo', 'Follow-up', 'Contract', 'Support', 'Other'];
+    return option_values('options_activity_types');
 }
 
 function activity_status_options(): array
 {
-    return ['Open', 'Done', 'Cancelled', 'Waiting'];
+    return option_values('options_activity_statuses');
 }
 
 function fa_label(string $value): string
 {
+    foreach ([
+        'options_customer_types',
+        'options_sales_statuses',
+        'options_products',
+        'options_deal_stages',
+        'options_activity_types',
+        'options_activity_statuses',
+        'options_ticket_statuses',
+        'options_ticket_priorities',
+        'options_ticket_categories',
+    ] as $key) {
+        $pairs = option_pairs($key);
+        if (isset($pairs[$value])) {
+            return $pairs[$value];
+        }
+    }
+
     $labels = [
         'B2B Fleet' => 'ناوگان سازمانی',
         'B2C Owner' => 'مالک شخصی',

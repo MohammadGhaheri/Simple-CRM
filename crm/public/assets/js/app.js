@@ -13,7 +13,8 @@ document.querySelectorAll('[data-weighted]').forEach(function (box) {
   const probability = document.querySelector('[name="probability"]');
   const update = function () {
     const value = (Number(amount?.value || 0) * Number(probability?.value || 0)) / 100;
-    box.textContent = new Intl.NumberFormat('fa-IR').format(value) + ' ریال';
+    const unit = box.getAttribute('data-currency') || 'ریال';
+    box.textContent = new Intl.NumberFormat('fa-IR').format(value) + ' ' + unit;
   };
   amount?.addEventListener('input', update);
   probability?.addEventListener('input', update);
