@@ -7,6 +7,10 @@
         <span>تنظیمات پایه</span>
         <small>مواردی که معمولا برای راه‌اندازی و کار روزانه کافی هستند.</small>
     </div>
+    <div class="system-version-note">
+        <span>نسخه نصب‌شده سامانه</span>
+        <strong>v<?= e(app_version()) ?></strong>
+    </div>
     <h2>تنظیمات عمومی</h2>
     <div class="grid grid-2">
         <div><label class="required">عنوان سامانه</label><input required name="app_title" value="<?= e($settings['app_title'] ?? '') ?>"></div>

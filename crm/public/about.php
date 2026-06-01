@@ -22,7 +22,7 @@ $settings = Setting::all();
             <?php if (!empty($settings['app_icon'])): ?><img class="brand-icon large" src="<?= e($settings['app_icon']) ?>" alt=""><?php else: ?><div class="brand-mark">Elm</div><?php endif; ?>
             <div>
                 <strong><?= e($settings['app_title']) ?></strong>
-                <span>پروژه متن‌باز CRM ساده</span>
+                <span>پروژه متن‌باز CRM ساده - v<?= e(app_version()) ?></span>
             </div>
         </div>
 

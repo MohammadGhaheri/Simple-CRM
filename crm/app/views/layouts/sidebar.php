@@ -32,6 +32,10 @@
         <?php endif; ?>
         <a class="<?= ($page ?? '') === 'help' ? 'active' : '' ?>" href="<?= e(url('help')) ?>">راهنما</a>
     </nav>
+    <div class="app-version">
+        <span><?= e($appSettings['app_title'] ?? 'Elm Simple CRM') ?></span>
+        <strong>v<?= e(app_version()) ?></strong>
+    </div>
 </aside>
 <main class="main">
     <header class="topbar">

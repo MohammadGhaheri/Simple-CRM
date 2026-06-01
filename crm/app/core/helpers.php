@@ -55,6 +55,18 @@ function asset(string $path): string
     return 'assets/' . ltrim($path, '/');
 }
 
+function app_version(): string
+{
+    static $version = null;
+    if ($version !== null) {
+        return $version;
+    }
+
+    $versionPath = dirname(__DIR__, 2) . '/../VERSION';
+    $version = is_file($versionPath) ? trim((string) file_get_contents($versionPath)) : '';
+    return $version !== '' ? $version : 'dev';
+}
+
 function url(string $page, array $params = []): string
 {
     return 'index.php?' . http_build_query(array_merge(['page' => $page], $params));
