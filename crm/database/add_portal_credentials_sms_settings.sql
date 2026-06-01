@@ -9,4 +9,4 @@ INSERT INTO app_settings (setting_key, setting_value) VALUES
 رمز عبور: {password}
 ورود: {portal_url}'),
 ('portal_public_url', '')
-ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
+ON DUPLICATE KEY UPDATE setting_value = setting_value;

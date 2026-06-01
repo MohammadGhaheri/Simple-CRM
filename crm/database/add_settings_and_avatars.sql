@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
   setting_key VARCHAR(80) PRIMARY KEY,
   setting_value TEXT NULL,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO app_settings (setting_key, setting_value) VALUES
 ('app_title', 'Elm Simple CRM'),
@@ -55,7 +55,7 @@ INSERT INTO app_settings (setting_key, setting_value) VALUES
 نام کاربری: {email}
 رمز عبور: {password}
 ورود: {portal_url}')
-ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
+ON DUPLICATE KEY UPDATE setting_value = setting_value;
 
 CREATE TABLE IF NOT EXISTS login_events (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS login_events (
   ip_address VARCHAR(64) NULL,
   user_agent VARCHAR(255) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS usage_events (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS usage_events (
   action_name VARCHAR(80) NOT NULL,
   ip_address VARCHAR(64) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sms_logs (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -83,4 +83,4 @@ CREATE TABLE IF NOT EXISTS sms_logs (
   status VARCHAR(30) NOT NULL,
   provider_response TEXT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

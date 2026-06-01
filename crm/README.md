@@ -67,8 +67,11 @@ SOURCE /path/to/crm/database/seed.sql;
 اگر نام کاربری یا رمز MySQL شما متفاوت است، فایل زیر را تغییر دهید:
 
 ```text
+app/config/database.example.php
 app/config/database.php
 ```
+
+فایل `database.php` واقعی در Git نگهداری نمی‌شود و نصب‌کننده آن را برای محیط شما می‌سازد.
 
 تنظیم پیش‌فرض:
 
@@ -78,6 +81,16 @@ app/config/database.php
 'username' => 'root',
 'password' => '',
 ```
+
+## آپدیت به نسخه 1.1.0
+
+قبل از آپدیت بکاپ بگیرید، فایل‌های نسخه جدید را جایگزین کنید و migration زیر را اجرا کنید:
+
+```sql
+SOURCE /path/to/crm/database/upgrade_to_1_1_0.sql;
+```
+
+این migration تنظیمات موجود را بازنویسی نمی‌کند.
 
 4. پروژه را باز کنید:
 
@@ -136,7 +149,7 @@ php /path/to/crm/cron/daily_summary.php
 ```text
 crm/
   app/
-    config/database.php
+    config/database.example.php
     core/auth.php
     core/helpers.php
     core/csrf.php

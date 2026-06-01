@@ -1,0 +1,3 @@
+*.php linguist-language=PHP
+*.sql linguist-language=SQL
+crm/public/uploads/** linguist-generated=true

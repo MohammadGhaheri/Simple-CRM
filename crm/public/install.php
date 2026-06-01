@@ -98,7 +98,7 @@ function normalize_database_charset(PDO $pdo, string $databaseName): void
 function execute_sql_file(PDO $pdo, string $sql): void
 {
     $statement = '';
-    $lines = preg_split('/\R/', $sql) ?: [];
+    $lines = preg_split('/\r\n|\r|\n/u', $sql) ?: [];
     foreach ($lines as $line) {
         $trimmed = trim($line);
         if ($trimmed === '' || str_starts_with($trimmed, '--')) {

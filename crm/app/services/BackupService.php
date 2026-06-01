@@ -62,7 +62,7 @@ class BackupService
     private static function executeScript(string $sql): void
     {
         $statement = '';
-        foreach (preg_split('/\R/', $sql) ?: [] as $line) {
+        foreach (preg_split('/\r\n|\r|\n/u', $sql) ?: [] as $line) {
             $trimmed = trim($line);
             if ($trimmed === '' || str_starts_with($trimmed, '--')) {
                 continue;

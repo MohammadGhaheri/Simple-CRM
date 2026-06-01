@@ -81,4 +81,4 @@ Bug|خطا
 Training|آموزش
 Billing|مالی
 Other|سایر')
-ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
+ON DUPLICATE KEY UPDATE setting_value = setting_value;

@@ -31,4 +31,4 @@ INSERT INTO app_settings (setting_key, setting_value) VALUES
 نام کاربری: {email}
 رمز عبور: {password}
 ورود: {portal_url}')
-ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
+ON DUPLICATE KEY UPDATE setting_value = setting_value;
