@@ -57,11 +57,14 @@ class Setting
             'sms_enabled' => '0',
             'sms_ticket_created_enabled' => '0',
             'sms_ticket_answered_enabled' => '0',
+            'sms_portal_credentials_enabled' => '1',
+            'sms_portal_credentials_template' => "سلام {contact_name}\nدسترسی شما به پرتال مشتری {app_title} فعال شد.\nنام کاربری: {email}\nرمز عبور: {password}\nورود: {portal_url}",
             'sms_daily_summary_enabled' => '0',
             'sms_api_key' => '',
             'sms_line_number' => '',
             'sms_admin_mobile' => '',
             'sms_default_assigned_user_id' => '',
+            'portal_public_url' => '',
         ];
     }
 }

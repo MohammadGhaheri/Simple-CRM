@@ -15,5 +15,6 @@
 </div>
 <p><label><input type="checkbox" name="is_primary" value="1" <?= checked($contact['is_primary'] ?? false) ?> style="width:auto"> مخاطب اصلی</label></p>
 <p><label><input type="checkbox" name="portal_enabled" value="1" <?= checked($contact['portal_enabled'] ?? false) ?> style="width:auto"> دسترسی به پرتال مشتری فعال باشد</label></p>
+<p><label><input type="checkbox" name="send_portal_sms" value="1" <?= checked($contact['send_portal_sms'] ?? false) ?> style="width:auto"> ارسال نام کاربری، رمز عبور و لینک پرتال با پیامک</label></p>
 <div><label>یادداشت</label><textarea name="notes"><?= e($contact['notes'] ?? '') ?></textarea></div>
 <div class="form-actions"><button class="btn btn-primary">ذخیره</button><a class="btn btn-light" href="<?= e(url('customers')) ?>">انصراف</a></div>

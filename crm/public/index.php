@@ -116,11 +116,14 @@ try {
                     'sms_enabled' => isset($_POST['sms_enabled']) ? '1' : '0',
                     'sms_ticket_created_enabled' => isset($_POST['sms_ticket_created_enabled']) ? '1' : '0',
                     'sms_ticket_answered_enabled' => isset($_POST['sms_ticket_answered_enabled']) ? '1' : '0',
+                    'sms_portal_credentials_enabled' => isset($_POST['sms_portal_credentials_enabled']) ? '1' : '0',
+                    'sms_portal_credentials_template' => trim($_POST['sms_portal_credentials_template'] ?? ''),
                     'sms_daily_summary_enabled' => isset($_POST['sms_daily_summary_enabled']) ? '1' : '0',
                     'sms_api_key' => trim($_POST['sms_api_key'] ?? ''),
                     'sms_line_number' => trim($_POST['sms_line_number'] ?? ''),
                     'sms_admin_mobile' => trim($_POST['sms_admin_mobile'] ?? ''),
                     'sms_default_assigned_user_id' => trim($_POST['sms_default_assigned_user_id'] ?? ''),
+                    'portal_public_url' => trim($_POST['portal_public_url'] ?? ''),
                 ]);
                 redirect(url('settings'));
             } catch (RuntimeException $e) {
@@ -319,8 +322,28 @@ try {
                 if (!empty($_POST['portal_enabled']) && trim((string) ($_POST['portal_password'] ?? '')) === '') {
                     $errors[] = 'برای فعال کردن پرتال، رمز عبور مخاطب الزامی است.';
                 }
+                if (!empty($_POST['send_portal_sms'])) {
+                    if (empty($_POST['portal_enabled'])) {
+                        $errors[] = 'برای ارسال پیامک اطلاعات ورود، دسترسی پرتال باید فعال باشد.';
+                    }
+                    if (trim((string) ($_POST['mobile'] ?? '')) === '') {
+                        $errors[] = 'برای ارسال پیامک اطلاعات ورود، موبایل مخاطب الزامی است.';
+                    }
+                    if (trim((string) ($_POST['email'] ?? '')) === '') {
+                        $errors[] = 'برای ارسال پیامک اطلاعات ورود، ایمیل مخاطب الزامی است.';
+                    }
+                    if (trim((string) ($_POST['portal_password'] ?? '')) === '') {
+                        $errors[] = 'برای ارسال پیامک اطلاعات ورود، رمز عبور جدید را وارد کنید.';
+                    }
+                }
                 if (!$errors) {
-                    Contact::create($_POST);
+                    $newId = Contact::create($_POST);
+                    if (!empty($_POST['send_portal_sms'])) {
+                        $newContact = Contact::find($newId);
+                        if ($newContact) {
+                            SmsService::sendPortalCredentials($newContact, (string) $_POST['portal_password']);
+                        }
+                    }
                     redirect(url('customers', ['action' => 'show', 'id' => (int) $_POST['customer_id']]));
                 }
                 $contact = $_POST;
@@ -339,8 +362,28 @@ try {
                 if (!empty($_POST['portal_enabled']) && empty($contact['password_hash']) && trim((string) ($_POST['portal_password'] ?? '')) === '') {
                     $errors[] = 'برای فعال کردن پرتال، رمز عبور مخاطب الزامی است.';
                 }
+                if (!empty($_POST['send_portal_sms'])) {
+                    if (empty($_POST['portal_enabled'])) {
+                        $errors[] = 'برای ارسال پیامک اطلاعات ورود، دسترسی پرتال باید فعال باشد.';
+                    }
+                    if (trim((string) ($_POST['mobile'] ?? '')) === '') {
+                        $errors[] = 'برای ارسال پیامک اطلاعات ورود، موبایل مخاطب الزامی است.';
+                    }
+                    if (trim((string) ($_POST['email'] ?? '')) === '') {
+                        $errors[] = 'برای ارسال پیامک اطلاعات ورود، ایمیل مخاطب الزامی است.';
+                    }
+                    if (trim((string) ($_POST['portal_password'] ?? '')) === '') {
+                        $errors[] = 'برای ارسال پیامک اطلاعات ورود، رمز عبور جدید را وارد کنید.';
+                    }
+                }
                 if (!$errors) {
                     Contact::update($id, $_POST);
+                    if (!empty($_POST['send_portal_sms'])) {
+                        $updatedContact = Contact::find($id);
+                        if ($updatedContact) {
+                            SmsService::sendPortalCredentials($updatedContact, (string) $_POST['portal_password']);
+                        }
+                    }
                     redirect(url('customers', ['action' => 'show', 'id' => (int) $_POST['customer_id']]));
                 }
                 $contact = array_merge($contact, $_POST);

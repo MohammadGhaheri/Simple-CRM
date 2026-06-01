@@ -71,6 +71,30 @@ class SmsService
         self::send($contact['mobile'] ?? '', 'نتیجه تیکت شما ثبت شد: ' . $ticket['ticket_code'] . "\n" . $link);
     }
 
+    public static function sendPortalCredentials(array $contact, string $plainPassword): bool
+    {
+        $settings = Setting::all();
+        if (($settings['sms_portal_credentials_enabled'] ?? '0') !== '1') {
+            return false;
+        }
+
+        $template = trim((string) ($settings['sms_portal_credentials_template'] ?? ''));
+        if ($template === '') {
+            $template = "سلام {contact_name}\nدسترسی شما به پرتال مشتری {app_title} فعال شد.\nنام کاربری: {email}\nرمز عبور: {password}\nورود: {portal_url}";
+        }
+
+        $message = strtr($template, [
+            '{app_title}' => (string) ($settings['app_title'] ?? 'Elm Simple CRM'),
+            '{contact_name}' => (string) ($contact['contact_name'] ?? ''),
+            '{customer_name}' => (string) ($contact['customer_name'] ?? ''),
+            '{email}' => (string) ($contact['email'] ?? ''),
+            '{password}' => $plainPassword,
+            '{portal_url}' => self::portalUrl($settings),
+        ]);
+
+        return self::send((string) ($contact['mobile'] ?? ''), $message);
+    }
+
     public static function sendDailySummary(): bool
     {
         $settings = Setting::all();
@@ -91,6 +115,16 @@ class SmsService
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
         $dir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/crm/public/index.php')), '/');
         return $scheme . '://' . $host . $dir;
+    }
+
+    private static function portalUrl(array $settings): string
+    {
+        $configured = trim((string) ($settings['portal_public_url'] ?? ''));
+        if ($configured !== '') {
+            return $configured;
+        }
+
+        return self::baseUrl() . '/portal.php?action=login';
     }
 
     private static function log(string $mobile, string $message, string $status, string $response): void

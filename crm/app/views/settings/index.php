@@ -26,6 +26,7 @@
         <div><label>توکن API</label><input name="sms_api_key" value="<?= e($settings['sms_api_key'] ?? '') ?>"></div>
         <div><label>خط ارسال کننده</label><input name="sms_line_number" value="<?= e($settings['sms_line_number'] ?? '') ?>"></div>
         <div><label>موبایل مدیر برای خلاصه روزانه</label><input name="sms_admin_mobile" value="<?= e($settings['sms_admin_mobile'] ?? '') ?>"></div>
+        <div><label>آدرس عمومی پرتال مشتری</label><input name="portal_public_url" placeholder="https://your-domain.com/portal.php?action=login" value="<?= e($settings['portal_public_url'] ?? '') ?>"></div>
         <div>
             <label>مسئول پیش‌فرض تیکت جدید</label>
             <select name="sms_default_assigned_user_id">
@@ -39,7 +40,13 @@
     <p><label><input type="checkbox" name="sms_enabled" value="1" <?= checked(($settings['sms_enabled'] ?? '0') === '1') ?> style="width:auto"> فعال‌سازی کلی پیامک</label></p>
     <p><label><input type="checkbox" name="sms_ticket_created_enabled" value="1" <?= checked(($settings['sms_ticket_created_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال پیامک به مسئول هنگام ثبت تیکت جدید</label></p>
     <p><label><input type="checkbox" name="sms_ticket_answered_enabled" value="1" <?= checked(($settings['sms_ticket_answered_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال پیامک به مخاطب هنگام پاسخ تیکت</label></p>
+    <p><label><input type="checkbox" name="sms_portal_credentials_enabled" value="1" <?= checked(($settings['sms_portal_credentials_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال پیامک اطلاعات ورود پرتال برای مخاطب</label></p>
     <p><label><input type="checkbox" name="sms_daily_summary_enabled" value="1" <?= checked(($settings['sms_daily_summary_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال خلاصه روزانه با cron</label></p>
+    <div style="margin-top:14px">
+        <label>متن پیامک اطلاعات ورود پرتال</label>
+        <textarea name="sms_portal_credentials_template"><?= e($settings['sms_portal_credentials_template'] ?? '') ?></textarea>
+        <p class="muted">Placeholderهای قابل استفاده: <code>{app_title}</code>، <code>{contact_name}</code>، <code>{customer_name}</code>، <code>{email}</code>، <code>{password}</code>، <code>{portal_url}</code></p>
+    </div>
 
     <div class="form-actions"><button class="btn btn-primary">ذخیره تنظیمات</button></div>
 </form>
