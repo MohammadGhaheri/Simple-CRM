@@ -30,6 +30,7 @@ $settings = Setting::all();
         <div class="home-actions">
             <a class="btn btn-primary" href="login.php">ورود به سامانه داخلی</a>
             <a class="btn btn-portal" href="portal.php?action=login">ورود به پرتال مشتری</a>
+            <a class="btn btn-light" href="about.php">درباره پروژه</a>
         </div>
     </main>
 </body>

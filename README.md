@@ -14,6 +14,10 @@
 - LinkedIn: [mohammadghaheri](https://www.linkedin.com/in/mohammadghaheri/)
 - Email: [mohammad.ghaheri@gmail.com](mailto:mohammad.ghaheri@gmail.com)
 
+## متن‌باز بودن
+
+`Elm Simple CRM` به صورت متن‌باز و با مجوز MIT منتشر شده است. متن مجوز را می‌توانید در فایل [LICENSE](LICENSE) ببینید.
+
 ## امکانات اصلی
 
 - رابط فارسی و RTL
@@ -275,4 +279,4 @@ crm/
 
 ## مجوز
 
-فعلا مجوز مشخصی برای پروژه تعیین نشده است. در صورت انتشار عمومی، بهتر است یک فایل `LICENSE` مناسب به پروژه اضافه شود.
+این پروژه با مجوز MIT منتشر شده است.

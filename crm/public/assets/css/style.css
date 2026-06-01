@@ -539,6 +539,30 @@ tr:last-child td { border-bottom: 0; }
   margin: 0 0 28px;
 }
 .home-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.about-page { width: min(980px, calc(100% - 32px)); }
+.about-content {
+  max-width: 780px;
+  display: grid;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.about-content p {
+  margin: 0;
+  line-height: 2.2;
+  color: var(--text);
+}
+.about-license {
+  max-width: 520px;
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  margin-bottom: 24px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #14532d;
+}
+.about-license span { color: #166534; }
 
 @media (max-width: 980px) {
   .app-shell { display: block; }
