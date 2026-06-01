@@ -16,6 +16,7 @@ require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/services/SmsService.php';
+require __DIR__ . '/../app/services/EmailService.php';
 require __DIR__ . '/../app/services/BackupService.php';
 
 if (!auth_check()) {
@@ -141,6 +142,14 @@ try {
                     'sms_admin_mobile' => trim($_POST['sms_admin_mobile'] ?? ''),
                     'sms_default_assigned_user_id' => trim($_POST['sms_default_assigned_user_id'] ?? ''),
                     'portal_public_url' => trim($_POST['portal_public_url'] ?? ''),
+                    'email_enabled' => isset($_POST['email_enabled']) ? '1' : '0',
+                    'email_from_name' => trim($_POST['email_from_name'] ?? ''),
+                    'email_from_address' => trim($_POST['email_from_address'] ?? ''),
+                    'email_portal_credentials_enabled' => isset($_POST['email_portal_credentials_enabled']) ? '1' : '0',
+                    'email_ticket_answered_enabled' => isset($_POST['email_ticket_answered_enabled']) ? '1' : '0',
+                    'email_activity_reminder_enabled' => isset($_POST['email_activity_reminder_enabled']) ? '1' : '0',
+                    'email_portal_credentials_subject' => trim($_POST['email_portal_credentials_subject'] ?? ''),
+                    'email_portal_credentials_template' => trim($_POST['email_portal_credentials_template'] ?? ''),
                 ]);
                 redirect(url('settings'));
             } catch (RuntimeException $e) {
@@ -370,12 +379,29 @@ try {
                         $errors[] = 'برای ارسال پیامک اطلاعات ورود، رمز عبور جدید را وارد کنید.';
                     }
                 }
+                if (!empty($_POST['send_portal_email'])) {
+                    if (empty($_POST['portal_enabled'])) {
+                        $errors[] = 'برای ارسال ایمیل اطلاعات ورود، دسترسی پرتال باید فعال باشد.';
+                    }
+                    if (trim((string) ($_POST['email'] ?? '')) === '') {
+                        $errors[] = 'برای ارسال ایمیل اطلاعات ورود، ایمیل مخاطب الزامی است.';
+                    }
+                    if (trim((string) ($_POST['portal_password'] ?? '')) === '') {
+                        $errors[] = 'برای ارسال ایمیل اطلاعات ورود، رمز عبور جدید را وارد کنید.';
+                    }
+                }
                 if (!$errors) {
                     $newId = Contact::create($_POST);
                     if (!empty($_POST['send_portal_sms'])) {
                         $newContact = Contact::find($newId);
                         if ($newContact) {
                             SmsService::sendPortalCredentials($newContact, (string) $_POST['portal_password']);
+                        }
+                    }
+                    if (!empty($_POST['send_portal_email'])) {
+                        $newContact = $newContact ?? Contact::find($newId);
+                        if ($newContact) {
+                            EmailService::sendPortalCredentials($newContact, (string) $_POST['portal_password']);
                         }
                     }
                     redirect(url('customers', ['action' => 'show', 'id' => (int) $_POST['customer_id']]));
@@ -410,12 +436,29 @@ try {
                         $errors[] = 'برای ارسال پیامک اطلاعات ورود، رمز عبور جدید را وارد کنید.';
                     }
                 }
+                if (!empty($_POST['send_portal_email'])) {
+                    if (empty($_POST['portal_enabled'])) {
+                        $errors[] = 'برای ارسال ایمیل اطلاعات ورود، دسترسی پرتال باید فعال باشد.';
+                    }
+                    if (trim((string) ($_POST['email'] ?? '')) === '') {
+                        $errors[] = 'برای ارسال ایمیل اطلاعات ورود، ایمیل مخاطب الزامی است.';
+                    }
+                    if (trim((string) ($_POST['portal_password'] ?? '')) === '') {
+                        $errors[] = 'برای ارسال ایمیل اطلاعات ورود، رمز عبور جدید را وارد کنید.';
+                    }
+                }
                 if (!$errors) {
                     Contact::update($id, $_POST);
                     if (!empty($_POST['send_portal_sms'])) {
                         $updatedContact = Contact::find($id);
                         if ($updatedContact) {
                             SmsService::sendPortalCredentials($updatedContact, (string) $_POST['portal_password']);
+                        }
+                    }
+                    if (!empty($_POST['send_portal_email'])) {
+                        $updatedContact = $updatedContact ?? Contact::find($id);
+                        if ($updatedContact) {
+                            EmailService::sendPortalCredentials($updatedContact, (string) $_POST['portal_password']);
                         }
                     }
                     redirect(url('customers', ['action' => 'show', 'id' => (int) $_POST['customer_id']]));
@@ -447,6 +490,7 @@ try {
                 $after = Ticket::find($id);
                 if ($after && trim((string) ($_POST['response'] ?? '')) !== '' && (($before['response'] ?? '') !== ($_POST['response'] ?? '') || ($before['status'] ?? '') !== ($_POST['status'] ?? ''))) {
                     SmsService::notifyTicketAnswered($after);
+                    EmailService::notifyTicketAnswered($after);
                 }
                 redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
             }
@@ -527,7 +571,13 @@ try {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'activity_date' => 'تاریخ فعالیت', 'summary' => 'خلاصه']);
                 if (!$errors) {
-                    Activity::create($_POST);
+                    $createdActivityId = Activity::create($_POST);
+                    if (!empty($_POST['send_activity_email'])) {
+                        $createdActivity = Activity::find($createdActivityId);
+                        if ($createdActivity) {
+                            EmailService::sendActivityReminder($createdActivity);
+                        }
+                    }
                     if ($sourceActivity) {
                         Activity::markDoneForOwner($completeId, current_user_id());
                     }

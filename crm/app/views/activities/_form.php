@@ -11,5 +11,6 @@
 </div>
 <div style="margin-top:14px"><label class="required">خلاصه</label><input required name="summary" value="<?= e($activity['summary'] ?? '') ?>"></div>
 <div style="margin-top:14px"><label>اقدام بعدی</label><input name="next_action" value="<?= e($activity['next_action'] ?? '') ?>"></div>
+<p><label><input type="checkbox" name="send_activity_email" value="1" <?= checked($activity['send_activity_email'] ?? false) ?> style="width:auto"> ارسال یادآوری ایمیلی به مخاطب اصلی مشتری</label></p>
 <div style="margin-top:14px"><label>یادداشت</label><textarea name="notes"><?= e($activity['notes'] ?? '') ?></textarea></div>
 <div class="form-actions"><button class="btn btn-primary">ذخیره</button><a class="btn btn-light" href="<?= e(url('activities')) ?>">انصراف</a></div>

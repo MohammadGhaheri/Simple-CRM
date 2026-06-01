@@ -90,7 +90,19 @@ Other|سایر'),
 ('sms_line_number', ''),
 ('sms_admin_mobile', ''),
 ('sms_default_assigned_user_id', ''),
-('portal_public_url', '');
+('portal_public_url', ''),
+('email_enabled', '0'),
+('email_from_name', 'Elm Simple CRM'),
+('email_from_address', ''),
+('email_portal_credentials_enabled', '1'),
+('email_ticket_answered_enabled', '1'),
+('email_activity_reminder_enabled', '1'),
+('email_portal_credentials_subject', 'اطلاعات ورود پرتال مشتری'),
+('email_portal_credentials_template', 'سلام {contact_name}
+دسترسی شما به پرتال مشتری {app_title} فعال شد.
+نام کاربری: {email}
+رمز عبور: {password}
+ورود: {portal_url}');
 
 INSERT INTO customers (id, customer_code, customer_name, customer_type, industry, city, lead_source, interested_product, vehicle_count, estimated_contract_value, sales_status, owner_user_id, last_followup_date, next_followup_date, notes) VALUES
 (1, 'SC-1001', 'ناوگان لجستیک آریا ترابر', 'B2B Fleet', 'حمل و نقل و پخش', 'تهران', 'نمایشگاه حمل و نقل و لجستیک', 'FMS', 180, 12500000000, 'Negotiation', 1, '2026-05-20', '2026-06-03', 'نیاز اصلی مشتری پایش لحظه‌ای ناوگان، کنترل مصرف سوخت، هشدار توقف غیرمجاز و گزارش رفتار راننده است.'),

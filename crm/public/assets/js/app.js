@@ -21,6 +21,38 @@ document.querySelectorAll('[data-weighted]').forEach(function (box) {
   update();
 });
 
+function generatePortalPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  let password = '';
+  for (let i = 0; i < 10; i++) {
+    password += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return password;
+}
+
+document.addEventListener('click', function (event) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  const wrapper = target.closest('.password-tools');
+  if (!wrapper) return;
+  const input = wrapper.querySelector('[data-password-field]');
+  if (!(input instanceof HTMLInputElement)) return;
+
+  if (target.matches('[data-generate-password]')) {
+    input.value = generatePortalPassword();
+    input.type = 'text';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  if (target.matches('[data-toggle-password]')) {
+    input.type = input.type === 'password' ? 'text' : 'password';
+    target.textContent = input.type === 'password' ? 'نمایش' : 'مخفی';
+  }
+  if (target.matches('[data-copy-password]')) {
+    input.select();
+    navigator.clipboard?.writeText(input.value);
+  }
+});
+
 const persianMonths = [
   'فروردین',
   'اردیبهشت',

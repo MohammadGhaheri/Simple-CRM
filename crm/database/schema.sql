@@ -7,6 +7,7 @@ CREATE DATABASE IF NOT EXISTS simple_crm CHARACTER SET utf8mb4 COLLATE utf8mb4_u
 USE simple_crm;
 
 DROP TABLE IF EXISTS activities;
+DROP TABLE IF EXISTS email_logs;
 DROP TABLE IF EXISTS sms_logs;
 DROP TABLE IF EXISTS usage_events;
 DROP TABLE IF EXISTS login_events;
@@ -58,6 +59,16 @@ CREATE TABLE usage_events (
 CREATE TABLE sms_logs (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   mobile VARCHAR(40) NOT NULL,
+  message TEXT NOT NULL,
+  status VARCHAR(30) NOT NULL,
+  provider_response TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE email_logs (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  recipient_email VARCHAR(190) NOT NULL,
+  subject VARCHAR(190) NOT NULL,
   message TEXT NOT NULL,
   status VARCHAR(30) NOT NULL,
   provider_response TEXT NULL,

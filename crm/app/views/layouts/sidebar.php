@@ -37,7 +37,7 @@
     <header class="topbar">
         <div>
             <h1><?= e($title ?? 'داشبورد') ?></h1>
-            <p>مدیریت مشتریان، فرصت‌ها و پیگیری‌های فروش تلماتیک</p>
+            <?php if (!empty($appSettings['app_subtitle'])): ?><p><?= e($appSettings['app_subtitle']) ?></p><?php endif; ?>
         </div>
         <div class="user-menu">
             <?php if (!empty($_SESSION['user']['avatar_path'])): ?><img class="user-avatar" src="<?= e($_SESSION['user']['avatar_path']) ?>" alt=""><?php endif; ?>

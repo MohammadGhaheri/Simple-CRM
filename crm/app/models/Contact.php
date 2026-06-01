@@ -34,6 +34,13 @@ class Contact
         return $stmt->fetchAll();
     }
 
+    public static function primaryByCustomer(int $customerId): ?array
+    {
+        $stmt = db()->prepare('SELECT ct.*, c.customer_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.customer_id = ? AND ct.email IS NOT NULL AND ct.email <> "" ORDER BY ct.is_primary DESC, ct.id DESC LIMIT 1');
+        $stmt->execute([$customerId]);
+        return $stmt->fetch() ?: null;
+    }
+
     public static function find(int $id): ?array
     {
         $stmt = db()->prepare('SELECT ct.*, c.customer_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.id = ?');

@@ -76,6 +76,22 @@
         <p class="muted">Placeholderهای قابل استفاده: <code>{app_title}</code>، <code>{contact_name}</code>، <code>{customer_name}</code>، <code>{email}</code>، <code>{password}</code>، <code>{portal_url}</code></p>
     </div>
 
+    <h2 style="margin-top:22px">تنظیمات ایمیل</h2>
+    <div class="grid grid-2">
+        <div><label>نام فرستنده</label><input name="email_from_name" value="<?= e($settings['email_from_name'] ?? '') ?>"></div>
+        <div><label>ایمیل فرستنده</label><input type="email" name="email_from_address" value="<?= e($settings['email_from_address'] ?? '') ?>"></div>
+        <div><label>عنوان ایمیل اطلاعات ورود پرتال</label><input name="email_portal_credentials_subject" value="<?= e($settings['email_portal_credentials_subject'] ?? '') ?>"></div>
+    </div>
+    <p><label><input type="checkbox" name="email_enabled" value="1" <?= checked(($settings['email_enabled'] ?? '0') === '1') ?> style="width:auto"> فعال‌سازی ارسال ایمیل</label></p>
+    <p><label><input type="checkbox" name="email_portal_credentials_enabled" value="1" <?= checked(($settings['email_portal_credentials_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال ایمیل اطلاعات ورود پرتال برای مخاطب</label></p>
+    <p><label><input type="checkbox" name="email_ticket_answered_enabled" value="1" <?= checked(($settings['email_ticket_answered_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال ایمیل هنگام پاسخ تیکت</label></p>
+    <p><label><input type="checkbox" name="email_activity_reminder_enabled" value="1" <?= checked(($settings['email_activity_reminder_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال ایمیل یادآوری فعالیت به مخاطب اصلی مشتری</label></p>
+    <div style="margin-top:14px">
+        <label>متن ایمیل اطلاعات ورود پرتال</label>
+        <textarea name="email_portal_credentials_template"><?= e($settings['email_portal_credentials_template'] ?? '') ?></textarea>
+        <p class="muted">Placeholderهای قابل استفاده: <code>{app_title}</code>، <code>{contact_name}</code>، <code>{customer_name}</code>، <code>{email}</code>، <code>{password}</code>، <code>{portal_url}</code></p>
+    </div>
+
     <div class="form-actions"><button class="btn btn-primary">ذخیره تنظیمات</button></div>
 </form>
 

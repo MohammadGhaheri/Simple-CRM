@@ -247,6 +247,11 @@ input, select, textarea {
 textarea { min-height: 96px; resize: vertical; }
 
 .form-actions { display: flex; gap: 10px; margin-top: 18px; }
+.password-tools {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 7px;
+}
 .btn {
   display: inline-flex;
   align-items: center;
@@ -600,6 +605,7 @@ tr:last-child td { border-bottom: 0; }
   .sidebar nav { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
   .topbar { align-items: flex-start; flex-direction: column; }
   .grid-2, .grid-3, .grid-4, .filters, .detail-list { grid-template-columns: 1fr; }
+  .password-tools { grid-template-columns: 1fr; }
   .task-item { grid-template-columns: 1fr; }
   .task-actions { justify-content: flex-start; }
   .content { padding: 18px; }

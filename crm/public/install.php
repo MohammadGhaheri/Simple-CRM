@@ -150,6 +150,14 @@ function seed_initial_data(PDO $pdo, array $data): void
         'sms_admin_mobile' => $data['admin_mobile'],
         'sms_default_assigned_user_id' => '',
         'portal_public_url' => '',
+        'email_enabled' => '0',
+        'email_from_name' => 'Elm Simple CRM',
+        'email_from_address' => '',
+        'email_portal_credentials_enabled' => '1',
+        'email_ticket_answered_enabled' => '1',
+        'email_activity_reminder_enabled' => '1',
+        'email_portal_credentials_subject' => 'اطلاعات ورود پرتال مشتری',
+        'email_portal_credentials_template' => "سلام {contact_name}\nدسترسی شما به پرتال مشتری {app_title} فعال شد.\nنام کاربری: {email}\nرمز عبور: {password}\nورود: {portal_url}",
     ];
 
     $stmt = $pdo->prepare('INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)');
