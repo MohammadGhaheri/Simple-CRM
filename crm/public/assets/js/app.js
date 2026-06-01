@@ -232,6 +232,7 @@ function createDatepicker() {
   }
 
   picker.addEventListener('click', function (event) {
+    event.stopPropagation();
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const nav = target.getAttribute('data-nav');
@@ -276,7 +277,7 @@ function createDatepicker() {
 
   document.addEventListener('click', function (event) {
     const target = event.target;
-    if (target === activeInput || picker.contains(target)) return;
+    if (!(target instanceof Node) || target === activeInput || picker.contains(target)) return;
     close();
   });
 
