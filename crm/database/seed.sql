@@ -15,6 +15,7 @@ INSERT INTO app_settings (setting_key, setting_value) VALUES
 ('app_icon', ''),
 ('home_title', 'Elm Simple CRM'),
 ('home_text', 'یک سامانه سبک برای مدیریت مشتریان، مخاطبین، فرصت‌های فروش، پیگیری‌ها و تیکت‌های مشتریان.'),
+('show_about_page', '1'),
 ('currency_unit', 'ریال'),
 ('contract_renewal_reminder_days', '30'),
 ('customer_code_mode', 'manual'),

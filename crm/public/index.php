@@ -121,6 +121,7 @@ try {
                     'app_icon' => $uploadedIcon ?: ($settings['app_icon'] ?? ''),
                     'home_title' => trim($_POST['home_title'] ?? ''),
                     'home_text' => trim($_POST['home_text'] ?? ''),
+                    'show_about_page' => isset($_POST['show_about_page']) ? '1' : '0',
                     'currency_unit' => trim($_POST['currency_unit'] ?? 'ریال'),
                     'customer_code_mode' => ($_POST['customer_code_mode'] ?? 'manual') === 'auto' ? 'auto' : 'manual',
                     'customer_code_format' => trim($_POST['customer_code_format'] ?? 'CUS-{YYYY}-{SEQ4}'),

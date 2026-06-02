@@ -127,6 +127,7 @@ function seed_initial_data(PDO $pdo, array $data): void
         'app_icon' => '',
         'home_title' => $data['app_title'],
         'home_text' => $data['home_text'],
+        'show_about_page' => '1',
         'currency_unit' => 'ریال',
         'contract_renewal_reminder_days' => '30',
         'customer_code_mode' => 'manual',

@@ -6,6 +6,9 @@ require __DIR__ . '/../app/core/helpers.php';
 require __DIR__ . '/../app/models/Setting.php';
 
 $settings = Setting::all();
+if (($settings['show_about_page'] ?? '1') !== '1') {
+    redirect('home.php');
+}
 ?>
 <!doctype html>
 <html lang="fa" dir="rtl">

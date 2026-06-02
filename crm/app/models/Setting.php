@@ -54,6 +54,7 @@ class Setting
             'app_icon' => '',
             'home_title' => 'Elm Simple CRM',
             'home_text' => 'یک سامانه سبک برای مدیریت مشتریان، مخاطبین، فرصت‌های فروش، پیگیری‌ها و تیکت‌های مشتریان.',
+            'show_about_page' => '1',
             'currency_unit' => 'ریال',
             'customer_code_mode' => 'manual',
             'customer_code_format' => 'CUS-{YYYY}-{SEQ4}',

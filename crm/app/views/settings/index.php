@@ -31,6 +31,7 @@
         <div><label>عنوان هوم‌پیج</label><input name="home_title" value="<?= e($settings['home_title'] ?? '') ?>"></div>
     </div>
     <div style="margin-top:14px"><label>متن هوم‌پیج</label><textarea name="home_text"><?= e($settings['home_text'] ?? '') ?></textarea></div>
+    <p><label><input type="checkbox" name="show_about_page" value="1" <?= checked(($settings['show_about_page'] ?? '1') === '1') ?> style="width:auto"> نمایش صفحه درباره سازنده و پروژه</label></p>
 
     <h2 style="margin-top:22px">کدگذاری مشتری</h2>
     <div class="grid grid-2">
