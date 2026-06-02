@@ -16,6 +16,7 @@
         <div><label class="required">عنوان سامانه</label><input required name="app_title" value="<?= e($settings['app_title'] ?? '') ?>"></div>
         <div><label>زیرعنوان سامانه</label><input name="app_subtitle" value="<?= e($settings['app_subtitle'] ?? '') ?>"></div>
         <div><label>واحد پول</label><input name="currency_unit" value="<?= e($settings['currency_unit'] ?? 'ریال') ?>"></div>
+        <div><label>یادآوری تمدید قرارداد چند روز قبل از انقضا</label><input type="number" min="0" name="contract_renewal_reminder_days" value="<?= e($settings['contract_renewal_reminder_days'] ?? '30') ?>"></div>
         <div><label>رنگ اصلی</label><input type="color" name="primary_color" value="<?= e($settings['primary_color'] ?? '#155eef') ?>"></div>
         <div><label>رنگ نوار کناری</label><input type="color" name="sidebar_color" value="<?= e($settings['sidebar_color'] ?? '#111827') ?>"></div>
         <div>
@@ -53,6 +54,7 @@
         <div><label>مراحل فرصت فروش</label><textarea name="options_deal_stages"><?= e($settings['options_deal_stages'] ?? '') ?></textarea></div>
         <div><label>نوع فعالیت</label><textarea name="options_activity_types"><?= e($settings['options_activity_types'] ?? '') ?></textarea></div>
         <div><label>وضعیت فعالیت</label><textarea name="options_activity_statuses"><?= e($settings['options_activity_statuses'] ?? '') ?></textarea></div>
+        <div><label>وضعیت قرارداد</label><textarea name="options_contract_statuses"><?= e($settings['options_contract_statuses'] ?? '') ?></textarea></div>
         <div><label>وضعیت تیکت</label><textarea name="options_ticket_statuses"><?= e($settings['options_ticket_statuses'] ?? '') ?></textarea></div>
         <div><label>اولویت تیکت</label><textarea name="options_ticket_priorities"><?= e($settings['options_ticket_priorities'] ?? '') ?></textarea></div>
         <div><label>دسته‌بندی تیکت</label><textarea name="options_ticket_categories"><?= e($settings['options_ticket_categories'] ?? '') ?></textarea></div>

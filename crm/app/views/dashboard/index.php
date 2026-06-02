@@ -6,6 +6,7 @@
     <div class="card stat"><span>فروش برنده</span><strong><?= e(format_money($stats['won_value'])) ?></strong></div>
     <div class="card stat"><span>تعداد باخت</span><strong><?= e((string) $stats['lost_count']) ?></strong></div>
     <div class="card stat"><span>پیگیری‌های عقب‌افتاده</span><strong><?= e((string) $stats['overdue']) ?></strong></div>
+    <div class="card stat"><span>تمدیدهای نیازمند پیگیری</span><strong><?= e((string) $stats['renewal_due']) ?></strong></div>
 </div>
 
 <div class="grid grid-2" style="margin-top:16px">
@@ -49,5 +50,16 @@
             <p><strong><?= e(fa_date($activity['next_followup_date'])) ?></strong> - <?= e($activity['customer_name']) ?><br><span class="muted"><?= e($activity['next_action'] ?: $activity['summary']) ?></span></p>
         <?php endforeach; ?>
         <?php if (!$upcomingActivities): ?><div class="empty">پیگیری آینده‌ای وجود ندارد.</div><?php endif; ?>
+    </div>
+    <div class="card">
+        <h3>تمدید قراردادها</h3>
+        <?php foreach ($renewalContracts as $contract): ?>
+            <p>
+                <strong><a href="<?= e(url('contracts', ['action' => 'show', 'id' => $contract['id']])) ?>"><?= e($contract['contract_title']) ?></a></strong>
+                <span class="badge <?= e(badge_class($contract['status'])) ?>"><?= e(fa_label($contract['status'])) ?></span><br>
+                <span class="muted"><?= e($contract['customer_name']) ?> - یادآوری: <?= e(fa_date($contract['renewal_reminder_date'])) ?> - پایان: <?= e(fa_date($contract['end_date'])) ?></span>
+            </p>
+        <?php endforeach; ?>
+        <?php if (!$renewalContracts): ?><div class="empty">قراردادی در موعد تمدید نیست.</div><?php endif; ?>
     </div>
 </div>

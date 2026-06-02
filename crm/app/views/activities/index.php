@@ -14,13 +14,14 @@
 </form>
 <div class="table-wrap">
     <table>
-        <thead><tr><th>تاریخ</th><th>مشتری</th><th>فرصت</th><th>نوع</th><th>خلاصه</th><th>پیگیری بعدی</th><th>وضعیت</th><th>مالک</th><th>عملیات</th></tr></thead>
+        <thead><tr><th>تاریخ</th><th>مشتری</th><th>فرصت</th><th>قرارداد</th><th>نوع</th><th>خلاصه</th><th>پیگیری بعدی</th><th>وضعیت</th><th>مالک</th><th>عملیات</th></tr></thead>
         <tbody>
         <?php foreach ($activities as $activity): ?>
             <tr>
                 <td><?= e(fa_date($activity['activity_date'])) ?></td>
                 <td><?= e($activity['customer_name']) ?></td>
                 <td><?= e($activity['deal_name']) ?></td>
+                <td><?= e($activity['contract_title']) ?></td>
                 <td><?= e(fa_label($activity['activity_type'])) ?></td>
                 <td><strong><?= e($activity['summary']) ?></strong><br><span class="muted"><?= e($activity['next_action']) ?></span></td>
                 <td><?= e(fa_date($activity['next_followup_date'])) ?></td>
@@ -32,7 +33,7 @@
                 </td>
             </tr>
         <?php endforeach; ?>
-        <?php if (!$activities): ?><tr><td colspan="9" class="empty">فعالیتی یافت نشد.</td></tr><?php endif; ?>
+        <?php if (!$activities): ?><tr><td colspan="10" class="empty">فعالیتی یافت نشد.</td></tr><?php endif; ?>
         </tbody>
     </table>
 </div>

@@ -7,6 +7,7 @@ CREATE DATABASE IF NOT EXISTS simple_crm CHARACTER SET utf8mb4 COLLATE utf8mb4_u
 USE simple_crm;
 
 DROP TABLE IF EXISTS activities;
+DROP TABLE IF EXISTS contracts;
 DROP TABLE IF EXISTS email_logs;
 DROP TABLE IF EXISTS sms_logs;
 DROP TABLE IF EXISTS usage_events;
@@ -152,10 +153,33 @@ CREATE TABLE deals (
   CONSTRAINT fk_deals_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+CREATE TABLE contracts (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  contract_number VARCHAR(80) NOT NULL,
+  contract_title VARCHAR(190) NOT NULL,
+  customer_id INT UNSIGNED NOT NULL,
+  deal_id INT UNSIGNED NULL,
+  product VARCHAR(120) NOT NULL DEFAULT 'Other',
+  vehicle_count INT UNSIGNED NOT NULL DEFAULT 0,
+  contract_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+  start_date DATE NULL,
+  end_date DATE NOT NULL,
+  renewal_reminder_date DATE NULL,
+  owner_user_id INT UNSIGNED NULL,
+  status VARCHAR(80) NOT NULL DEFAULT 'Active',
+  notes TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_contracts_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_contracts_deal FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE SET NULL,
+  CONSTRAINT fk_contracts_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
 CREATE TABLE activities (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   customer_id INT UNSIGNED NOT NULL,
   deal_id INT UNSIGNED NULL,
+  contract_id INT UNSIGNED NULL,
   activity_date DATE NOT NULL,
   activity_type VARCHAR(80) NOT NULL DEFAULT 'Follow-up',
   summary VARCHAR(255) NOT NULL,
@@ -168,9 +192,11 @@ CREATE TABLE activities (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_activities_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
   CONSTRAINT fk_activities_deal FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE SET NULL,
+  CONSTRAINT fk_activities_contract FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE SET NULL,
   CONSTRAINT fk_activities_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_customers_status ON customers(sales_status);
 CREATE INDEX idx_deals_stage ON deals(deal_stage);
+CREATE INDEX idx_contracts_renewal ON contracts(renewal_reminder_date, status);
 CREATE INDEX idx_activities_followup ON activities(next_followup_date, status);

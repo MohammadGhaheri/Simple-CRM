@@ -16,6 +16,7 @@ INSERT INTO app_settings (setting_key, setting_value) VALUES
 ('home_title', 'Elm Simple CRM'),
 ('home_text', 'یک سامانه سبک برای مدیریت مشتریان، مخاطبین، فرصت‌های فروش، پیگیری‌ها و تیکت‌های مشتریان.'),
 ('currency_unit', 'ریال'),
+('contract_renewal_reminder_days', '30'),
 ('customer_code_mode', 'manual'),
 ('customer_code_format', 'CUS-{YYYY}-{SEQ4}'),
 ('options_customer_types', 'B2B Fleet|ناوگان سازمانی
@@ -55,12 +56,18 @@ Proposal Sent|پیشنهاد ارسال شده
 Demo|دمو
 Follow-up|پیگیری
 Contract|قرارداد
+Contract Renewal|تمدید قرارداد
 Support|پشتیبانی
 Other|سایر'),
 ('options_activity_statuses', 'Open|باز
 Done|انجام شده
 Cancelled|لغو شده
 Waiting|در انتظار'),
+('options_contract_statuses', 'Active|فعال
+Renewal Due|نیازمند تمدید
+Renewed|تمدید شده
+Expired|منقضی شده
+Cancelled|لغو شده'),
 ('options_ticket_statuses', 'Open|باز
 In Progress|در حال بررسی
 Waiting Customer|در انتظار مشتری

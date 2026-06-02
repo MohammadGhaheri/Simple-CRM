@@ -15,7 +15,7 @@
 
 <div class="table-wrap">
     <table>
-        <thead><tr><th>کد</th><th>نام</th><th>نوع</th><th>شهر</th><th>محصول</th><th>وضعیت</th><th>مالک</th><th>پیگیری بعدی</th><th>عملیات</th></tr></thead>
+        <thead><tr><th>کد</th><th>نام</th><th>نوع</th><th>شهر</th><th>وضعیت</th><th>مالک</th><th>پیگیری بعدی</th><th>عملیات</th></tr></thead>
         <tbody>
         <?php foreach ($customers as $customer): ?>
             <tr>
@@ -23,18 +23,17 @@
                 <td><strong><?= e($customer['customer_name']) ?></strong><br><span class="muted"><?= e($customer['industry']) ?></span></td>
                 <td><?= e(fa_label($customer['customer_type'])) ?></td>
                 <td><?= e($customer['city']) ?></td>
-                <td><?= e($customer['interested_product']) ?></td>
                 <td><span class="badge <?= e(badge_class($customer['sales_status'])) ?>"><?= e(fa_label($customer['sales_status'])) ?></span></td>
                 <td><?= e($customer['owner_name']) ?></td>
                 <td><?= e(fa_date($customer['next_followup_date'])) ?></td>
                 <td class="actions">
                     <a class="btn btn-small btn-light" href="<?= e(url('customers', ['action' => 'show', 'id' => $customer['id']])) ?>">نمایش</a>
                     <a class="btn btn-small btn-light" href="<?= e(url('customers', ['action' => 'edit', 'id' => $customer['id']])) ?>">ویرایش</a>
-                    <form method="post" action="<?= e(url('customers', ['action' => 'delete', 'id' => $customer['id']])) ?>" data-confirm="حذف این مشتری همه مخاطب‌ها، فرصت‌ها و فعالیت‌های مرتبط را حذف می‌کند. ادامه می‌دهید؟"><?= csrf_field() ?><button class="btn btn-small btn-danger">حذف</button></form>
+                    <form method="post" action="<?= e(url('customers', ['action' => 'delete', 'id' => $customer['id']])) ?>" data-confirm="حذف این مشتری همه مخاطب‌ها، فرصت‌ها، قراردادها و فعالیت‌های مرتبط را حذف می‌کند. ادامه می‌دهید؟"><?= csrf_field() ?><button class="btn btn-small btn-danger">حذف</button></form>
                 </td>
             </tr>
         <?php endforeach; ?>
-        <?php if (!$customers): ?><tr><td colspan="9" class="empty">موردی یافت نشد.</td></tr><?php endif; ?>
+        <?php if (!$customers): ?><tr><td colspan="8" class="empty">موردی یافت نشد.</td></tr><?php endif; ?>
         </tbody>
     </table>
 </div>

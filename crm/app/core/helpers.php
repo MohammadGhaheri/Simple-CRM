@@ -273,6 +273,11 @@ function badge_class(string $value): string
         'Done' => 'badge-success',
         'Cancelled' => 'badge-danger',
         'Waiting' => 'badge-warning',
+        'Active' => 'badge-success',
+        'Renewal Due' => 'badge-warning',
+        'Renewed' => 'badge-primary',
+        'Expired' => 'badge-danger',
+        'Contract Renewal' => 'badge-warning',
     ];
 
     return $map[$value] ?? 'badge-muted';
@@ -337,6 +342,11 @@ function activity_status_options(): array
     return option_values('options_activity_statuses');
 }
 
+function contract_status_options(): array
+{
+    return option_values('options_contract_statuses');
+}
+
 function fa_label(string $value): string
 {
     foreach ([
@@ -346,6 +356,7 @@ function fa_label(string $value): string
         'options_deal_stages',
         'options_activity_types',
         'options_activity_statuses',
+        'options_contract_statuses',
         'options_ticket_statuses',
         'options_ticket_priorities',
         'options_ticket_categories',
@@ -385,7 +396,12 @@ function fa_label(string $value): string
         'Demo' => 'دمو',
         'Follow-up' => 'پیگیری',
         'Contract' => 'قرارداد',
+        'Contract Renewal' => 'تمدید قرارداد',
         'Support' => 'پشتیبانی',
+        'Active' => 'فعال',
+        'Renewal Due' => 'نیازمند تمدید',
+        'Renewed' => 'تمدید شده',
+        'Expired' => 'منقضی شده',
     ];
 
     return $labels[$value] ?? $value;

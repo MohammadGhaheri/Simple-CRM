@@ -3,6 +3,34 @@
     <a class="btn btn-primary" href="<?= e(url('users', ['action' => 'create'])) ?>">کاربر جدید</a>
 </div>
 
+<?php if (!empty($errors)): ?>
+    <div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div>
+<?php endif; ?>
+<?php if (!empty($transferred)): ?>
+    <div class="alert alert-success"><?= e((string) $transferred) ?> مورد از وظایف و قراردادهای باز منتقل شد.</div>
+<?php endif; ?>
+
+<div class="card" style="margin-bottom:16px">
+    <h3>انتقال وظایف فردی</h3>
+    <p class="muted">فعالیت‌های باز و قراردادهای فعال یک کاربر را به کاربر دیگر منتقل کنید.</p>
+    <form class="filters" method="post" action="<?= e(url('users', ['action' => 'transfer_tasks'])) ?>">
+        <?= csrf_field() ?>
+        <select name="from_user_id" required>
+            <option value="">از کاربر</option>
+            <?php foreach ($usersList as $user): ?>
+                <option value="<?= e((string) $user['id']) ?>"><?= e($user['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <select name="to_user_id" required>
+            <option value="">به کاربر</option>
+            <?php foreach ($usersList as $user): ?>
+                <option value="<?= e((string) $user['id']) ?>"><?= e($user['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <button class="btn btn-light" data-confirm="وظایف باز و قراردادهای فعال منتقل شوند؟">انتقال</button>
+    </form>
+</div>
+
 <div class="table-wrap">
     <table>
         <thead>

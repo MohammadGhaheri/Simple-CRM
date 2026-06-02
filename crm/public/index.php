@@ -11,6 +11,7 @@ require __DIR__ . '/../app/models/User.php';
 require __DIR__ . '/../app/models/Customer.php';
 require __DIR__ . '/../app/models/Contact.php';
 require __DIR__ . '/../app/models/Deal.php';
+require __DIR__ . '/../app/models/Contract.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/Setting.php';
@@ -123,12 +124,14 @@ try {
                     'currency_unit' => trim($_POST['currency_unit'] ?? 'ریال'),
                     'customer_code_mode' => ($_POST['customer_code_mode'] ?? 'manual') === 'auto' ? 'auto' : 'manual',
                     'customer_code_format' => trim($_POST['customer_code_format'] ?? 'CUS-{YYYY}-{SEQ4}'),
+                    'contract_renewal_reminder_days' => max(0, (int) ($_POST['contract_renewal_reminder_days'] ?? 30)),
                     'options_customer_types' => trim($_POST['options_customer_types'] ?? ''),
                     'options_sales_statuses' => trim($_POST['options_sales_statuses'] ?? ''),
                     'options_products' => trim($_POST['options_products'] ?? ''),
                     'options_deal_stages' => trim($_POST['options_deal_stages'] ?? ''),
                     'options_activity_types' => trim($_POST['options_activity_types'] ?? ''),
                     'options_activity_statuses' => trim($_POST['options_activity_statuses'] ?? ''),
+                    'options_contract_statuses' => trim($_POST['options_contract_statuses'] ?? ''),
                     'options_ticket_statuses' => trim($_POST['options_ticket_statuses'] ?? ''),
                     'options_ticket_priorities' => trim($_POST['options_ticket_priorities'] ?? ''),
                     'options_ticket_categories' => trim($_POST['options_ticket_categories'] ?? ''),
@@ -269,7 +272,23 @@ try {
             exit;
         }
 
-        render('users/index', ['title' => 'مدیریت کاربران', 'usersList' => User::all()]);
+        if ($action === 'transfer_tasks') {
+            if (is_post()) {
+                verify_csrf();
+                $fromUserId = (int) ($_POST['from_user_id'] ?? 0);
+                $toUserId = (int) ($_POST['to_user_id'] ?? 0);
+                if ($fromUserId <= 0 || $toUserId <= 0 || $fromUserId === $toUserId) {
+                    $errors[] = 'مبدا و مقصد انتقال وظایف را درست انتخاب کنید.';
+                }
+                if (!$errors) {
+                    $activityCount = Activity::transferOwner($fromUserId, $toUserId);
+                    $contractCount = Contract::transferOwner($fromUserId, $toUserId);
+                    redirect(url('users', ['transferred' => $activityCount + $contractCount]));
+                }
+            }
+        }
+
+        render('users/index', ['title' => 'مدیریت کاربران', 'usersList' => User::all(), 'errors' => $errors, 'transferred' => (int) ($_GET['transferred'] ?? 0)]);
         exit;
     }
 
@@ -299,6 +318,7 @@ try {
             'won_value' => (float) db()->query("SELECT COALESCE(SUM(estimated_amount),0) FROM deals WHERE deal_stage = 'Won'")->fetchColumn(),
             'lost_count' => (int) db()->query("SELECT COUNT(*) FROM deals WHERE deal_stage = 'Lost'")->fetchColumn(),
             'overdue' => Activity::overdueCount(),
+            'renewal_due' => (int) db()->query("SELECT COUNT(*) FROM contracts WHERE renewal_reminder_date <= CURDATE() AND status IN ('Active','Renewal Due')")->fetchColumn(),
         ];
         render('dashboard/index', [
             'title' => 'داشبورد فروش',
@@ -307,6 +327,7 @@ try {
             'customersByType' => Customer::statsByType(),
             'recentActivities' => Activity::recent(),
             'upcomingActivities' => Activity::upcoming(),
+            'renewalContracts' => Contract::renewalDue(),
         ]);
         exit;
     }
@@ -360,6 +381,7 @@ try {
                 'customer' => $customer,
                 'contacts' => Contact::byCustomer($id),
                 'deals' => Deal::byCustomer($id),
+                'contracts' => Contract::byCustomer($id),
                 'activities' => Activity::byCustomer($id),
             ]);
             exit;
@@ -566,10 +588,67 @@ try {
             if (!$deal) {
                 redirect(url('deals'));
             }
-            render('deals/show', ['title' => $deal['deal_name'], 'deal' => $deal, 'activities' => Activity::byDeal($id)]);
+            render('deals/show', ['title' => $deal['deal_name'], 'deal' => $deal, 'contracts' => Contract::byDeal($id), 'activities' => Activity::byDeal($id)]);
             exit;
         }
         render('deals/index', ['title' => 'فرصت‌های فروش', 'deals' => Deal::search($_GET), 'users' => $users, 'filters' => $_GET]);
+        exit;
+    }
+
+    if ($page === 'contracts') {
+        if ($action === 'delete' && is_post()) {
+            delete_action(fn() => Contract::delete($id), url('contracts'));
+        }
+        if ($action === 'create') {
+            $dealId = (int) ($_GET['deal_id'] ?? 0);
+            $deal = $dealId > 0 ? Deal::find($dealId) : null;
+            $contract = [
+                'customer_id' => (int) ($deal['customer_id'] ?? ($_GET['customer_id'] ?? 0)),
+                'deal_id' => $dealId,
+                'product' => $deal['product'] ?? 'Other',
+                'vehicle_count' => (int) ($deal['vehicle_count'] ?? 0),
+                'contract_amount' => (float) ($deal['estimated_amount'] ?? 0),
+                'owner_user_id' => (int) ($deal['owner_user_id'] ?? current_user_id()),
+                'status' => 'Active',
+            ];
+            if (is_post()) {
+                verify_csrf();
+                $errors = required_fields($_POST, ['contract_number' => 'شماره قرارداد', 'contract_title' => 'عنوان قرارداد', 'customer_id' => 'مشتری', 'end_date' => 'تاریخ پایان']);
+                if (!$errors) {
+                    $newId = Contract::create($_POST);
+                    redirect(url('contracts', ['action' => 'show', 'id' => $newId]));
+                }
+                $contract = $_POST;
+            }
+            render('contracts/create', ['title' => 'قرارداد جدید', 'contract' => $contract, 'customers' => Customer::search(), 'deals' => Deal::search(), 'users' => $users, 'errors' => $errors]);
+            exit;
+        }
+        if ($action === 'edit') {
+            $contract = Contract::find($id);
+            if (!$contract) {
+                redirect(url('contracts'));
+            }
+            if (is_post()) {
+                verify_csrf();
+                $errors = required_fields($_POST, ['contract_number' => 'شماره قرارداد', 'contract_title' => 'عنوان قرارداد', 'customer_id' => 'مشتری', 'end_date' => 'تاریخ پایان']);
+                if (!$errors) {
+                    Contract::update($id, $_POST);
+                    redirect(url('contracts', ['action' => 'show', 'id' => $id]));
+                }
+                $contract = array_merge($contract, $_POST);
+            }
+            render('contracts/edit', ['title' => 'ویرایش قرارداد', 'contract' => $contract, 'customers' => Customer::search(), 'deals' => Deal::search(), 'users' => $users, 'errors' => $errors]);
+            exit;
+        }
+        if ($action === 'show') {
+            $contract = Contract::find($id);
+            if (!$contract) {
+                redirect(url('contracts'));
+            }
+            render('contracts/show', ['title' => $contract['contract_title'], 'contract' => $contract, 'activities' => Activity::byContract($id)]);
+            exit;
+        }
+        render('contracts/index', ['title' => 'قراردادها', 'contracts' => Contract::search($_GET), 'users' => $users, 'filters' => $_GET]);
         exit;
     }
 
@@ -583,6 +662,7 @@ try {
             $activity = [
                 'customer_id' => (int) ($sourceActivity['customer_id'] ?? ($_GET['customer_id'] ?? 0)),
                 'deal_id' => (int) ($sourceActivity['deal_id'] ?? ($_GET['deal_id'] ?? 0)),
+                'contract_id' => (int) ($sourceActivity['contract_id'] ?? ($_GET['contract_id'] ?? 0)),
                 'activity_date' => fa_date(date('Y-m-d')),
                 'status' => 'Open',
                 'activity_type' => $sourceActivity['activity_type'] ?? 'Follow-up',
@@ -605,7 +685,13 @@ try {
                     if ($sourceActivity) {
                         redirect(url('my_tasks'));
                     }
-                    $target = !empty($_POST['deal_id']) ? url('deals', ['action' => 'show', 'id' => (int) $_POST['deal_id']]) : url('customers', ['action' => 'show', 'id' => (int) $_POST['customer_id']]);
+                    if (!empty($_POST['contract_id'])) {
+                        $target = url('contracts', ['action' => 'show', 'id' => (int) $_POST['contract_id']]);
+                    } elseif (!empty($_POST['deal_id'])) {
+                        $target = url('deals', ['action' => 'show', 'id' => (int) $_POST['deal_id']]);
+                    } else {
+                        $target = url('customers', ['action' => 'show', 'id' => (int) $_POST['customer_id']]);
+                    }
                     redirect($target);
                 }
                 $activity = $_POST;

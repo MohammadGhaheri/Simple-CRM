@@ -6,12 +6,12 @@ class Activity
 {
     public static function search(array $filters = []): array
     {
-        $sql = 'SELECT a.*, c.customer_name, d.deal_name, u.name AS owner_name FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN users u ON u.id = a.owner_user_id WHERE 1=1';
+        $sql = 'SELECT a.*, c.customer_name, d.deal_name, ct.contract_title, u.name AS owner_name FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id LEFT JOIN users u ON u.id = a.owner_user_id WHERE 1=1';
         $params = [];
         if (!empty($filters['q'])) {
-            $sql .= ' AND (a.summary LIKE ? OR c.customer_name LIKE ? OR d.deal_name LIKE ?)';
+            $sql .= ' AND (a.summary LIKE ? OR c.customer_name LIKE ? OR d.deal_name LIKE ? OR ct.contract_title LIKE ?)';
             $q = '%' . $filters['q'] . '%';
-            array_push($params, $q, $q, $q);
+            array_push($params, $q, $q, $q, $q);
         }
         foreach (['status', 'activity_type', 'owner_user_id'] as $field) {
             if (!empty($filters[$field])) {
@@ -35,15 +35,22 @@ class Activity
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT a.*, d.deal_name FROM activities a LEFT JOIN deals d ON d.id = a.deal_id WHERE a.customer_id = ? ORDER BY a.activity_date DESC, a.id DESC');
+        $stmt = db()->prepare('SELECT a.*, d.deal_name, ct.contract_title FROM activities a LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id WHERE a.customer_id = ? ORDER BY a.activity_date DESC, a.id DESC');
         $stmt->execute([$customerId]);
         return $stmt->fetchAll();
     }
 
     public static function byDeal(int $dealId): array
     {
-        $stmt = db()->prepare('SELECT a.*, c.customer_name FROM activities a JOIN customers c ON c.id = a.customer_id WHERE a.deal_id = ? ORDER BY a.activity_date DESC, a.id DESC');
+        $stmt = db()->prepare('SELECT a.*, c.customer_name, ct.contract_title FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN contracts ct ON ct.id = a.contract_id WHERE a.deal_id = ? ORDER BY a.activity_date DESC, a.id DESC');
         $stmt->execute([$dealId]);
+        return $stmt->fetchAll();
+    }
+
+    public static function byContract(int $contractId): array
+    {
+        $stmt = db()->prepare('SELECT a.*, c.customer_name, d.deal_name FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN deals d ON d.id = a.deal_id WHERE a.contract_id = ? ORDER BY a.activity_date DESC, a.id DESC');
+        $stmt->execute([$contractId]);
         return $stmt->fetchAll();
     }
 
@@ -63,7 +70,7 @@ class Activity
 
     public static function create(array $data): int
     {
-        $sql = 'INSERT INTO activities (customer_id, deal_id, activity_date, activity_type, summary, next_action, next_followup_date, owner_user_id, status, notes) VALUES (:customer_id, :deal_id, :activity_date, :activity_type, :summary, :next_action, :next_followup_date, :owner_user_id, :status, :notes)';
+        $sql = 'INSERT INTO activities (customer_id, deal_id, contract_id, activity_date, activity_type, summary, next_action, next_followup_date, owner_user_id, status, notes) VALUES (:customer_id, :deal_id, :contract_id, :activity_date, :activity_type, :summary, :next_action, :next_followup_date, :owner_user_id, :status, :notes)';
         db()->prepare($sql)->execute(self::payload($data));
         self::syncCustomerFollowup($data);
         return (int) db()->lastInsertId();
@@ -71,7 +78,7 @@ class Activity
 
     public static function update(int $id, array $data): void
     {
-        $sql = 'UPDATE activities SET customer_id=:customer_id, deal_id=:deal_id, activity_date=:activity_date, activity_type=:activity_type, summary=:summary, next_action=:next_action, next_followup_date=:next_followup_date, owner_user_id=:owner_user_id, status=:status, notes=:notes WHERE id=:id';
+        $sql = 'UPDATE activities SET customer_id=:customer_id, deal_id=:deal_id, contract_id=:contract_id, activity_date=:activity_date, activity_type=:activity_type, summary=:summary, next_action=:next_action, next_followup_date=:next_followup_date, owner_user_id=:owner_user_id, status=:status, notes=:notes WHERE id=:id';
         $payload = self::payload($data);
         $payload['id'] = $id;
         db()->prepare($sql)->execute($payload);
@@ -122,10 +129,11 @@ class Activity
             $where[] = 'a.next_followup_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)';
         }
 
-        $sql = 'SELECT a.*, c.customer_name, d.deal_name
+        $sql = 'SELECT a.*, c.customer_name, d.deal_name, ct.contract_title
                 FROM activities a
                 JOIN customers c ON c.id = a.customer_id
                 LEFT JOIN deals d ON d.id = a.deal_id
+                LEFT JOIN contracts ct ON ct.id = a.contract_id
                 WHERE ' . implode(' AND ', $where) . '
                 ORDER BY a.next_followup_date ASC, a.id ASC';
         $stmt = db()->prepare($sql);
@@ -160,11 +168,61 @@ class Activity
         $stmt->execute([$id, $ownerId]);
     }
 
+    public static function transferOwner(int $fromUserId, int $toUserId): int
+    {
+        $stmt = db()->prepare("UPDATE activities SET owner_user_id = ? WHERE owner_user_id = ? AND status <> 'Done'");
+        $stmt->execute([$toUserId, $fromUserId]);
+        return $stmt->rowCount();
+    }
+
+    public static function createOrUpdateContractRenewal(array $contract): void
+    {
+        $contractId = (int) ($contract['id'] ?? 0);
+        if ($contractId <= 0) {
+            return;
+        }
+
+        if (!in_array(($contract['status'] ?? 'Active'), ['Active', 'Renewal Due'], true)) {
+            $stmt = db()->prepare("UPDATE activities SET status = 'Cancelled' WHERE contract_id = ? AND activity_type = 'Contract Renewal' AND status <> 'Done'");
+            $stmt->execute([$contractId]);
+            return;
+        }
+
+        if (empty($contract['renewal_reminder_date'])) {
+            return;
+        }
+
+        $payload = [
+            'customer_id' => (int) $contract['customer_id'],
+            'deal_id' => !empty($contract['deal_id']) ? (int) $contract['deal_id'] : null,
+            'contract_id' => $contractId,
+            'activity_date' => date('Y-m-d'),
+            'activity_type' => 'Contract Renewal',
+            'summary' => 'پیگیری تمدید قرارداد: ' . ($contract['contract_title'] ?? ''),
+            'next_action' => 'بررسی تمدید قرارداد پیش از تاریخ پایان ' . fa_date($contract['end_date'] ?? ''),
+            'next_followup_date' => $contract['renewal_reminder_date'],
+            'owner_user_id' => (int) ($contract['owner_user_id'] ?? current_user_id()),
+            'status' => 'Open',
+            'notes' => 'این فعالیت به صورت خودکار از قرارداد ساخته یا به‌روزرسانی شده است.',
+        ];
+
+        $existing = db()->prepare("SELECT id FROM activities WHERE contract_id = ? AND activity_type = 'Contract Renewal' AND status <> 'Done' ORDER BY id DESC LIMIT 1");
+        $existing->execute([$contractId]);
+        $activityId = (int) ($existing->fetchColumn() ?: 0);
+        if ($activityId > 0) {
+            self::update($activityId, $payload);
+            return;
+        }
+
+        self::create($payload);
+    }
+
     private static function payload(array $data): array
     {
         return [
             'customer_id' => (int) ($data['customer_id'] ?? 0),
             'deal_id' => !empty($data['deal_id']) ? (int) $data['deal_id'] : null,
+            'contract_id' => !empty($data['contract_id']) ? (int) $data['contract_id'] : null,
             'activity_date' => db_date($data['activity_date'] ?? null) ?: date('Y-m-d'),
             'activity_type' => $data['activity_type'] ?? 'Follow-up',
             'summary' => trim($data['summary'] ?? ''),

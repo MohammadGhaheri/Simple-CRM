@@ -3,6 +3,7 @@
     <div class="actions">
         <a class="btn btn-primary" href="<?= e(url('activities', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">ثبت فعالیت</a>
         <a class="btn btn-light" href="<?= e(url('deals', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">فرصت جدید</a>
+        <a class="btn btn-light" href="<?= e(url('contracts', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">قرارداد جدید</a>
         <a class="btn btn-light" href="<?= e(url('contacts', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">مخاطب جدید</a>
     </div>
 </div>
@@ -13,9 +14,6 @@
         <div><span>نوع</span><?= e(fa_label($customer['customer_type'])) ?></div>
         <div><span>وضعیت</span><span class="badge <?= e(badge_class($customer['sales_status'])) ?>"><?= e(fa_label($customer['sales_status'])) ?></span></div>
         <div><span>شهر</span><?= e($customer['city']) ?></div>
-        <div><span>محصول</span><?= e($customer['interested_product']) ?></div>
-        <div><span>تعداد خودرو</span><?= e((string) $customer['vehicle_count']) ?></div>
-        <div><span>ارزش تخمینی</span><?= e(format_money($customer['estimated_contract_value'])) ?></div>
         <div><span>مالک</span><?= e($customer['owner_name']) ?></div>
         <div><span>پیگیری بعدی</span><?= e(fa_date($customer['next_followup_date'])) ?></div>
     </div>
@@ -43,6 +41,13 @@
             <p><a href="<?= e(url('deals', ['action' => 'show', 'id' => $deal['id']])) ?>"><strong><?= e($deal['deal_name']) ?></strong></a> <span class="badge <?= e(badge_class($deal['deal_stage'])) ?>"><?= e(fa_label($deal['deal_stage'])) ?></span><br><span class="muted"><?= e($deal['product']) ?> - <?= e(format_money($deal['estimated_amount'])) ?></span></p>
         <?php endforeach; ?>
         <?php if (!$deals): ?><div class="empty">فرصتی ثبت نشده است.</div><?php endif; ?>
+    </div>
+    <div class="card">
+        <h3>قراردادها</h3>
+        <?php foreach ($contracts as $contract): ?>
+            <p><a href="<?= e(url('contracts', ['action' => 'show', 'id' => $contract['id']])) ?>"><strong><?= e($contract['contract_title']) ?></strong></a> <span class="badge <?= e(badge_class($contract['status'])) ?>"><?= e(fa_label($contract['status'])) ?></span><br><span class="muted"><?= e($contract['contract_number']) ?> - پایان: <?= e(fa_date($contract['end_date'])) ?> - <?= e(format_money($contract['contract_amount'])) ?></span></p>
+        <?php endforeach; ?>
+        <?php if (!$contracts): ?><div class="empty">قراردادی ثبت نشده است.</div><?php endif; ?>
     </div>
 </div>
 

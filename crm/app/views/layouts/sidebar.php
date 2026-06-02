@@ -17,6 +17,7 @@
         <a class="<?= ($page ?? '') === 'customers' ? 'active' : '' ?>" href="<?= e(url('customers')) ?>">مشتریان</a>
         <a class="<?= ($page ?? '') === 'contacts' ? 'active' : '' ?>" href="<?= e(url('contacts')) ?>">مخاطبین</a>
         <a class="<?= ($page ?? '') === 'deals' ? 'active' : '' ?>" href="<?= e(url('deals')) ?>">فرصت‌ها</a>
+        <a class="<?= ($page ?? '') === 'contracts' ? 'active' : '' ?>" href="<?= e(url('contracts')) ?>">قراردادها</a>
         <a class="<?= ($page ?? '') === 'activities' ? 'active' : '' ?>" href="<?= e(url('activities')) ?>">فعالیت‌ها</a>
         <?php $ticketNeedsReview = class_exists('Ticket') ? Ticket::needsReviewCount() : 0; ?>
         <a class="nav-with-badge <?= ($page ?? '') === 'tickets' ? 'active' : '' ?>" href="<?= e(url('tickets')) ?>">

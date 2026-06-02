@@ -1,6 +1,7 @@
 <div class="toolbar">
     <h2><?= e($deal['deal_name']) ?></h2>
     <div class="actions">
+        <a class="btn btn-primary" href="<?= e(url('contracts', ['action' => 'create', 'deal_id' => $deal['id']])) ?>">ثبت قرارداد</a>
         <a class="btn btn-primary" href="<?= e(url('activities', ['action' => 'create', 'customer_id' => $deal['customer_id'], 'deal_id' => $deal['id']])) ?>">ثبت فعالیت</a>
         <a class="btn btn-light" href="<?= e(url('deals', ['action' => 'edit', 'id' => $deal['id']])) ?>">ویرایش</a>
     </div>
@@ -19,6 +20,21 @@
     </div>
     <?php if ($deal['win_loss_reason']): ?><p><strong>دلیل برد/باخت:</strong> <?= e($deal['win_loss_reason']) ?></p><?php endif; ?>
     <?php if ($deal['notes']): ?><p class="muted"><?= nl2br(e($deal['notes'])) ?></p><?php endif; ?>
+</div>
+<div class="card" style="margin-top:16px">
+    <h3>قراردادهای مرتبط</h3>
+    <?php foreach ($contracts as $contract): ?>
+        <p>
+            <strong><a href="<?= e(url('contracts', ['action' => 'show', 'id' => $contract['id']])) ?>"><?= e($contract['contract_title']) ?></a></strong>
+            <span class="badge <?= e(badge_class($contract['status'])) ?>"><?= e(fa_label($contract['status'])) ?></span><br>
+            <span class="muted">
+                <?= e($contract['contract_number']) ?> -
+                پایان: <?= e(fa_date($contract['end_date'])) ?> -
+                <?= e(format_money($contract['contract_amount'])) ?>
+            </span>
+        </p>
+    <?php endforeach; ?>
+    <?php if (!$contracts): ?><div class="empty">هنوز قراردادی برای این فرصت ثبت نشده است.</div><?php endif; ?>
 </div>
 <div class="card" style="margin-top:16px">
     <h3>فعالیت‌های مرتبط</h3>

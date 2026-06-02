@@ -26,6 +26,9 @@ function render_agenda_items(array $activities, string $type): void
                     <?php if (!empty($activity['deal_id'])): ?>
                         <span> | فرصت: <a href="<?= e(url('deals', ['action' => 'show', 'id' => $activity['deal_id']])) ?>"><?= e($activity['deal_name']) ?></a></span>
                     <?php endif; ?>
+                    <?php if (!empty($activity['contract_id'])): ?>
+                        <span> | قرارداد: <a href="<?= e(url('contracts', ['action' => 'show', 'id' => $activity['contract_id']])) ?>"><?= e($activity['contract_title']) ?></a></span>
+                    <?php endif; ?>
                     <br>
                     <span>موعد پیگیری: <?= e(fa_date($activity['next_followup_date'])) ?></span>
                     <?php if (!empty($activity['next_action'])): ?>
