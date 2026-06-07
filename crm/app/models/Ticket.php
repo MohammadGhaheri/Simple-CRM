@@ -141,6 +141,16 @@ class Ticket
         return (int) db()->query("SELECT COUNT(*) FROM tickets WHERE status NOT IN ('Resolved','Closed')")->fetchColumn();
     }
 
+    public static function supportUnreadCount(): int
+    {
+        return (int) db()->query("
+            SELECT COUNT(*)
+            FROM ticket_messages
+            WHERE sender_type = 'contact'
+              AND user_read_at IS NULL
+        ")->fetchColumn();
+    }
+
     public static function statuses(): array
     {
         return function_exists('option_values') ? option_values('options_ticket_statuses') : ['Open', 'In Progress', 'Waiting Customer', 'Resolved', 'Closed'];

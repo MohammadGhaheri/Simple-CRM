@@ -27,7 +27,7 @@
                 <td><?= e(Ticket::label($ticket['category'])) ?></td>
                 <td><span class="badge <?= e($ticket['priority'] === 'Urgent' || $ticket['priority'] === 'High' ? 'badge-danger' : 'badge-muted') ?>"><?= e(Ticket::label($ticket['priority'])) ?></span></td>
                 <td><span class="badge <?= e(badge_class($ticket['status'])) ?>"><?= e(Ticket::label($ticket['status'])) ?></span></td>
-                <td><a class="btn btn-small btn-light" href="<?= e(url('tickets', ['action' => 'edit', 'id' => $ticket['id']])) ?>">بررسی</a></td>
+                <td><a class="btn btn-small <?= $unreadCount > 0 ? 'btn-primary' : 'btn-light' ?>" href="<?= e(url('tickets', ['action' => 'edit', 'id' => $ticket['id']])) ?>"><?= $unreadCount > 0 ? 'مشاهده پیام' : 'بررسی' ?></a></td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$tickets): ?><tr><td colspan="8" class="empty">تیکتی یافت نشد.</td></tr><?php endif; ?>

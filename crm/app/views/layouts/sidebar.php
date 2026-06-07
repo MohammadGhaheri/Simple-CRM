@@ -19,7 +19,7 @@
         <a class="<?= ($page ?? '') === 'deals' ? 'active' : '' ?>" href="<?= e(url('deals')) ?>">فرصت‌ها</a>
         <a class="<?= ($page ?? '') === 'contracts' ? 'active' : '' ?>" href="<?= e(url('contracts')) ?>">قراردادها</a>
         <a class="<?= ($page ?? '') === 'activities' ? 'active' : '' ?>" href="<?= e(url('activities')) ?>">فعالیت‌ها</a>
-        <?php $ticketNeedsReview = class_exists('Ticket') ? Ticket::needsReviewCount() : 0; ?>
+        <?php $ticketNeedsReview = class_exists('Ticket') ? Ticket::supportUnreadCount() : 0; ?>
         <a class="nav-with-badge <?= ($page ?? '') === 'tickets' ? 'active' : '' ?>" href="<?= e(url('tickets')) ?>">
             <span>تیکت‌ها</span>
             <?php if ($ticketNeedsReview > 0): ?>
