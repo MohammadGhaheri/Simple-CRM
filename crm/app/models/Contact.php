@@ -77,6 +77,19 @@ class Contact
         db()->prepare($sql)->execute($payload);
     }
 
+    public static function updatePortalPassword(int $id, string $password): void
+    {
+        db()->prepare('UPDATE contacts SET password_hash = ? WHERE id = ?')->execute([
+            password_hash($password, PASSWORD_DEFAULT),
+            $id,
+        ]);
+    }
+
+    public static function updateAvatar(int $id, string $avatarPath): void
+    {
+        db()->prepare('UPDATE contacts SET avatar_path = ? WHERE id = ?')->execute([$avatarPath, $id]);
+    }
+
     public static function delete(int $id): void
     {
         db()->prepare('DELETE FROM contacts WHERE id = ?')->execute([$id]);

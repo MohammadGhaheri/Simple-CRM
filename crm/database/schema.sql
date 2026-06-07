@@ -109,6 +109,7 @@ CREATE TABLE contacts (
   email VARCHAR(190) NULL,
   portal_enabled TINYINT(1) NOT NULL DEFAULT 0,
   password_hash VARCHAR(255) NULL,
+  avatar_path VARCHAR(255) NULL,
   default_support_user_id INT UNSIGNED NULL,
   is_primary TINYINT(1) NOT NULL DEFAULT 0,
   notes TEXT NULL,

@@ -60,6 +60,7 @@ function portal_layout(string $title, callable $content): void
             <?php if ($contact): ?>
                 <div class="user-menu">
                     <span><?= e($contact['contact_name']) ?> - <?= e($contact['customer_name']) ?></span>
+                    <a class="btn btn-light" href="portal.php?action=profile">پروفایل من</a>
                     <a class="btn btn-light" href="portal.php?action=logout">خروج</a>
                 </div>
             <?php endif; ?>
@@ -145,6 +146,110 @@ if ($action === 'login') {
 
 $contact = require_portal_auth();
 UsageReport::logUsage('contact', (int) $contact['id'], 'portal_' . $action, $_SERVER['REQUEST_METHOD'] ?? 'GET');
+
+if ($action === 'profile') {
+    $profileErrors = [];
+    $profileSuccess = '';
+    if (is_post()) {
+        verify_csrf();
+        if (($_POST['form_type'] ?? '') === 'password') {
+            $currentPassword = (string) ($_POST['current_password'] ?? '');
+            $newPassword = (string) ($_POST['new_password'] ?? '');
+            $confirmPassword = (string) ($_POST['confirm_password'] ?? '');
+            if (empty($contact['password_hash']) || !password_verify($currentPassword, $contact['password_hash'])) {
+                $profileErrors[] = 'رمز عبور فعلی درست نیست.';
+            }
+            if (strlen($newPassword) < 8) {
+                $profileErrors[] = 'رمز عبور جدید باید حداقل ۸ کاراکتر باشد.';
+            }
+            if ($newPassword !== $confirmPassword) {
+                $profileErrors[] = 'تکرار رمز عبور با رمز جدید یکسان نیست.';
+            }
+            if (!$profileErrors) {
+                Contact::updatePortalPassword((int) $contact['id'], $newPassword);
+                $profileSuccess = 'رمز عبور با موفقیت تغییر کرد.';
+                $contact = require_portal_auth();
+            }
+        }
+
+        if (($_POST['form_type'] ?? '') === 'avatar') {
+            try {
+                $avatarPath = upload_profile_image('avatar_file', 'contacts');
+                if (!$avatarPath) {
+                    $profileErrors[] = 'لطفاً یک تصویر پروفایل انتخاب کنید.';
+                } else {
+                    Contact::updateAvatar((int) $contact['id'], $avatarPath);
+                    $profileSuccess = 'تصویر پروفایل با موفقیت ذخیره شد.';
+                    $contact = require_portal_auth();
+                }
+            } catch (RuntimeException $e) {
+                $profileErrors[] = $e->getMessage();
+            }
+        }
+    }
+
+    portal_layout('پروفایل من', function () use ($contact, $profileErrors, $profileSuccess) {
+        ?>
+        <div class="toolbar">
+            <h2>پروفایل من</h2>
+            <a class="btn btn-light" href="portal.php">بازگشت</a>
+        </div>
+        <?php if ($profileSuccess): ?><div class="alert alert-success"><?= e($profileSuccess) ?></div><?php endif; ?>
+        <?php if ($profileErrors): ?><div class="alert alert-danger"><?= e(implode(' ', $profileErrors)) ?></div><?php endif; ?>
+        <div class="grid grid-2">
+            <div class="card">
+                <h3>اطلاعات ثبت‌شده</h3>
+                <div class="portal-profile-head">
+                    <?php if (!empty($contact['avatar_path'])): ?>
+                        <img class="profile-photo" src="<?= e($contact['avatar_path']) ?>" alt="">
+                    <?php else: ?>
+                        <div class="profile-photo placeholder">م</div>
+                    <?php endif; ?>
+                    <div>
+                        <strong><?= e($contact['contact_name']) ?></strong>
+                        <span><?= e($contact['customer_name']) ?></span>
+                    </div>
+                </div>
+                <div class="detail-list">
+                    <div><span>نام</span><?= e($contact['contact_name']) ?></div>
+                    <div><span>شرکت</span><?= e($contact['customer_name']) ?></div>
+                    <div><span>سمت</span><?= e($contact['position']) ?></div>
+                    <div><span>موبایل</span><?= e($contact['mobile']) ?></div>
+                    <div><span>تلفن</span><?= e($contact['phone']) ?></div>
+                    <div><span>ایمیل</span><?= e($contact['email']) ?></div>
+                </div>
+                <div class="empty" style="margin-top:14px">برای اصلاح اطلاعات پایه، یک تیکت با موضوع اصلاح اطلاعات ثبت کنید.</div>
+                <div class="form-actions"><a class="btn btn-light" href="portal.php?action=create_ticket">ثبت درخواست اصلاح اطلاعات</a></div>
+            </div>
+
+            <div class="card">
+                <h3>تصویر پروفایل</h3>
+                <form method="post" enctype="multipart/form-data">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="form_type" value="avatar">
+                    <label>تصویر جدید</label>
+                    <input type="file" name="avatar_file" accept="image/jpeg,image/png,image/webp">
+                    <span class="muted">تصویر به صورت خودکار به avatar سبک ۳۲۰×۳۲۰ تبدیل می‌شود. فرمت‌های مجاز: jpg، png، webp</span>
+                    <div class="form-actions"><button class="btn btn-primary">ذخیره تصویر</button></div>
+                </form>
+                <hr>
+                <h3>تغییر رمز عبور</h3>
+                <form method="post">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="form_type" value="password">
+                    <div class="grid">
+                        <div><label>رمز عبور فعلی</label><input required type="password" name="current_password"></div>
+                        <div><label>رمز عبور جدید</label><input required minlength="8" type="password" name="new_password"></div>
+                        <div><label>تکرار رمز عبور جدید</label><input required minlength="8" type="password" name="confirm_password"></div>
+                    </div>
+                    <div class="form-actions"><button class="btn btn-primary">تغییر رمز عبور</button></div>
+                </form>
+            </div>
+        </div>
+        <?php
+    });
+    exit;
+}
 
 if ($action === 'create_ticket') {
     if (is_post()) {
@@ -253,8 +358,11 @@ if ($action === 'ticket') {
             <h3>گفت‌وگوی تیکت</h3>
             <div class="ticket-thread ticket-thread-chat ticket-thread-portal">
                 <?php foreach ($messages as $message): ?>
+                    <?php $avatarPath = $message['sender_type'] === 'contact' ? ($message['contact_avatar_path'] ?? '') : ($message['user_avatar_path'] ?? ''); ?>
                     <div class="ticket-message <?= e($message['sender_type'] === 'contact' ? 'from-contact' : 'from-user') ?>">
-                        <div class="ticket-avatar"><?= e($message['sender_type'] === 'contact' ? 'م' : 'پ') ?></div>
+                        <div class="ticket-avatar">
+                            <?php if ($avatarPath): ?><img src="<?= e($avatarPath) ?>" alt=""><?php else: ?><?= e($message['sender_type'] === 'contact' ? 'م' : 'پ') ?><?php endif; ?>
+                        </div>
                         <div class="ticket-bubble">
                         <div class="ticket-message-head">
                             <strong><?= e($message['sender_type'] === 'contact' ? ($message['contact_name'] ?? 'مشتری') : ($message['user_name'] ?? 'پشتیبانی')) ?></strong>

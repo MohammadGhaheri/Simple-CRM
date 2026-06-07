@@ -449,6 +449,12 @@ tr:last-child td { border-bottom: 0; }
   background: #eff6ff;
   color: var(--primary);
   font-weight: 800;
+  overflow: hidden;
+}
+.ticket-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .ticket-bubble {
   width: fit-content;
@@ -544,6 +550,31 @@ tr:last-child td { border-bottom: 0; }
 }
 .ticket-upload-field input[type="file"] {
   margin-top: 8px;
+}
+.portal-profile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.portal-profile-head strong,
+.portal-profile-head span {
+  display: block;
+}
+.profile-photo {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: #f8fafc;
+}
+.profile-photo.placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  background: #eff6ff;
+  font-weight: 800;
 }
 
 @media (max-width: 720px) {

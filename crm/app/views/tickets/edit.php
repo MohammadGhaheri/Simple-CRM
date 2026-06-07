@@ -42,8 +42,11 @@
     <h3>گفت‌وگوی تیکت</h3>
     <div class="ticket-thread ticket-thread-chat">
         <?php foreach ($messages as $message): ?>
+            <?php $avatarPath = $message['sender_type'] === 'contact' ? ($message['contact_avatar_path'] ?? '') : ($message['user_avatar_path'] ?? ''); ?>
             <div class="ticket-message <?= e($message['sender_type'] === 'contact' ? 'from-contact' : 'from-user') ?>">
-                <div class="ticket-avatar"><?= e($message['sender_type'] === 'contact' ? 'م' : 'پ') ?></div>
+                <div class="ticket-avatar">
+                    <?php if ($avatarPath): ?><img src="<?= e($avatarPath) ?>" alt=""><?php else: ?><?= e($message['sender_type'] === 'contact' ? 'م' : 'پ') ?><?php endif; ?>
+                </div>
                 <div class="ticket-bubble">
                 <div class="ticket-message-head">
                     <strong><?= e($message['sender_type'] === 'contact' ? ($message['contact_name'] ?? 'مشتری') : ($message['user_name'] ?? 'پشتیبانی')) ?></strong>

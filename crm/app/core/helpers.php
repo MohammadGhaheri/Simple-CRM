@@ -121,8 +121,7 @@ function upload_ticket_image(string $field): ?array
         throw new RuntimeException('فرمت تصویر تیکت مجاز نیست. فقط jpg، png یا webp قابل قبول است.');
     }
 
-    $projectRoot = dirname(__DIR__, 2);
-    $publicRoot = is_dir($projectRoot . '/public_html') ? $projectRoot . '/public_html' : $projectRoot . '/public';
+    $publicRoot = public_upload_root();
     $dir = $publicRoot . '/uploads/tickets/' . date('Y/m');
     if (!is_dir($dir)) {
         if (!mkdir($dir, 0775, true) && !is_dir($dir)) {
@@ -147,6 +146,85 @@ function upload_ticket_image(string $field): ?array
         'mime' => $mime,
         'size' => (int) ($_FILES[$field]['size'] ?? 0),
     ];
+}
+
+function public_upload_root(): string
+{
+    $projectRoot = dirname(__DIR__, 2);
+    return is_dir($projectRoot . '/public_html') ? $projectRoot . '/public_html' : $projectRoot . '/public';
+}
+
+function upload_profile_image(string $field, string $ownerType): ?string
+{
+    if (empty($_FILES[$field]['tmp_name']) || !is_uploaded_file($_FILES[$field]['tmp_name'])) {
+        return null;
+    }
+
+    $maxSourceSize = 2 * 1024 * 1024;
+    if ((int) ($_FILES[$field]['size'] ?? 0) > $maxSourceSize) {
+        throw new RuntimeException('حجم تصویر پروفایل نباید بیشتر از ۲ مگابایت باشد. تصویر پس از آپلود کوچک‌سازی می‌شود.');
+    }
+
+    if (!extension_loaded('gd')) {
+        throw new RuntimeException('افزونه GD برای پردازش تصویر روی سرور فعال نیست.');
+    }
+
+    $allowed = [
+        'image/jpeg' => 'jpeg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+    ];
+    $tmp = $_FILES[$field]['tmp_name'];
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = (string) $finfo->file($tmp);
+    if (!isset($allowed[$mime])) {
+        throw new RuntimeException('فرمت تصویر پروفایل مجاز نیست. فقط jpg، png یا webp قابل قبول است.');
+    }
+
+    $image = match ($mime) {
+        'image/jpeg' => imagecreatefromjpeg($tmp),
+        'image/png' => imagecreatefrompng($tmp),
+        'image/webp' => function_exists('imagecreatefromwebp') ? imagecreatefromwebp($tmp) : false,
+        default => false,
+    };
+    if (!$image) {
+        throw new RuntimeException('امکان پردازش تصویر پروفایل وجود ندارد.');
+    }
+
+    $width = imagesx($image);
+    $height = imagesy($image);
+    $side = min($width, $height);
+    $srcX = (int) floor(($width - $side) / 2);
+    $srcY = (int) floor(($height - $side) / 2);
+
+    $targetSize = 320;
+    $thumb = imagecreatetruecolor($targetSize, $targetSize);
+    $white = imagecolorallocate($thumb, 255, 255, 255);
+    imagefill($thumb, 0, 0, $white);
+    imagecopyresampled($thumb, $image, 0, 0, $srcX, $srcY, $targetSize, $targetSize, $side, $side);
+    imagedestroy($image);
+
+    $safeOwnerType = preg_replace('/[^a-z0-9_-]/i', '', $ownerType) ?: 'profiles';
+    $relativeDir = 'uploads/profiles/' . $safeOwnerType . '/' . date('Y/m');
+    $dir = public_upload_root() . '/' . $relativeDir;
+    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+        imagedestroy($thumb);
+        throw new RuntimeException('امکان ساخت پوشه تصویر پروفایل وجود ندارد.');
+    }
+    if (!is_writable($dir)) {
+        imagedestroy($thumb);
+        throw new RuntimeException('پوشه تصویر پروفایل قابل نوشتن نیست.');
+    }
+
+    $filename = bin2hex(random_bytes(16)) . '.jpg';
+    $target = $dir . '/' . $filename;
+    if (!imagejpeg($thumb, $target, 78)) {
+        imagedestroy($thumb);
+        throw new RuntimeException('ذخیره تصویر پروفایل ناموفق بود.');
+    }
+    imagedestroy($thumb);
+
+    return $relativeDir . '/' . $filename;
 }
 
 function normalize_digits(string $value): string

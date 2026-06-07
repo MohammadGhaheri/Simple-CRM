@@ -9,7 +9,9 @@ class TicketMessage
         $stmt = db()->prepare("
             SELECT tm.*,
                 u.name AS user_name,
-                ct.contact_name
+                u.avatar_path AS user_avatar_path,
+                ct.contact_name,
+                ct.avatar_path AS contact_avatar_path
             FROM ticket_messages tm
             LEFT JOIN users u ON u.id = tm.sender_user_id
             LEFT JOIN contacts ct ON ct.id = tm.sender_contact_id
