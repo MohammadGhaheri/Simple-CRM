@@ -248,11 +248,13 @@ if ($action === 'ticket') {
             <h3>شرح درخواست</h3>
             <p><?= nl2br(e($ticket['description'])) ?></p>
         </div>
-        <div class="card" style="margin-top:16px">
+        <div class="card ticket-conversation-card" style="margin-top:16px">
             <h3>گفت‌وگوی تیکت</h3>
-            <div class="ticket-thread">
+            <div class="ticket-thread ticket-thread-chat">
                 <?php foreach ($messages as $message): ?>
                     <div class="ticket-message <?= e($message['sender_type'] === 'contact' ? 'from-contact' : 'from-user') ?>">
+                        <div class="ticket-avatar"><?= e($message['sender_type'] === 'contact' ? 'م' : 'پ') ?></div>
+                        <div class="ticket-bubble">
                         <div class="ticket-message-head">
                             <strong><?= e($message['sender_type'] === 'contact' ? ($message['contact_name'] ?? 'مشتری') : ($message['user_name'] ?? 'پشتیبانی')) ?></strong>
                             <span><?= e(fa_datetime($message['created_at'])) ?></span>
@@ -264,20 +266,23 @@ if ($action === 'ticket') {
                                 <span><?= e($message['attachment_name'] ?: 'تصویر پیوست') ?></span>
                             </a>
                         <?php endif; ?>
+                        </div>
                     </div>
                 <?php endforeach; ?>
                 <?php if (!$messages): ?><div class="empty">هنوز پیامی برای این تیکت ثبت نشده است.</div><?php endif; ?>
             </div>
         </div>
-        <form class="card" style="margin-top:16px" method="post" enctype="multipart/form-data">
+        <form class="card ticket-reply-card" style="margin-top:16px" method="post" enctype="multipart/form-data">
             <?= csrf_field() ?>
             <?php if (!empty($ticket['errors'])): ?><div class="alert alert-danger"><?= e(implode(' ', $ticket['errors'])) ?></div><?php endif; ?>
             <?php if (Ticket::isClosed($ticket)): ?>
                 <div class="empty">این تیکت بسته شده است.</div>
             <?php else: ?>
                 <h3>ارسال پیام جدید</h3>
-                <textarea name="message" placeholder="متن پیام شما..."></textarea>
-                <div style="margin-top:14px"><label>تصویر پیوست</label><input type="file" name="attachment" accept="image/jpeg,image/png,image/webp"><span class="muted">حداکثر ۲ مگابایت. فرمت‌های مجاز: jpg، png، webp</span></div>
+                <div class="ticket-reply-grid">
+                    <textarea name="message" placeholder="متن پیام شما..."></textarea>
+                </div>
+                <div class="ticket-upload-field"><label>تصویر پیوست</label><input type="file" name="attachment" accept="image/jpeg,image/png,image/webp"><span class="muted">حداکثر ۲ مگابایت. فرمت‌های مجاز: jpg، png، webp</span></div>
                 <div class="form-actions">
                     <button class="btn btn-primary" name="ticket_action" value="reply">ارسال پیام</button>
                     <button class="btn btn-danger" name="ticket_action" value="close" data-confirm="این تیکت بسته شود؟">بستن تیکت</button>
