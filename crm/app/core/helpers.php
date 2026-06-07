@@ -99,6 +99,49 @@ function checked($actual): string
     return (bool) $actual ? 'checked' : '';
 }
 
+function upload_ticket_image(string $field): ?array
+{
+    if (empty($_FILES[$field]['tmp_name']) || !is_uploaded_file($_FILES[$field]['tmp_name'])) {
+        return null;
+    }
+
+    $maxSize = 2 * 1024 * 1024;
+    if ((int) ($_FILES[$field]['size'] ?? 0) > $maxSize) {
+        throw new RuntimeException('حجم تصویر تیکت نباید بیشتر از ۲ مگابایت باشد.');
+    }
+
+    $allowed = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+    ];
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = (string) $finfo->file($_FILES[$field]['tmp_name']);
+    if (!isset($allowed[$mime])) {
+        throw new RuntimeException('فرمت تصویر تیکت مجاز نیست. فقط jpg، png یا webp قابل قبول است.');
+    }
+
+    $publicRoot = dirname(__DIR__, 2) . '/public';
+    $dir = $publicRoot . '/uploads/tickets/' . date('Y/m');
+    if (!is_dir($dir)) {
+        mkdir($dir, 0775, true);
+    }
+
+    $originalName = basename((string) ($_FILES[$field]['name'] ?? 'attachment'));
+    $filename = bin2hex(random_bytes(16)) . '.' . $allowed[$mime];
+    $target = $dir . '/' . $filename;
+    if (!move_uploaded_file($_FILES[$field]['tmp_name'], $target)) {
+        throw new RuntimeException('آپلود تصویر تیکت ناموفق بود.');
+    }
+
+    return [
+        'path' => 'uploads/tickets/' . date('Y/m') . '/' . $filename,
+        'name' => $originalName,
+        'mime' => $mime,
+        'size' => (int) ($_FILES[$field]['size'] ?? 0),
+    ];
+}
+
 function normalize_digits(string $value): string
 {
     return strtr($value, [

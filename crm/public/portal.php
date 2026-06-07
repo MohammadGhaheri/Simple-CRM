@@ -8,6 +8,7 @@ require __DIR__ . '/../app/core/helpers.php';
 require __DIR__ . '/../app/core/csrf.php';
 require __DIR__ . '/../app/models/Contact.php';
 require __DIR__ . '/../app/models/Ticket.php';
+require __DIR__ . '/../app/models/TicketMessage.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/services/SmsService.php';
@@ -66,6 +67,7 @@ function portal_layout(string $title, callable $content): void
             <?php $content(); ?>
         </main>
     </div>
+    <script src="<?= e(asset('js/app.js')) ?>"></script>
     </body>
     </html>
     <?php
@@ -147,11 +149,22 @@ if ($action === 'create_ticket') {
     if (is_post()) {
         verify_csrf();
         $errors = required_fields($_POST, ['subject' => 'موضوع', 'description' => 'شرح درخواست']);
+        try {
+            $attachment = upload_ticket_image('attachment');
+        } catch (RuntimeException $e) {
+            $errors[] = $e->getMessage();
+            $attachment = null;
+        }
         if (!$errors) {
+            $_POST['attachment'] = $attachment;
             $ticketId = Ticket::createFromPortal($contact, $_POST);
             $ticket = Ticket::find($ticketId);
             if ($ticket) {
-                SmsService::notifyTicketCreated($ticket);
+                if ((int) ($ticket['is_vip'] ?? 0) === 1) {
+                    SmsService::notifyVipTicketCreated($ticket);
+                } else {
+                    SmsService::notifyTicketCreated($ticket);
+                }
             }
             redirect('portal.php');
         }
@@ -163,7 +176,7 @@ if ($action === 'create_ticket') {
             <h2>ثبت تیکت جدید</h2>
             <a class="btn btn-light" href="portal.php">بازگشت</a>
         </div>
-        <form class="card" method="post">
+        <form class="card" method="post" enctype="multipart/form-data">
             <?= csrf_field() ?>
             <?php if ($errors): ?><div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
             <div class="grid grid-2">
@@ -172,6 +185,7 @@ if ($action === 'create_ticket') {
                 <div><label>اولویت</label><select name="priority"><?php foreach (Ticket::priorities() as $option): ?><option value="<?= e($option) ?>" <?= selected($option, 'Normal') ?>><?= e(Ticket::label($option)) ?></option><?php endforeach; ?></select></div>
             </div>
             <div style="margin-top:14px"><label class="required">شرح درخواست</label><textarea required name="description"><?= e($_POST['description'] ?? '') ?></textarea></div>
+            <div style="margin-top:14px"><label>تصویر پیوست</label><input type="file" name="attachment" accept="image/jpeg,image/png,image/webp"><span class="muted">حداکثر ۲ مگابایت. فرمت‌های مجاز: jpg، png، webp</span></div>
             <div class="form-actions"><button class="btn btn-primary">ثبت تیکت</button></div>
         </form>
         <?php
@@ -184,8 +198,40 @@ if ($action === 'ticket') {
     if (!$ticket) {
         redirect('portal.php');
     }
+    $ticketErrors = [];
+    if (is_post()) {
+        verify_csrf();
+        if (($_POST['ticket_action'] ?? '') === 'close') {
+            Ticket::closeForContact((int) $ticket['id'], (int) $contact['id']);
+            redirect('portal.php?action=ticket&id=' . (int) $ticket['id']);
+        }
+        $errors = [];
+        if (Ticket::isClosed($ticket)) {
+            $errors[] = 'این تیکت بسته شده و امکان ارسال پیام جدید ندارد.';
+        }
+        $message = trim((string) ($_POST['message'] ?? ''));
+        try {
+            $attachment = upload_ticket_image('attachment');
+        } catch (RuntimeException $e) {
+            $errors[] = $e->getMessage();
+            $attachment = null;
+        }
+        if (!$message && !$attachment) {
+            $errors[] = 'برای ارسال پیام، متن یا تصویر را وارد کنید.';
+        }
+        if (!$errors) {
+            TicketMessage::createFromContact((int) $ticket['id'], (int) $contact['id'], $message, $attachment);
+            redirect('portal.php?action=ticket&id=' . (int) $ticket['id']);
+        }
+        $ticketErrors = $errors;
+    }
+    $ticket = Ticket::findForContact((int) ($_GET['id'] ?? 0), (int) $contact['id']) ?: $ticket;
+    if (!empty($ticketErrors)) {
+        $ticket['errors'] = $ticketErrors;
+    }
+    $messages = TicketMessage::byTicket((int) $ticket['id']);
 
-    portal_layout('جزئیات تیکت', function () use ($ticket) {
+    portal_layout('جزئیات تیکت', function () use ($ticket, $messages) {
         ?>
         <div class="toolbar">
             <h2><?= e($ticket['ticket_code']) ?> - <?= e($ticket['subject']) ?></h2>
@@ -201,11 +247,43 @@ if ($action === 'ticket') {
             </div>
             <h3>شرح درخواست</h3>
             <p><?= nl2br(e($ticket['description'])) ?></p>
-            <?php if (!empty($ticket['response'])): ?>
-                <h3>پاسخ تیم پشتیبانی</h3>
-                <p><?= nl2br(e($ticket['response'])) ?></p>
-            <?php endif; ?>
         </div>
+        <div class="card" style="margin-top:16px">
+            <h3>گفت‌وگوی تیکت</h3>
+            <div class="ticket-thread">
+                <?php foreach ($messages as $message): ?>
+                    <div class="ticket-message <?= e($message['sender_type'] === 'contact' ? 'from-contact' : 'from-user') ?>">
+                        <div class="ticket-message-head">
+                            <strong><?= e($message['sender_type'] === 'contact' ? ($message['contact_name'] ?? 'مشتری') : ($message['user_name'] ?? 'پشتیبانی')) ?></strong>
+                            <span><?= e(fa_datetime($message['created_at'])) ?></span>
+                        </div>
+                        <?php if (trim((string) $message['message']) !== ''): ?><p><?= nl2br(e($message['message'])) ?></p><?php endif; ?>
+                        <?php if (!empty($message['attachment_path'])): ?>
+                            <a class="ticket-attachment" href="<?= e($message['attachment_path']) ?>" target="_blank" rel="noopener">
+                                <img src="<?= e($message['attachment_path']) ?>" alt="">
+                                <span><?= e($message['attachment_name'] ?: 'تصویر پیوست') ?></span>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+                <?php if (!$messages): ?><div class="empty">هنوز پیامی برای این تیکت ثبت نشده است.</div><?php endif; ?>
+            </div>
+        </div>
+        <form class="card" style="margin-top:16px" method="post" enctype="multipart/form-data">
+            <?= csrf_field() ?>
+            <?php if (!empty($ticket['errors'])): ?><div class="alert alert-danger"><?= e(implode(' ', $ticket['errors'])) ?></div><?php endif; ?>
+            <?php if (Ticket::isClosed($ticket)): ?>
+                <div class="empty">این تیکت بسته شده است.</div>
+            <?php else: ?>
+                <h3>ارسال پیام جدید</h3>
+                <textarea name="message" placeholder="متن پیام شما..."></textarea>
+                <div style="margin-top:14px"><label>تصویر پیوست</label><input type="file" name="attachment" accept="image/jpeg,image/png,image/webp"><span class="muted">حداکثر ۲ مگابایت. فرمت‌های مجاز: jpg، png، webp</span></div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" name="ticket_action" value="reply">ارسال پیام</button>
+                    <button class="btn btn-danger" name="ticket_action" value="close" data-confirm="این تیکت بسته شود؟">بستن تیکت</button>
+                </div>
+            <?php endif; ?>
+        </form>
         <?php
     });
     exit;

@@ -60,6 +60,23 @@ class SmsService
         self::send($mobile, 'تیکت جدید برای بررسی ثبت شد: ' . $ticket['ticket_code'] . "\n" . $link);
     }
 
+    public static function notifyVipTicketCreated(array $ticket): void
+    {
+        if ((int) ($ticket['is_vip'] ?? 0) !== 1) {
+            return;
+        }
+
+        $settings = Setting::all();
+        $mobile = '';
+        if (!empty($ticket['assigned_user_id'])) {
+            $user = User::find((int) $ticket['assigned_user_id']);
+            $mobile = $user['mobile'] ?? '';
+        }
+        $mobile = $mobile ?: ($settings['sms_admin_mobile'] ?? '');
+        $link = self::baseUrl() . '/index.php?page=tickets&action=edit&id=' . (int) $ticket['id'];
+        self::send($mobile, 'تیکت VIP جدید ثبت شد: ' . $ticket['ticket_code'] . "\n" . $link);
+    }
+
     public static function notifyTicketAnswered(array $ticket): void
     {
         $settings = Setting::all();

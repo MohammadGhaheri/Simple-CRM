@@ -17,6 +17,7 @@
     <div><label>آخرین پیگیری</label><input class="date-input" name="last_followup_date" placeholder="مثلا 1405/03/12" title="تاریخ را به شمسی و با فرمت 1405/03/12 وارد کنید" value="<?= e(fa_date($customer['last_followup_date'] ?? '')) ?>"></div>
     <div><label>پیگیری بعدی</label><input class="date-input" name="next_followup_date" placeholder="مثلا 1405/03/12" title="تاریخ را به شمسی و با فرمت 1405/03/12 وارد کنید" value="<?= e(fa_date($customer['next_followup_date'] ?? '')) ?>"></div>
 </div>
+<p><label><input type="checkbox" name="is_vip" value="1" <?= checked($customer['is_vip'] ?? false) ?> style="width:auto"> مشتری VIP</label></p>
 <div style="margin-top:14px"><label>یادداشت</label><textarea name="notes"><?= e($customer['notes'] ?? '') ?></textarea></div>
 <div class="form-actions">
     <button class="btn btn-primary" type="submit">ذخیره</button>

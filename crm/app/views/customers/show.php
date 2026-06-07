@@ -1,5 +1,5 @@
 <div class="toolbar">
-    <h2><?= e($customer['customer_name']) ?></h2>
+    <h2><?= e($customer['customer_name']) ?> <?= (int) ($customer['is_vip'] ?? 0) === 1 ? '<span class="badge badge-warning">VIP</span>' : '' ?></h2>
     <div class="actions">
         <a class="btn btn-primary" href="<?= e(url('activities', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">ثبت فعالیت</a>
         <a class="btn btn-light" href="<?= e(url('deals', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">فرصت جدید</a>
@@ -13,6 +13,7 @@
         <div><span>کد مشتری</span><?= e($customer['customer_code']) ?></div>
         <div><span>نوع</span><?= e(fa_label($customer['customer_type'])) ?></div>
         <div><span>وضعیت</span><span class="badge <?= e(badge_class($customer['sales_status'])) ?>"><?= e(fa_label($customer['sales_status'])) ?></span></div>
+        <div><span>سطح مشتری</span><?= (int) ($customer['is_vip'] ?? 0) === 1 ? '<span class="badge badge-warning">VIP</span>' : 'عادی' ?></div>
         <div><span>شهر</span><?= e($customer['city']) ?></div>
         <div><span>مالک</span><?= e($customer['owner_name']) ?></div>
         <div><span>پیگیری بعدی</span><?= e(fa_date($customer['next_followup_date'])) ?></div>

@@ -395,6 +395,54 @@ tr:last-child td { border-bottom: 0; }
 .task-meta { color: var(--muted); line-height: 1.8; }
 .task-actions { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; }
 
+.ticket-thread {
+  display: grid;
+  gap: 12px;
+}
+.ticket-message {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+}
+.ticket-message.from-contact {
+  border-right: 4px solid var(--primary);
+}
+.ticket-message.from-user {
+  border-right: 4px solid var(--success);
+  background: #f8fafc;
+}
+.ticket-message-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.ticket-message-head strong { color: var(--text); }
+.ticket-message p {
+  margin: 0 0 10px;
+  line-height: 1.9;
+}
+.ticket-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+  color: var(--text);
+}
+.ticket-attachment img {
+  width: 86px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+
 .login-page {
   min-height: 100vh;
   display: grid;

@@ -6,7 +6,7 @@ class Contact
 {
     public static function search(array $filters = []): array
     {
-        $sql = 'SELECT ct.*, c.customer_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE 1=1';
+        $sql = 'SELECT ct.*, c.customer_name, u.name AS default_support_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE 1=1';
         $params = [];
         if (!empty($filters['q'])) {
             $sql .= ' AND (ct.contact_name LIKE ? OR ct.mobile LIKE ? OR ct.email LIKE ? OR c.customer_name LIKE ?)';
@@ -29,7 +29,7 @@ class Contact
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT * FROM contacts WHERE customer_id = ? ORDER BY is_primary DESC, id DESC');
+        $stmt = db()->prepare('SELECT ct.*, u.name AS default_support_name FROM contacts ct LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.customer_id = ? ORDER BY ct.is_primary DESC, ct.id DESC');
         $stmt->execute([$customerId]);
         return $stmt->fetchAll();
     }
@@ -43,21 +43,21 @@ class Contact
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT ct.*, c.customer_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.id = ?');
+        $stmt = db()->prepare('SELECT ct.*, c.customer_name, u.name AS default_support_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.id = ?');
         $stmt->execute([$id]);
         return $stmt->fetch() ?: null;
     }
 
     public static function findPortalByEmail(string $email): ?array
     {
-        $stmt = db()->prepare('SELECT ct.*, c.customer_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.email = ? AND ct.portal_enabled = 1 LIMIT 1');
+        $stmt = db()->prepare('SELECT ct.*, c.customer_name, c.is_vip FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.email = ? AND ct.portal_enabled = 1 LIMIT 1');
         $stmt->execute([$email]);
         return $stmt->fetch() ?: null;
     }
 
     public static function create(array $data): int
     {
-        $sql = 'INSERT INTO contacts (customer_id, contact_name, position, mobile, phone, email, portal_enabled, password_hash, is_primary, notes) VALUES (:customer_id, :contact_name, :position, :mobile, :phone, :email, :portal_enabled, :password_hash, :is_primary, :notes)';
+        $sql = 'INSERT INTO contacts (customer_id, contact_name, position, mobile, phone, email, portal_enabled, password_hash, default_support_user_id, is_primary, notes) VALUES (:customer_id, :contact_name, :position, :mobile, :phone, :email, :portal_enabled, :password_hash, :default_support_user_id, :is_primary, :notes)';
         db()->prepare($sql)->execute(self::payload($data));
         return (int) db()->lastInsertId();
     }
@@ -72,7 +72,7 @@ class Contact
         } else {
             unset($payload['password_hash']);
         }
-        $sql = "UPDATE contacts SET customer_id=:customer_id, contact_name=:contact_name, position=:position, mobile=:mobile, phone=:phone, email=:email, portal_enabled=:portal_enabled, is_primary=:is_primary, notes=:notes $passwordSql WHERE id=:id";
+        $sql = "UPDATE contacts SET customer_id=:customer_id, contact_name=:contact_name, position=:position, mobile=:mobile, phone=:phone, email=:email, portal_enabled=:portal_enabled, default_support_user_id=:default_support_user_id, is_primary=:is_primary, notes=:notes $passwordSql WHERE id=:id";
         $payload['id'] = $id;
         db()->prepare($sql)->execute($payload);
     }
@@ -93,6 +93,7 @@ class Contact
             'email' => trim($data['email'] ?? ''),
             'portal_enabled' => isset($data['portal_enabled']) ? 1 : 0,
             'password_hash' => trim((string) ($data['portal_password'] ?? '')) !== '' ? password_hash((string) $data['portal_password'], PASSWORD_DEFAULT) : null,
+            'default_support_user_id' => !empty($data['default_support_user_id']) ? (int) $data['default_support_user_id'] : null,
             'is_primary' => isset($data['is_primary']) ? 1 : 0,
             'notes' => trim($data['notes'] ?? ''),
         ];

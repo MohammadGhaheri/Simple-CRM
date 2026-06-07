@@ -36,7 +36,7 @@ class Customer
 
     public static function create(array $data): int
     {
-        $sql = 'INSERT INTO customers (customer_code, customer_name, customer_type, industry, city, lead_source, interested_product, vehicle_count, estimated_contract_value, sales_status, owner_user_id, last_followup_date, next_followup_date, notes) VALUES (:customer_code, :customer_name, :customer_type, :industry, :city, :lead_source, :interested_product, :vehicle_count, :estimated_contract_value, :sales_status, :owner_user_id, :last_followup_date, :next_followup_date, :notes)';
+        $sql = 'INSERT INTO customers (customer_code, customer_name, customer_type, industry, city, lead_source, interested_product, vehicle_count, estimated_contract_value, sales_status, owner_user_id, last_followup_date, next_followup_date, is_vip, notes) VALUES (:customer_code, :customer_name, :customer_type, :industry, :city, :lead_source, :interested_product, :vehicle_count, :estimated_contract_value, :sales_status, :owner_user_id, :last_followup_date, :next_followup_date, :is_vip, :notes)';
         $payload = self::payload($data);
         if ($payload['customer_code'] === '' && class_exists('Setting') && Setting::get('customer_code_mode') === 'auto') {
             $payload['customer_code'] = self::nextCode();
@@ -47,7 +47,7 @@ class Customer
 
     public static function update(int $id, array $data): void
     {
-        $sql = 'UPDATE customers SET customer_code=:customer_code, customer_name=:customer_name, customer_type=:customer_type, industry=:industry, city=:city, lead_source=:lead_source, interested_product=:interested_product, vehicle_count=:vehicle_count, estimated_contract_value=:estimated_contract_value, sales_status=:sales_status, owner_user_id=:owner_user_id, last_followup_date=:last_followup_date, next_followup_date=:next_followup_date, notes=:notes WHERE id=:id';
+        $sql = 'UPDATE customers SET customer_code=:customer_code, customer_name=:customer_name, customer_type=:customer_type, industry=:industry, city=:city, lead_source=:lead_source, interested_product=:interested_product, vehicle_count=:vehicle_count, estimated_contract_value=:estimated_contract_value, sales_status=:sales_status, owner_user_id=:owner_user_id, last_followup_date=:last_followup_date, next_followup_date=:next_followup_date, is_vip=:is_vip, notes=:notes WHERE id=:id';
         $payload = self::payload($data);
         $payload['id'] = $id;
         db()->prepare($sql)->execute($payload);
@@ -74,6 +74,7 @@ class Customer
             'owner_user_id' => (int) ($data['owner_user_id'] ?? current_user_id()),
             'last_followup_date' => db_date($data['last_followup_date'] ?? null),
             'next_followup_date' => db_date($data['next_followup_date'] ?? null),
+            'is_vip' => isset($data['is_vip']) ? 1 : 0,
             'notes' => trim($data['notes'] ?? ''),
         ];
     }

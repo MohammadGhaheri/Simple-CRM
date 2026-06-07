@@ -1,7 +1,9 @@
 document.addEventListener('submit', function (event) {
   const form = event.target;
-  if (form.matches('[data-confirm]')) {
-    const message = form.getAttribute('data-confirm') || 'آیا مطمئن هستید؟';
+  const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
+  const confirmTarget = form.matches('[data-confirm]') ? form : submitter?.closest('[data-confirm]');
+  if (confirmTarget) {
+    const message = confirmTarget.getAttribute('data-confirm') || 'آیا مطمئن هستید؟';
     if (!confirm(message)) {
       event.preventDefault();
     }

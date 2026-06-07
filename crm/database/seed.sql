@@ -131,6 +131,9 @@ INSERT INTO contacts (customer_id, contact_name, position, mobile, phone, email,
 (3, 'مهدی کریمی', 'مدیر فروش نمایندگی', '09120000003', '05137000003', 'mahdi.karimi@example.com', 0, NULL, 1, 'پیگیر سرویس‌های قابل فروش به مشتری نهایی.'),
 (4, 'نسترن رضایی', 'مدیر توسعه کسب‌وکار', '09120000004', '02188000004', 'nastaran.rezaei@example.com', 0, NULL, 1, 'مسئول مذاکره چارچوب همکاری و مدل درآمدی.');
 
+UPDATE customers SET is_vip = 1 WHERE id = 1;
+UPDATE contacts SET default_support_user_id = 1 WHERE id IN (1, 2);
+
 INSERT INTO deals (id, deal_name, customer_id, product, vehicle_count, estimated_amount, probability, weighted_amount, deal_stage, expected_close_date, owner_user_id, win_loss_reason, notes) VALUES
 (1, 'استقرار سامانه FMS برای ناوگان آریا', 1, 'FMS', 180, 12500000000, 65, 8125000000, 'Negotiation', '2026-06-25', 1, '', 'پیشنهاد onCloud همراه با داشبورد مدیر ناوگان و گزارش مصرف سوخت ارائه شده است.'),
 (2, 'پلتفرم خودروی متصل برای البرز موتور', 2, 'Connected Vehicle Platform', 5000, 85000000000, 45, 38250000000, 'Proposal', '2026-07-15', 1, '', 'پیشنهاد شامل TBox، سرویس API، پنل پایش و لایه تحلیل داده است.'),
@@ -146,3 +149,7 @@ INSERT INTO activities (customer_id, deal_id, activity_date, activity_type, summ
 INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, status, description, assigned_user_id) VALUES
 ('TCK-1001', 1, 1, 'درخواست بررسی گزارش مصرف سوخت', 'Support', 'Normal', 'Open', 'در گزارش مصرف سوخت برخی خودروها داده روز گذشته دیده نمی‌شود. لطفا بررسی شود.', 1),
 ('TCK-1002', 2, 2, 'درخواست جلسه آموزشی API', 'Training', 'High', 'In Progress', 'برای تیم فنی نیاز به یک جلسه آموزشی درباره endpointهای اصلی API داریم.', 1);
+
+INSERT INTO ticket_messages (ticket_id, sender_type, sender_contact_id, message, created_at) VALUES
+(1, 'contact', 1, 'در گزارش مصرف سوخت برخی خودروها داده روز گذشته دیده نمی‌شود. لطفا بررسی شود.', NOW()),
+(2, 'contact', 2, 'برای تیم فنی نیاز به یک جلسه آموزشی درباره endpointهای اصلی API داریم.', NOW());

@@ -8,6 +8,7 @@ USE simple_crm;
 
 DROP TABLE IF EXISTS activities;
 DROP TABLE IF EXISTS contracts;
+DROP TABLE IF EXISTS ticket_messages;
 DROP TABLE IF EXISTS email_logs;
 DROP TABLE IF EXISTS sms_logs;
 DROP TABLE IF EXISTS usage_events;
@@ -91,6 +92,7 @@ CREATE TABLE customers (
   owner_user_id INT UNSIGNED NULL,
   last_followup_date DATE NULL,
   next_followup_date DATE NULL,
+  is_vip TINYINT(1) NOT NULL DEFAULT 0,
   notes TEXT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -107,11 +109,13 @@ CREATE TABLE contacts (
   email VARCHAR(190) NULL,
   portal_enabled TINYINT(1) NOT NULL DEFAULT 0,
   password_hash VARCHAR(255) NULL,
+  default_support_user_id INT UNSIGNED NULL,
   is_primary TINYINT(1) NOT NULL DEFAULT 0,
   notes TEXT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_contacts_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+  CONSTRAINT fk_contacts_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_contacts_default_support FOREIGN KEY (default_support_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE tickets (
@@ -131,6 +135,23 @@ CREATE TABLE tickets (
   CONSTRAINT fk_tickets_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
   CONSTRAINT fk_tickets_contact FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
   CONSTRAINT fk_tickets_assigned_user FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE ticket_messages (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  ticket_id INT UNSIGNED NOT NULL,
+  sender_type ENUM('contact','user') NOT NULL,
+  sender_contact_id INT UNSIGNED NULL,
+  sender_user_id INT UNSIGNED NULL,
+  message TEXT NULL,
+  attachment_path VARCHAR(255) NULL,
+  attachment_name VARCHAR(190) NULL,
+  attachment_mime VARCHAR(100) NULL,
+  attachment_size INT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_ticket_messages_ticket FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ticket_messages_contact FOREIGN KEY (sender_contact_id) REFERENCES contacts(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ticket_messages_user FOREIGN KEY (sender_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE deals (
@@ -197,6 +218,7 @@ CREATE TABLE activities (
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_customers_status ON customers(sales_status);
+CREATE INDEX idx_ticket_messages_ticket ON ticket_messages(ticket_id, created_at);
 CREATE INDEX idx_deals_stage ON deals(deal_stage);
 CREATE INDEX idx_contracts_renewal ON contracts(renewal_reminder_date, status);
 CREATE INDEX idx_activities_followup ON activities(next_followup_date, status);

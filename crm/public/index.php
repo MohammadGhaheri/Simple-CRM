@@ -14,6 +14,7 @@ require __DIR__ . '/../app/models/Deal.php';
 require __DIR__ . '/../app/models/Contract.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
+require __DIR__ . '/../app/models/TicketMessage.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/services/SmsService.php';
@@ -452,7 +453,7 @@ try {
                 }
                 $contact = $_POST;
             }
-            render('contacts/create', ['title' => 'مخاطب جدید', 'contact' => $contact, 'customers' => Customer::search(), 'errors' => $errors]);
+            render('contacts/create', ['title' => 'مخاطب جدید', 'contact' => $contact, 'customers' => Customer::search(), 'users' => $users, 'errors' => $errors]);
             exit;
         }
         if ($action === 'edit') {
@@ -509,7 +510,7 @@ try {
                 }
                 $contact = array_merge($contact, $_POST);
             }
-            render('contacts/edit', ['title' => 'ویرایش مخاطب', 'contact' => $contact, 'customers' => Customer::search(), 'errors' => $errors]);
+            render('contacts/edit', ['title' => 'ویرایش مخاطب', 'contact' => $contact, 'customers' => Customer::search(), 'users' => $users, 'errors' => $errors]);
             exit;
         }
         render('contacts/index', [
@@ -529,16 +530,39 @@ try {
             }
             if (is_post()) {
                 verify_csrf();
-                $before = Ticket::find($id);
-                Ticket::update($id, $_POST);
-                $after = Ticket::find($id);
-                if ($after && trim((string) ($_POST['response'] ?? '')) !== '' && (($before['response'] ?? '') !== ($_POST['response'] ?? '') || ($before['status'] ?? '') !== ($_POST['status'] ?? ''))) {
-                    SmsService::notifyTicketAnswered($after);
-                    EmailService::notifyTicketAnswered($after);
+                try {
+                    $ticketAction = $_POST['ticket_action'] ?? 'meta';
+                    if ($ticketAction === 'reply') {
+                        if (Ticket::isClosed($ticket)) {
+                            $errors[] = 'این تیکت بسته شده و امکان ارسال پیام جدید ندارد.';
+                        }
+                        $message = trim((string) ($_POST['message'] ?? ''));
+                        $attachment = upload_ticket_image('attachment');
+                        if (!$message && !$attachment) {
+                            $errors[] = 'برای ارسال پیام، متن یا تصویر را وارد کنید.';
+                        }
+                        if (!$errors) {
+                            TicketMessage::createFromUser($id, current_user_id(), $message, $attachment);
+                            $after = Ticket::find($id);
+                            if ($after) {
+                                SmsService::notifyTicketAnswered($after);
+                                EmailService::notifyTicketAnswered($after);
+                            }
+                            redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
+                        }
+                    } elseif ($ticketAction === 'close') {
+                        Ticket::close($id);
+                        redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
+                    } else {
+                        Ticket::updateMeta($id, $_POST);
+                        redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
+                    }
+                } catch (RuntimeException $e) {
+                    $errors[] = $e->getMessage();
                 }
-                redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
+                $ticket = Ticket::find($id) ?: $ticket;
             }
-            render('tickets/edit', ['title' => 'جزئیات تیکت', 'ticket' => $ticket, 'users' => $users]);
+            render('tickets/edit', ['title' => 'جزئیات تیکت', 'ticket' => $ticket, 'messages' => TicketMessage::byTicket($id), 'users' => $users, 'errors' => $errors]);
             exit;
         }
         render('tickets/index', [

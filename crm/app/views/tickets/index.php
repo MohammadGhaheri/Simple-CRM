@@ -19,7 +19,7 @@
             <tr>
                 <td><?= e($ticket['ticket_code']) ?></td>
                 <td><strong><?= e($ticket['subject']) ?></strong></td>
-                <td><?= e($ticket['customer_name']) ?></td>
+                <td><?= e($ticket['customer_name']) ?> <?= (int) ($ticket['is_vip'] ?? 0) === 1 ? '<span class="badge badge-warning">VIP</span>' : '' ?></td>
                 <td><?= e($ticket['contact_name']) ?></td>
                 <td><?= e(Ticket::label($ticket['category'])) ?></td>
                 <td><span class="badge <?= e($ticket['priority'] === 'Urgent' || $ticket['priority'] === 'High' ? 'badge-danger' : 'badge-muted') ?>"><?= e(Ticket::label($ticket['priority'])) ?></span></td>

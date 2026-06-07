@@ -20,7 +20,7 @@
         <?php foreach ($customers as $customer): ?>
             <tr>
                 <td><?= e($customer['customer_code']) ?></td>
-                <td><strong><?= e($customer['customer_name']) ?></strong><br><span class="muted"><?= e($customer['industry']) ?></span></td>
+                <td><strong><?= e($customer['customer_name']) ?></strong> <?= (int) ($customer['is_vip'] ?? 0) === 1 ? '<span class="badge badge-warning">VIP</span>' : '' ?><br><span class="muted"><?= e($customer['industry']) ?></span></td>
                 <td><?= e(fa_label($customer['customer_type'])) ?></td>
                 <td><?= e($customer['city']) ?></td>
                 <td><span class="badge <?= e(badge_class($customer['sales_status'])) ?>"><?= e(fa_label($customer['sales_status'])) ?></span></td>
