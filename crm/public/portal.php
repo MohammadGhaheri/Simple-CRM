@@ -250,7 +250,7 @@ if ($action === 'ticket') {
         </div>
         <div class="card ticket-conversation-card" style="margin-top:16px">
             <h3>گفت‌وگوی تیکت</h3>
-            <div class="ticket-thread ticket-thread-chat">
+            <div class="ticket-thread ticket-thread-chat ticket-thread-portal">
                 <?php foreach ($messages as $message): ?>
                     <div class="ticket-message <?= e($message['sender_type'] === 'contact' ? 'from-contact' : 'from-user') ?>">
                         <div class="ticket-avatar"><?= e($message['sender_type'] === 'contact' ? 'م' : 'پ') ?></div>

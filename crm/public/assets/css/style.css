@@ -463,6 +463,26 @@ tr:last-child td { border-bottom: 0; }
   border-left: 4px solid var(--success);
   background: #f8fffb;
 }
+.ticket-thread-portal .ticket-message.from-contact {
+  justify-content: flex-end;
+}
+.ticket-thread-portal .ticket-message.from-contact .ticket-avatar {
+  order: 2;
+}
+.ticket-thread-portal .ticket-message.from-contact .ticket-bubble {
+  border-right-width: 1px;
+  border-left: 4px solid var(--primary);
+}
+.ticket-thread-portal .ticket-message.from-user {
+  justify-content: flex-start;
+}
+.ticket-thread-portal .ticket-message.from-user .ticket-avatar {
+  order: 0;
+}
+.ticket-thread-portal .ticket-message.from-user .ticket-bubble {
+  border-left-width: 1px;
+  border-right: 4px solid var(--success);
+}
 .ticket-message-head {
   display: flex;
   align-items: center;
@@ -532,6 +552,9 @@ tr:last-child td { border-bottom: 0; }
     justify-content: flex-start;
   }
   .ticket-message.from-user .ticket-avatar {
+    order: 0;
+  }
+  .ticket-thread-portal .ticket-message.from-contact .ticket-avatar {
     order: 0;
   }
   .ticket-bubble {
