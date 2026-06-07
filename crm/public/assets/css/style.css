@@ -426,6 +426,9 @@ tr:last-child td { border-bottom: 0; }
 .ticket-message.from-contact {
   justify-content: flex-end;
 }
+.ticket-message.from-contact .ticket-avatar {
+  order: 2;
+}
 .ticket-message.from-user {
   justify-content: flex-start;
 }
