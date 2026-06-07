@@ -32,7 +32,19 @@ class Ticket
 
     public static function byContact(int $contactId): array
     {
-        $stmt = db()->prepare('SELECT * FROM tickets WHERE contact_id = ? ORDER BY updated_at DESC, id DESC');
+        $stmt = db()->prepare("
+            SELECT t.*,
+                (
+                    SELECT COUNT(*)
+                    FROM ticket_messages tm
+                    WHERE tm.ticket_id = t.id
+                      AND tm.sender_type = 'user'
+                      AND tm.contact_read_at IS NULL
+                ) AS unread_count
+            FROM tickets t
+            WHERE t.contact_id = ?
+            ORDER BY t.updated_at DESC, t.id DESC
+        ");
         $stmt->execute([$contactId]);
         return $stmt->fetchAll();
     }

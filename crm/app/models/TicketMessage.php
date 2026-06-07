@@ -22,6 +22,18 @@ class TicketMessage
         return $stmt->fetchAll();
     }
 
+    public static function markReadForContact(int $ticketId, int $contactId): void
+    {
+        db()->prepare("
+            UPDATE ticket_messages
+            SET contact_read_at = COALESCE(contact_read_at, CURRENT_TIMESTAMP)
+            WHERE ticket_id = ?
+              AND sender_type = 'user'
+              AND contact_read_at IS NULL
+              AND ticket_id IN (SELECT id FROM tickets WHERE id = ? AND contact_id = ?)
+        ")->execute([$ticketId, $ticketId, $contactId]);
+    }
+
     public static function createFromContact(int $ticketId, int $contactId, string $message, ?array $attachment = null): int
     {
         return self::create([

@@ -23,7 +23,7 @@
                 <td><?= e($ticket['contact_name']) ?></td>
                 <td><?= e(Ticket::label($ticket['category'])) ?></td>
                 <td><span class="badge <?= e($ticket['priority'] === 'Urgent' || $ticket['priority'] === 'High' ? 'badge-danger' : 'badge-muted') ?>"><?= e(Ticket::label($ticket['priority'])) ?></span></td>
-                <td><span class="badge <?= e($ticket['status'] === 'Open' ? 'badge-info' : ($ticket['status'] === 'Closed' ? 'badge-muted' : 'badge-warning')) ?>"><?= e(Ticket::label($ticket['status'])) ?></span></td>
+                <td><span class="badge <?= e(badge_class($ticket['status'])) ?>"><?= e(Ticket::label($ticket['status'])) ?></span></td>
                 <td><a class="btn btn-small btn-light" href="<?= e(url('tickets', ['action' => 'edit', 'id' => $ticket['id']])) ?>">بررسی</a></td>
             </tr>
         <?php endforeach; ?>

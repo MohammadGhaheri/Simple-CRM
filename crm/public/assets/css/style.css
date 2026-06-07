@@ -176,6 +176,12 @@ a { color: inherit; text-decoration: none; }
   gap: 16px;
   margin-bottom: 16px;
 }
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .filters {
   display: grid;
   grid-template-columns: repeat(5, minmax(120px, 1fr));
@@ -294,6 +300,15 @@ table { width: 100%; border-collapse: collapse; min-width: 760px; }
 th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: right; vertical-align: top; }
 th { background: #f9fafb; color: #374151; white-space: nowrap; }
 tr:last-child td { border-bottom: 0; }
+.ticket-row-unread {
+  background: #eff6ff;
+}
+.ticket-row-unread td {
+  border-bottom-color: #bfdbfe;
+}
+.ticket-row-unread strong {
+  color: var(--primary);
+}
 .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .muted { color: var(--muted); }
 .empty { text-align: center; color: var(--muted); padding: 28px; }
@@ -313,6 +328,7 @@ tr:last-child td { border-bottom: 0; }
 .badge-primary { background: #dbeafe; color: var(--primary); }
 .badge-purple { background: #ede9fe; color: var(--purple); }
 .badge-muted { background: #f3f4f6; color: var(--muted); }
+.unread-badge { margin-right: 8px; }
 
 .alert { padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; }
 .alert-danger { background: #fee2e2; color: var(--danger); }

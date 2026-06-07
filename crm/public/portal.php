@@ -336,6 +336,7 @@ if ($action === 'ticket') {
         $ticket['errors'] = $ticketErrors;
     }
     $messages = TicketMessage::byTicket((int) $ticket['id']);
+    TicketMessage::markReadForContact((int) $ticket['id'], (int) $contact['id']);
 
     portal_layout('جزئیات تیکت', function () use ($ticket, $messages) {
         ?>
@@ -345,7 +346,7 @@ if ($action === 'ticket') {
         </div>
         <div class="card">
             <div class="detail-list">
-                <div><span>وضعیت</span><?= e(Ticket::label($ticket['status'])) ?></div>
+                <div><span>وضعیت</span><span class="badge <?= e(badge_class($ticket['status'])) ?>"><?= e(Ticket::label($ticket['status'])) ?></span></div>
                 <div><span>اولویت</span><?= e(Ticket::label($ticket['priority'])) ?></div>
                 <div><span>دسته</span><?= e(Ticket::label($ticket['category'])) ?></div>
                 <div><span>ایجاد</span><?= e(fa_datetime($ticket['created_at'])) ?></div>
@@ -404,23 +405,28 @@ if ($action === 'ticket') {
 }
 
 $tickets = Ticket::byContact((int) $contact['id']);
-portal_layout('داشبورد', function () use ($tickets) {
+$totalUnread = array_sum(array_map(static fn($ticket) => (int) ($ticket['unread_count'] ?? 0), $tickets));
+portal_layout('داشبورد', function () use ($tickets, $totalUnread) {
     ?>
     <div class="toolbar">
         <h2>تیکت‌های من</h2>
-        <a class="btn btn-primary" href="portal.php?action=create_ticket">ثبت تیکت جدید</a>
+        <div class="toolbar-actions">
+            <?php if ($totalUnread > 0): ?><span class="badge badge-primary"><?= e((string) $totalUnread) ?> پیام جدید</span><?php endif; ?>
+            <a class="btn btn-primary" href="portal.php?action=create_ticket">ثبت تیکت جدید</a>
+        </div>
     </div>
     <div class="table-wrap">
         <table>
             <thead><tr><th>کد</th><th>موضوع</th><th>دسته</th><th>اولویت</th><th>وضعیت</th><th>آخرین تغییر</th><th>عملیات</th></tr></thead>
             <tbody>
             <?php foreach ($tickets as $ticket): ?>
-                <tr>
+                <?php $unreadCount = (int) ($ticket['unread_count'] ?? 0); ?>
+                <tr class="<?= $unreadCount > 0 ? 'ticket-row-unread' : '' ?>">
                     <td><?= e($ticket['ticket_code']) ?></td>
-                    <td><strong><?= e($ticket['subject']) ?></strong></td>
+                    <td><strong><?= e($ticket['subject']) ?></strong><?php if ($unreadCount > 0): ?> <span class="badge badge-primary unread-badge"><?= e((string) $unreadCount) ?> جدید</span><?php endif; ?></td>
                     <td><?= e(Ticket::label($ticket['category'])) ?></td>
                     <td><?= e(Ticket::label($ticket['priority'])) ?></td>
-                    <td><span class="badge badge-info"><?= e(Ticket::label($ticket['status'])) ?></span></td>
+                    <td><span class="badge <?= e(badge_class($ticket['status'])) ?>"><?= e(Ticket::label($ticket['status'])) ?></span></td>
                     <td><?= e(fa_datetime($ticket['updated_at'])) ?></td>
                     <td><a class="btn btn-small btn-light" href="portal.php?action=ticket&id=<?= e((string) $ticket['id']) ?>">نمایش</a></td>
                 </tr>
