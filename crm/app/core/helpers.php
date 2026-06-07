@@ -121,10 +121,17 @@ function upload_ticket_image(string $field): ?array
         throw new RuntimeException('فرمت تصویر تیکت مجاز نیست. فقط jpg، png یا webp قابل قبول است.');
     }
 
-    $publicRoot = dirname(__DIR__, 2) . '/public';
+    $projectRoot = dirname(__DIR__, 2);
+    $publicRoot = is_dir($projectRoot . '/public_html') ? $projectRoot . '/public_html' : $projectRoot . '/public';
     $dir = $publicRoot . '/uploads/tickets/' . date('Y/m');
     if (!is_dir($dir)) {
-        mkdir($dir, 0775, true);
+        if (!mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException('Ticket upload directory could not be created.');
+        }
+    }
+
+    if (!is_writable($dir)) {
+        throw new RuntimeException('Ticket upload directory is not writable.');
     }
 
     $originalName = basename((string) ($_FILES[$field]['name'] ?? 'attachment'));
