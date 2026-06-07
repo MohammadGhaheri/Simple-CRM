@@ -59,6 +59,11 @@ function portal_layout(string $title, callable $content): void
             </div>
             <?php if ($contact): ?>
                 <div class="user-menu">
+                    <?php if (!empty($contact['avatar_path'])): ?>
+                        <img class="user-avatar" src="<?= e($contact['avatar_path']) ?>" alt="">
+                    <?php else: ?>
+                        <span class="user-avatar user-avatar-initial">م</span>
+                    <?php endif; ?>
                     <span><?= e($contact['contact_name']) ?> - <?= e($contact['customer_name']) ?></span>
                     <a class="btn btn-light" href="portal.php?action=profile">پروفایل من</a>
                     <a class="btn btn-light" href="portal.php?action=logout">خروج</a>

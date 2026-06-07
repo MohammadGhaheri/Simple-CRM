@@ -149,6 +149,7 @@ CREATE TABLE ticket_messages (
   attachment_name VARCHAR(190) NULL,
   attachment_mime VARCHAR(100) NULL,
   attachment_size INT UNSIGNED NULL,
+  user_read_at DATETIME NULL,
   contact_read_at DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_ticket_messages_ticket FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,

@@ -1,5 +1,7 @@
 <div class="toolbar">
     <h2>تیکت‌های مشتریان</h2>
+    <?php $totalUnread = array_sum(array_map(static fn($ticket) => (int) ($ticket['unread_count'] ?? 0), $tickets)); ?>
+    <?php if ($totalUnread > 0): ?><span class="badge badge-primary"><?= e((string) $totalUnread) ?> پیام جدید</span><?php endif; ?>
 </div>
 
 <form class="filters" method="get">
@@ -16,9 +18,10 @@
         <thead><tr><th>کد</th><th>موضوع</th><th>مشتری</th><th>مخاطب</th><th>دسته</th><th>اولویت</th><th>وضعیت</th><th>عملیات</th></tr></thead>
         <tbody>
         <?php foreach ($tickets as $ticket): ?>
-            <tr>
+            <?php $unreadCount = (int) ($ticket['unread_count'] ?? 0); ?>
+            <tr class="<?= $unreadCount > 0 ? 'ticket-row-unread' : '' ?>">
                 <td><?= e($ticket['ticket_code']) ?></td>
-                <td><strong><?= e($ticket['subject']) ?></strong></td>
+                <td><strong><?= e($ticket['subject']) ?></strong><?php if ($unreadCount > 0): ?> <span class="badge badge-primary unread-badge"><?= e((string) $unreadCount) ?> جدید</span><?php endif; ?></td>
                 <td><?= e($ticket['customer_name']) ?> <?= (int) ($ticket['is_vip'] ?? 0) === 1 ? '<span class="badge badge-warning">VIP</span>' : '' ?></td>
                 <td><?= e($ticket['contact_name']) ?></td>
                 <td><?= e(Ticket::label($ticket['category'])) ?></td>

@@ -6,12 +6,19 @@ class Ticket
 {
     public static function search(array $filters = []): array
     {
-        $sql = 'SELECT t.*, c.customer_name, c.is_vip, ct.contact_name, u.name AS assigned_name
+        $sql = "SELECT t.*, c.customer_name, c.is_vip, ct.contact_name, u.name AS assigned_name,
+                    (
+                        SELECT COUNT(*)
+                        FROM ticket_messages tm
+                        WHERE tm.ticket_id = t.id
+                          AND tm.sender_type = 'contact'
+                          AND tm.user_read_at IS NULL
+                    ) AS unread_count
                 FROM tickets t
                 JOIN customers c ON c.id = t.customer_id
                 JOIN contacts ct ON ct.id = t.contact_id
                 LEFT JOIN users u ON u.id = t.assigned_user_id
-                WHERE 1=1';
+                WHERE 1=1";
         $params = [];
         if (!empty($filters['q'])) {
             $sql .= ' AND (t.ticket_code LIKE ? OR t.subject LIKE ? OR c.customer_name LIKE ? OR ct.contact_name LIKE ?)';

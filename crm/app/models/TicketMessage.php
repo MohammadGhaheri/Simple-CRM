@@ -34,6 +34,17 @@ class TicketMessage
         ")->execute([$ticketId, $ticketId, $contactId]);
     }
 
+    public static function markReadForUser(int $ticketId): void
+    {
+        db()->prepare("
+            UPDATE ticket_messages
+            SET user_read_at = COALESCE(user_read_at, CURRENT_TIMESTAMP)
+            WHERE ticket_id = ?
+              AND sender_type = 'contact'
+              AND user_read_at IS NULL
+        ")->execute([$ticketId]);
+    }
+
     public static function createFromContact(int $ticketId, int $contactId, string $message, ?array $attachment = null): int
     {
         return self::create([

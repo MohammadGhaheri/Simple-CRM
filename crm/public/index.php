@@ -562,7 +562,9 @@ try {
                 }
                 $ticket = Ticket::find($id) ?: $ticket;
             }
-            render('tickets/edit', ['title' => 'جزئیات تیکت', 'ticket' => $ticket, 'messages' => TicketMessage::byTicket($id), 'users' => $users, 'errors' => $errors]);
+            $messages = TicketMessage::byTicket($id);
+            TicketMessage::markReadForUser($id);
+            render('tickets/edit', ['title' => 'جزئیات تیکت', 'ticket' => $ticket, 'messages' => $messages, 'users' => $users, 'errors' => $errors]);
             exit;
         }
         render('tickets/index', [

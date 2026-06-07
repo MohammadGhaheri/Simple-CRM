@@ -59,6 +59,15 @@
                         <span><?= e($message['attachment_name'] ?: 'تصویر پیوست') ?></span>
                     </a>
                 <?php endif; ?>
+                <?php if ($message['sender_type'] === 'user'): ?>
+                    <div class="message-read-receipt <?= !empty($message['contact_read_at']) ? 'is-seen' : 'is-unseen' ?>">
+                        <?php if (!empty($message['contact_read_at'])): ?>
+                            دیده شده <?= e(fa_datetime($message['contact_read_at'])) ?>
+                        <?php else: ?>
+                            دیده نشده
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
                 </div>
             </div>
         <?php endforeach; ?>
