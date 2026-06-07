@@ -51,7 +51,7 @@ class SmsService
             return;
         }
         $mobile = '';
-        if (!empty($ticket['assigned_user_id'])) {
+        if (!empty($ticket['assigned_user_id']) && class_exists('User')) {
             $user = User::find((int) $ticket['assigned_user_id']);
             $mobile = $user['mobile'] ?? '';
         }
@@ -68,7 +68,7 @@ class SmsService
 
         $settings = Setting::all();
         $mobile = '';
-        if (!empty($ticket['assigned_user_id'])) {
+        if (!empty($ticket['assigned_user_id']) && class_exists('User')) {
             $user = User::find((int) $ticket['assigned_user_id']);
             $mobile = $user['mobile'] ?? '';
         }

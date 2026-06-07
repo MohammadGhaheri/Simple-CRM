@@ -424,13 +424,13 @@ tr:last-child td { border-bottom: 0; }
   gap: 10px;
 }
 .ticket-message.from-contact {
-  justify-content: flex-start;
-}
-.ticket-message.from-user {
   justify-content: flex-end;
 }
+.ticket-message.from-user {
+  justify-content: flex-start;
+}
 .ticket-message.from-user .ticket-avatar {
-  order: 2;
+  order: 0;
   background: #ecfdf5;
   color: #047857;
   border-color: rgba(4, 120, 87, .18);
@@ -464,20 +464,20 @@ tr:last-child td { border-bottom: 0; }
   background: #f8fffb;
 }
 .ticket-thread-portal .ticket-message.from-contact {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 .ticket-thread-portal .ticket-message.from-contact .ticket-avatar {
-  order: 2;
+  order: 0;
 }
 .ticket-thread-portal .ticket-message.from-contact .ticket-bubble {
   border-right-width: 1px;
   border-left: 4px solid var(--primary);
 }
 .ticket-thread-portal .ticket-message.from-user {
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
 .ticket-thread-portal .ticket-message.from-user .ticket-avatar {
-  order: 0;
+  order: 2;
 }
 .ticket-thread-portal .ticket-message.from-user .ticket-bubble {
   border-left-width: 1px;
@@ -546,16 +546,6 @@ tr:last-child td { border-bottom: 0; }
 @media (max-width: 720px) {
   .ticket-thread-chat {
     padding: 12px;
-  }
-  .ticket-message,
-  .ticket-message.from-user {
-    justify-content: flex-start;
-  }
-  .ticket-message.from-user .ticket-avatar {
-    order: 0;
-  }
-  .ticket-thread-portal .ticket-message.from-contact .ticket-avatar {
-    order: 0;
   }
   .ticket-bubble {
     max-width: calc(100% - 44px);

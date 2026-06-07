@@ -11,6 +11,7 @@ require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/TicketMessage.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
+require __DIR__ . '/../app/models/User.php';
 require __DIR__ . '/../app/services/SmsService.php';
 
 $action = $_GET['action'] ?? 'dashboard';
