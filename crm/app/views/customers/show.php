@@ -5,6 +5,7 @@
         <a class="btn btn-light" href="<?= e(url('deals', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">فرصت جدید</a>
         <a class="btn btn-light" href="<?= e(url('contracts', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">قرارداد جدید</a>
         <a class="btn btn-light" href="<?= e(url('contacts', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">مخاطب جدید</a>
+        <a class="btn btn-light" href="<?= e(url('customers', ['action' => 'invite_contacts', 'id' => $customer['id']])) ?>">دعوتنامه مخاطب</a>
     </div>
 </div>
 
@@ -27,7 +28,9 @@
         <?php foreach ($contacts as $contact): ?>
             <p>
                 <strong><?= e($contact['contact_name']) ?></strong> <?= $contact['is_primary'] ? '<span class="badge badge-primary">اصلی</span>' : '' ?><br>
-                <span class="muted"><?= e($contact['position']) ?> - <?= e($contact['mobile']) ?> - <?= e($contact['email']) ?></span>
+                <?php if (($contact['approval_status'] ?? 'approved') === 'pending'): ?><span class="badge badge-warning">در انتظار تأیید</span><?php endif; ?>
+                <?php if (($contact['approval_status'] ?? 'approved') === 'rejected'): ?><span class="badge badge-danger">رد شده</span><?php endif; ?>
+                <br><span class="muted"><?= e($contact['position']) ?> - <?= e($contact['mobile']) ?> - <?= e($contact['email']) ?></span>
                 <span class="actions" style="margin-top:8px">
                     <a class="btn btn-small btn-light" href="<?= e(url('contacts', ['action' => 'edit', 'id' => $contact['id']])) ?>">ویرایش</a>
                     <form method="post" action="<?= e(url('contacts', ['action' => 'delete', 'id' => $contact['id']])) ?>" data-confirm="این مخاطب حذف شود؟"><?= csrf_field() ?><button class="btn btn-small btn-danger">حذف</button></form>

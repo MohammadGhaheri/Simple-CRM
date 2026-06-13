@@ -388,6 +388,29 @@ try {
             ]);
             exit;
         }
+        if ($action === 'invite_contacts') {
+            $customer = Customer::find($id);
+            if (!$customer) {
+                redirect(url('customers'));
+            }
+            if (is_post()) {
+                verify_csrf();
+                Customer::regenerateInviteToken($id);
+                redirect(url('customers', ['action' => 'invite_contacts', 'id' => $id]));
+            }
+            $token = Customer::ensureInviteToken($id);
+            $settings = Setting::all();
+            $inviteUrl = absolute_public_url('portal.php', ['action' => 'contact_invite', 'token' => $token]);
+            $inviteText = "سلام، شما به عنوان همکار " . $customer['customer_name'] . " برای ایجاد حساب کاربری در سامانه CRM " . ($settings['app_title'] ?? 'Elm Simple CRM') . " دعوت شده‌اید.\n"
+                . "لینک اختصاصی ثبت‌نام:\n" . $inviteUrl;
+            render('customers/invite', [
+                'title' => 'دعوتنامه مخاطبین',
+                'customer' => $customer,
+                'inviteUrl' => $inviteUrl,
+                'inviteText' => $inviteText,
+            ]);
+            exit;
+        }
         render('customers/index', [
             'title' => 'مشتریان',
             'customers' => Customer::search($_GET),

@@ -35,6 +35,17 @@ function generatePortalPassword() {
 document.addEventListener('click', function (event) {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
+  if (target.matches('[data-copy-button]')) {
+    const key = target.getAttribute('data-copy-target');
+    const source = key ? document.querySelector('[data-copy-source="' + key + '"]') : null;
+    if (source instanceof HTMLInputElement || source instanceof HTMLTextAreaElement) {
+      source.select();
+      navigator.clipboard?.writeText(source.value);
+      target.textContent = 'کپی شد';
+      setTimeout(function () { target.textContent = target.getAttribute('data-copy-label') || 'کپی'; }, 1800);
+    }
+    return;
+  }
   const wrapper = target.closest('.password-tools');
   if (!wrapper) return;
   const input = wrapper.querySelector('[data-password-field]');

@@ -6,6 +6,7 @@ session_start();
 
 require __DIR__ . '/../app/core/helpers.php';
 require __DIR__ . '/../app/core/csrf.php';
+require __DIR__ . '/../app/models/Customer.php';
 require __DIR__ . '/../app/models/Contact.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/TicketMessage.php';
@@ -83,6 +84,86 @@ function portal_layout(string $title, callable $content): void
 if ($action === 'logout') {
     unset($_SESSION['portal_contact']);
     redirect('portal.php?action=login');
+}
+
+if ($action === 'contact_invite') {
+    $appSettings = Setting::all();
+    $token = trim((string) ($_GET['token'] ?? $_POST['token'] ?? ''));
+    $customer = Customer::findByInviteToken($token);
+    $inviteErrors = [];
+    $inviteSuccess = false;
+
+    if (!$customer) {
+        $inviteErrors[] = 'لینک دعوتنامه معتبر نیست یا غیرفعال شده است.';
+    } elseif (is_post()) {
+        verify_csrf();
+        $inviteErrors = required_fields($_POST, [
+            'contact_name' => 'نام و نام خانوادگی',
+            'mobile' => 'موبایل',
+            'email' => 'ایمیل',
+        ]);
+        if (!$inviteErrors && Contact::emailExists(trim((string) ($_POST['email'] ?? '')))) {
+            $inviteErrors[] = 'این ایمیل قبلاً در سامانه ثبت شده است. در صورت نیاز با پشتیبانی تماس بگیرید.';
+        }
+        if (!$inviteErrors) {
+            $contactId = Contact::createFromInvitation($customer, $_POST);
+            $contact = Contact::find($contactId);
+            if ($contact) {
+                Ticket::createContactActivationRequest($customer, $contact);
+            }
+            $inviteSuccess = true;
+        }
+    }
+
+    ?>
+    <!doctype html>
+    <html lang="fa" dir="rtl">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>ثبت‌نام مخاطب - <?= e($appSettings['app_title']) ?></title>
+        <link rel="stylesheet" href="assets/css/style.css">
+        <style>:root { --primary: <?= e($appSettings['primary_color']) ?>; --primary-dark: <?= e($appSettings['primary_color']) ?>; --sidebar: <?= e($appSettings['sidebar_color']) ?>; }</style>
+    </head>
+    <body class="login-page">
+        <main class="invite-register">
+            <section class="card">
+                <div class="brand" style="margin-bottom:18px">
+                    <?php if (!empty($appSettings['app_icon'])): ?><img class="brand-icon" src="<?= e($appSettings['app_icon']) ?>" alt=""><?php else: ?><div class="brand-mark">Elm</div><?php endif; ?>
+                    <div>
+                        <strong><?= e($appSettings['app_title']) ?></strong>
+                        <span>فرم ثبت‌نام مخاطب</span>
+                    </div>
+                </div>
+                <?php if (!$customer): ?>
+                    <div class="alert alert-danger"><?= e(implode(' ', $inviteErrors)) ?></div>
+                <?php elseif ($inviteSuccess): ?>
+                    <div class="alert alert-success">اطلاعات شما ثبت شد. درخواست فعال‌سازی حساب کاربری برای تیم پشتیبانی ارسال شد.</div>
+                    <p class="muted">پس از بررسی و تأیید اطلاعات، دسترسی پرتال برای شما فعال و اطلاعات ورود ارسال می‌شود.</p>
+                <?php else: ?>
+                    <h2>ثبت اطلاعات مخاطب <?= e($customer['customer_name']) ?></h2>
+                    <p class="muted">لطفاً اطلاعات خود را کامل کنید. حساب کاربری پس از بررسی توسط پشتیبان فعال می‌شود.</p>
+                    <?php if ($inviteErrors): ?><div class="alert alert-danger"><?= e(implode(' ', $inviteErrors)) ?></div><?php endif; ?>
+                    <form method="post">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="token" value="<?= e($token) ?>">
+                        <div class="grid grid-2">
+                            <div><label class="required">نام و نام خانوادگی</label><input required name="contact_name" value="<?= e($_POST['contact_name'] ?? '') ?>"></div>
+                            <div><label>سمت</label><input name="position" value="<?= e($_POST['position'] ?? '') ?>"></div>
+                            <div><label class="required">موبایل</label><input required name="mobile" value="<?= e($_POST['mobile'] ?? '') ?>"></div>
+                            <div><label>تلفن</label><input name="phone" value="<?= e($_POST['phone'] ?? '') ?>"></div>
+                            <div><label class="required">ایمیل</label><input required type="email" name="email" value="<?= e($_POST['email'] ?? '') ?>"></div>
+                        </div>
+                        <div style="margin-top:14px"><label>توضیحات</label><textarea name="notes"><?= e($_POST['notes'] ?? '') ?></textarea></div>
+                        <div class="form-actions"><button class="btn btn-primary">ارسال درخواست ثبت‌نام</button></div>
+                    </form>
+                <?php endif; ?>
+            </section>
+        </main>
+    </body>
+    </html>
+    <?php
+    exit;
 }
 
 if ($action === 'login') {

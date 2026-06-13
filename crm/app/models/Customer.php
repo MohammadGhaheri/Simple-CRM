@@ -58,6 +58,42 @@ class Customer
         db()->prepare('DELETE FROM customers WHERE id = ?')->execute([$id]);
     }
 
+    public static function ensureInviteToken(int $id): string
+    {
+        $customer = self::find($id);
+        if (!$customer) {
+            return '';
+        }
+        if (!empty($customer['contact_invite_token'])) {
+            return (string) $customer['contact_invite_token'];
+        }
+
+        return self::regenerateInviteToken($id);
+    }
+
+    public static function regenerateInviteToken(int $id): string
+    {
+        $token = '';
+        $stmt = db()->prepare('SELECT COUNT(*) FROM customers WHERE contact_invite_token = ?');
+        do {
+            $token = bin2hex(random_bytes(24));
+            $stmt->execute([$token]);
+        } while ((int) $stmt->fetchColumn() > 0);
+
+        db()->prepare('UPDATE customers SET contact_invite_token = ?, contact_invite_created_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([$token, $id]);
+        return $token;
+    }
+
+    public static function findByInviteToken(string $token): ?array
+    {
+        if (!preg_match('/^[a-f0-9]{48}$/', $token)) {
+            return null;
+        }
+        $stmt = db()->prepare('SELECT c.*, u.name AS owner_name FROM customers c LEFT JOIN users u ON u.id = c.owner_user_id WHERE c.contact_invite_token = ? LIMIT 1');
+        $stmt->execute([$token]);
+        return $stmt->fetch() ?: null;
+    }
+
     private static function payload(array $data): array
     {
         return [

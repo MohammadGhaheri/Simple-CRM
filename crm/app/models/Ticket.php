@@ -96,6 +96,35 @@ class Ticket
         return $ticketId;
     }
 
+    public static function createContactActivationRequest(array $customer, array $contact): int
+    {
+        $description = "درخواست فعال‌سازی حساب کاربری مخاطب از طریق لینک دعوت مشتری ثبت شد.\n\n"
+            . 'نام مخاطب: ' . ($contact['contact_name'] ?? '') . "\n"
+            . 'سمت: ' . ($contact['position'] ?? '') . "\n"
+            . 'موبایل: ' . ($contact['mobile'] ?? '') . "\n"
+            . 'تلفن: ' . ($contact['phone'] ?? '') . "\n"
+            . 'ایمیل: ' . ($contact['email'] ?? '') . "\n"
+            . 'توضیحات: ' . ($contact['notes'] ?? '');
+
+        $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description, assigned_user_id)
+                VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description, :assigned_user_id)';
+        db()->prepare($sql)->execute([
+            'ticket_code' => self::nextCode(),
+            'customer_id' => (int) $customer['id'],
+            'contact_id' => (int) $contact['id'],
+            'subject' => 'درخواست فعال‌سازی حساب کاربری مخاطب',
+            'category' => in_array('Request', self::categories(), true) ? 'Request' : (self::categories()[0] ?? 'Support'),
+            'priority' => in_array('Normal', self::priorities(), true) ? 'Normal' : (self::priorities()[0] ?? 'Normal'),
+            'description' => $description,
+            'assigned_user_id' => !empty($customer['owner_user_id']) ? (int) $customer['owner_user_id'] : null,
+        ]);
+        $ticketId = (int) db()->lastInsertId();
+        if (class_exists('TicketMessage')) {
+            TicketMessage::createFromContact($ticketId, (int) $contact['id'], $description, null);
+        }
+        return $ticketId;
+    }
+
     public static function update(int $id, array $data): void
     {
         $sql = 'UPDATE tickets SET status=:status, priority=:priority, category=:category, assigned_user_id=:assigned_user_id, response=:response WHERE id=:id';

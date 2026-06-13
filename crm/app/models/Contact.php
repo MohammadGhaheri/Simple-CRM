@@ -55,10 +55,38 @@ class Contact
         return $stmt->fetch() ?: null;
     }
 
+    public static function emailExists(string $email): bool
+    {
+        if (trim($email) === '') {
+            return false;
+        }
+        $stmt = db()->prepare('SELECT COUNT(*) FROM contacts WHERE email = ?');
+        $stmt->execute([trim($email)]);
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
     public static function create(array $data): int
     {
-        $sql = 'INSERT INTO contacts (customer_id, contact_name, position, mobile, phone, email, portal_enabled, password_hash, default_support_user_id, is_primary, notes) VALUES (:customer_id, :contact_name, :position, :mobile, :phone, :email, :portal_enabled, :password_hash, :default_support_user_id, :is_primary, :notes)';
+        $sql = 'INSERT INTO contacts (customer_id, contact_name, position, mobile, phone, email, portal_enabled, password_hash, approval_status, default_support_user_id, is_primary, notes) VALUES (:customer_id, :contact_name, :position, :mobile, :phone, :email, :portal_enabled, :password_hash, :approval_status, :default_support_user_id, :is_primary, :notes)';
         db()->prepare($sql)->execute(self::payload($data));
+        return (int) db()->lastInsertId();
+    }
+
+    public static function createFromInvitation(array $customer, array $data): int
+    {
+        $sql = 'INSERT INTO contacts (customer_id, contact_name, position, mobile, phone, email, portal_enabled, password_hash, approval_status, default_support_user_id, is_primary, notes)
+                VALUES (:customer_id, :contact_name, :position, :mobile, :phone, :email, 0, NULL, :approval_status, :default_support_user_id, 0, :notes)';
+        db()->prepare($sql)->execute([
+            'customer_id' => (int) $customer['id'],
+            'contact_name' => trim($data['contact_name'] ?? ''),
+            'position' => trim($data['position'] ?? ''),
+            'mobile' => trim($data['mobile'] ?? ''),
+            'phone' => trim($data['phone'] ?? ''),
+            'email' => trim($data['email'] ?? ''),
+            'approval_status' => 'pending',
+            'default_support_user_id' => !empty($customer['owner_user_id']) ? (int) $customer['owner_user_id'] : null,
+            'notes' => trim($data['notes'] ?? ''),
+        ]);
         return (int) db()->lastInsertId();
     }
 
@@ -72,7 +100,7 @@ class Contact
         } else {
             unset($payload['password_hash']);
         }
-        $sql = "UPDATE contacts SET customer_id=:customer_id, contact_name=:contact_name, position=:position, mobile=:mobile, phone=:phone, email=:email, portal_enabled=:portal_enabled, default_support_user_id=:default_support_user_id, is_primary=:is_primary, notes=:notes $passwordSql WHERE id=:id";
+        $sql = "UPDATE contacts SET customer_id=:customer_id, contact_name=:contact_name, position=:position, mobile=:mobile, phone=:phone, email=:email, portal_enabled=:portal_enabled, approval_status=:approval_status, default_support_user_id=:default_support_user_id, is_primary=:is_primary, notes=:notes $passwordSql WHERE id=:id";
         $payload['id'] = $id;
         db()->prepare($sql)->execute($payload);
     }
@@ -106,9 +134,29 @@ class Contact
             'email' => trim($data['email'] ?? ''),
             'portal_enabled' => isset($data['portal_enabled']) ? 1 : 0,
             'password_hash' => trim((string) ($data['portal_password'] ?? '')) !== '' ? password_hash((string) $data['portal_password'], PASSWORD_DEFAULT) : null,
+            'approval_status' => self::validApprovalStatus($data['approval_status'] ?? (isset($data['portal_enabled']) ? 'approved' : 'approved')),
             'default_support_user_id' => !empty($data['default_support_user_id']) ? (int) $data['default_support_user_id'] : null,
             'is_primary' => isset($data['is_primary']) ? 1 : 0,
             'notes' => trim($data['notes'] ?? ''),
         ];
+    }
+
+    public static function approvalStatuses(): array
+    {
+        return [
+            'approved' => 'تأیید شده',
+            'pending' => 'در انتظار تأیید',
+            'rejected' => 'رد شده',
+        ];
+    }
+
+    public static function approvalLabel(string $status): string
+    {
+        return self::approvalStatuses()[$status] ?? $status;
+    }
+
+    private static function validApprovalStatus(string $status): string
+    {
+        return array_key_exists($status, self::approvalStatuses()) ? $status : 'approved';
     }
 }

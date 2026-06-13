@@ -72,6 +72,18 @@ function url(string $page, array $params = []): string
     return 'index.php?' . http_build_query(array_merge(['page' => $page], $params));
 }
 
+function absolute_public_url(string $path, array $params = []): string
+{
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $dir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
+    $url = $scheme . '://' . $host . ($dir !== '' ? $dir : '') . '/' . ltrim($path, '/');
+    if ($params) {
+        $url .= '?' . http_build_query($params);
+    }
+    return $url;
+}
+
 function current_user_id(): int
 {
     return (int) ($_SESSION['user']['id'] ?? 0);

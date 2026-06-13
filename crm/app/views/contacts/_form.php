@@ -7,6 +7,7 @@
     <div><label>موبایل</label><input name="mobile" value="<?= e($contact['mobile'] ?? '') ?>"></div>
     <div><label>تلفن</label><input name="phone" value="<?= e($contact['phone'] ?? '') ?>"></div>
     <div><label>ایمیل</label><input type="email" name="email" value="<?= e($contact['email'] ?? '') ?>"></div>
+    <div><label>وضعیت تأیید</label><select name="approval_status"><?php foreach (Contact::approvalStatuses() as $value => $label): ?><option value="<?= e($value) ?>" <?= selected($contact['approval_status'] ?? 'approved', $value) ?>><?= e($label) ?></option><?php endforeach; ?></select></div>
     <div><label>پشتیبان پیش‌فرض</label><select name="default_support_user_id"><option value="">بدون پشتیبان پیش‌فرض</option><?php foreach (($users ?? []) as $user): ?><option value="<?= e((string) $user['id']) ?>" <?= selected($contact['default_support_user_id'] ?? '', $user['id']) ?>><?= e($user['name']) ?></option><?php endforeach; ?></select></div>
     <div>
         <label>رمز پرتال مشتری</label>

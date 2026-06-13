@@ -786,6 +786,9 @@ tr:last-child td { border-bottom: 0; }
 }
 .hint { color: var(--muted); font-size: 12px; text-align: center; }
 .portal-shell { min-height: 100vh; }
+.invite-register {
+  width: min(760px, calc(100% - 32px));
+}
 .portal-topbar {
   background: var(--surface);
   border-bottom: 1px solid var(--line);
