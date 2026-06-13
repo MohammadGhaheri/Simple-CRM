@@ -401,7 +401,7 @@ try {
             $token = Customer::ensureInviteToken($id);
             $settings = Setting::all();
             $inviteUrl = absolute_public_url('portal.php', ['action' => 'contact_invite', 'token' => $token]);
-            $inviteText = "سلام، شما به عنوان همکار " . $customer['customer_name'] . " برای ایجاد حساب کاربری در سامانه CRM " . ($settings['app_title'] ?? 'Elm Simple CRM') . " دعوت شده‌اید.\n"
+            $inviteText = "سلام، شما به عنوان همکار " . $customer['customer_name'] . " برای ایجاد حساب کاربری در سامانه " . ($settings['app_title'] ?? 'Elm Simple CRM') . " دعوت شده‌اید.\n"
                 . "لینک اختصاصی ثبت‌نام:\n" . $inviteUrl;
             render('customers/invite', [
                 'title' => 'دعوتنامه مخاطبین',

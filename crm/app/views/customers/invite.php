@@ -8,7 +8,7 @@
         <h3>لینک اختصاصی ثبت‌نام</h3>
         <p class="muted">این لینک فقط مخاطبین همین مشتری را به فرم ثبت‌نام وصل می‌کند. بعد از ثبت فرم، مخاطب غیرفعال می‌ماند تا پشتیبان اطلاعات را بررسی و حساب را فعال کند.</p>
         <label>لینک ثبت‌نام</label>
-        <input readonly value="<?= e($inviteUrl) ?>" data-copy-source="invite-url">
+        <input class="ltr-field" dir="ltr" readonly value="<?= e($inviteUrl) ?>" data-copy-source="invite-url">
         <div class="form-actions">
             <button class="btn btn-primary" type="button" data-copy-button data-copy-target="invite-url" data-copy-label="کپی لینک">کپی لینک</button>
             <form method="post" data-confirm="لینک قبلی غیرفعال و لینک جدید ساخته شود؟">

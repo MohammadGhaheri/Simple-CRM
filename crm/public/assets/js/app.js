@@ -32,6 +32,24 @@ function generatePortalPassword() {
   return password;
 }
 
+function copyTextToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text);
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.pointerEvents = 'none';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+  return Promise.resolve();
+}
+
 document.addEventListener('click', function (event) {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
@@ -40,7 +58,7 @@ document.addEventListener('click', function (event) {
     const source = key ? document.querySelector('[data-copy-source="' + key + '"]') : null;
     if (source instanceof HTMLInputElement || source instanceof HTMLTextAreaElement) {
       source.select();
-      navigator.clipboard?.writeText(source.value);
+      copyTextToClipboard(source.value);
       target.textContent = 'کپی شد';
       setTimeout(function () { target.textContent = target.getAttribute('data-copy-label') || 'کپی'; }, 1800);
     }

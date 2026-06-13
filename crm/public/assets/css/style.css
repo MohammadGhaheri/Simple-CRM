@@ -302,6 +302,10 @@ textarea { min-height: 96px; resize: vertical; }
 .btn-danger { background: #fee4e2; color: var(--danger); }
 .btn-small { padding: 6px 9px; font-size: 12px; }
 .full { width: 100%; }
+.ltr-field {
+  direction: ltr;
+  text-align: left;
+}
 
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
 table { width: 100%; border-collapse: collapse; min-width: 760px; }
