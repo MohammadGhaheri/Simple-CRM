@@ -1,6 +1,11 @@
 <div class="toolbar">
     <h2><?= e($ticket['ticket_code']) ?> - <?= e($ticket['subject']) ?></h2>
-    <a class="btn btn-light" href="<?= e(url('tickets')) ?>">بازگشت</a>
+    <div class="actions">
+        <a class="btn btn-light" href="<?= e(url('tickets')) ?>">بازگشت</a>
+        <?php if (is_admin()): ?>
+            <form method="post" action="<?= e(url('tickets', ['action' => 'delete', 'id' => $ticket['id']])) ?>" data-confirm="این تیکت از نمایش مخفی شود؟"><?= csrf_field() ?><button class="btn btn-danger">حذف تیکت</button></form>
+        <?php endif; ?>
+    </div>
 </div>
 
 <?php if (!empty($errors)): ?><div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>

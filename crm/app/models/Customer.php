@@ -6,7 +6,7 @@ class Customer
 {
     public static function search(array $filters = []): array
     {
-        $sql = 'SELECT c.*, u.name AS owner_name FROM customers c LEFT JOIN users u ON u.id = c.owner_user_id WHERE 1=1';
+        $sql = 'SELECT c.*, u.name AS owner_name FROM customers c LEFT JOIN users u ON u.id = c.owner_user_id WHERE c.deleted_at IS NULL';
         $params = [];
 
         if (!empty($filters['q'])) {
@@ -29,7 +29,7 @@ class Customer
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT c.*, u.name AS owner_name FROM customers c LEFT JOIN users u ON u.id = c.owner_user_id WHERE c.id = ?');
+        $stmt = db()->prepare('SELECT c.*, u.name AS owner_name FROM customers c LEFT JOIN users u ON u.id = c.owner_user_id WHERE c.id = ? AND c.deleted_at IS NULL');
         $stmt->execute([$id]);
         return $stmt->fetch() ?: null;
     }
@@ -55,7 +55,20 @@ class Customer
 
     public static function delete(int $id): void
     {
-        db()->prepare('DELETE FROM customers WHERE id = ?')->execute([$id]);
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('UPDATE customers SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE id = ?')->execute([$id]);
+            $pdo->prepare('UPDATE contacts SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE customer_id = ?')->execute([$id]);
+            $pdo->prepare('UPDATE tickets SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE customer_id = ?')->execute([$id]);
+            $pdo->prepare('UPDATE deals SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE customer_id = ?')->execute([$id]);
+            $pdo->prepare('UPDATE contracts SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE customer_id = ?')->execute([$id]);
+            $pdo->prepare('UPDATE activities SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE customer_id = ?')->execute([$id]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
     }
 
     public static function ensureInviteToken(int $id): string
@@ -89,7 +102,7 @@ class Customer
         if (!preg_match('/^[a-f0-9]{48}$/', $token)) {
             return null;
         }
-        $stmt = db()->prepare('SELECT c.*, u.name AS owner_name FROM customers c LEFT JOIN users u ON u.id = c.owner_user_id WHERE c.contact_invite_token = ? LIMIT 1');
+        $stmt = db()->prepare('SELECT c.*, u.name AS owner_name FROM customers c LEFT JOIN users u ON u.id = c.owner_user_id WHERE c.contact_invite_token = ? AND c.deleted_at IS NULL LIMIT 1');
         $stmt->execute([$token]);
         return $stmt->fetch() ?: null;
     }
@@ -147,6 +160,6 @@ class Customer
 
     public static function statsByType(): array
     {
-        return db()->query('SELECT customer_type, COUNT(*) AS total FROM customers GROUP BY customer_type ORDER BY total DESC')->fetchAll();
+        return db()->query('SELECT customer_type, COUNT(*) AS total FROM customers WHERE deleted_at IS NULL GROUP BY customer_type ORDER BY total DESC')->fetchAll();
     }
 }

@@ -18,7 +18,9 @@ class Ticket
                 JOIN customers c ON c.id = t.customer_id
                 JOIN contacts ct ON ct.id = t.contact_id
                 LEFT JOIN users u ON u.id = t.assigned_user_id
-                WHERE 1=1";
+                WHERE t.deleted_at IS NULL
+                  AND c.deleted_at IS NULL
+                  AND ct.deleted_at IS NULL";
         $params = [];
         if (!empty($filters['q'])) {
             $sql .= ' AND (t.ticket_code LIKE ? OR t.subject LIKE ? OR c.customer_name LIKE ? OR ct.contact_name LIKE ?)';
@@ -49,7 +51,12 @@ class Ticket
                       AND tm.contact_read_at IS NULL
                 ) AS unread_count
             FROM tickets t
+            JOIN customers c ON c.id = t.customer_id
+            JOIN contacts ct ON ct.id = t.contact_id
             WHERE t.contact_id = ?
+              AND t.deleted_at IS NULL
+              AND c.deleted_at IS NULL
+              AND ct.deleted_at IS NULL
             ORDER BY t.updated_at DESC, t.id DESC
         ");
         $stmt->execute([$contactId]);
@@ -63,14 +70,17 @@ class Ticket
             JOIN customers c ON c.id = t.customer_id
             JOIN contacts ct ON ct.id = t.contact_id
             LEFT JOIN users u ON u.id = t.assigned_user_id
-            WHERE t.id = ?');
+            WHERE t.id = ?
+              AND t.deleted_at IS NULL
+              AND c.deleted_at IS NULL
+              AND ct.deleted_at IS NULL');
         $stmt->execute([$id]);
         return $stmt->fetch() ?: null;
     }
 
     public static function findForContact(int $id, int $contactId): ?array
     {
-        $stmt = db()->prepare('SELECT t.*, c.customer_name, c.is_vip FROM tickets t JOIN customers c ON c.id = t.customer_id WHERE t.id = ? AND t.contact_id = ?');
+        $stmt = db()->prepare('SELECT t.*, c.customer_name, c.is_vip FROM tickets t JOIN customers c ON c.id = t.customer_id JOIN contacts ct ON ct.id = t.contact_id WHERE t.id = ? AND t.contact_id = ? AND t.deleted_at IS NULL AND c.deleted_at IS NULL AND ct.deleted_at IS NULL');
         $stmt->execute([$id, $contactId]);
         return $stmt->fetch() ?: null;
     }
@@ -166,6 +176,11 @@ class Ticket
         db()->prepare("UPDATE tickets SET status = 'Closed' WHERE id = ? AND contact_id = ?")->execute([$id, $contactId]);
     }
 
+    public static function delete(int $id): void
+    {
+        db()->prepare('UPDATE tickets SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE id = ?')->execute([$id]);
+    }
+
     public static function isClosed(array $ticket): bool
     {
         return in_array(($ticket['status'] ?? ''), ['Closed', 'Resolved'], true);
@@ -173,16 +188,22 @@ class Ticket
 
     public static function needsReviewCount(): int
     {
-        return (int) db()->query("SELECT COUNT(*) FROM tickets WHERE status NOT IN ('Resolved','Closed')")->fetchColumn();
+        return (int) db()->query("SELECT COUNT(*) FROM tickets t JOIN customers c ON c.id = t.customer_id JOIN contacts ct ON ct.id = t.contact_id WHERE t.status NOT IN ('Resolved','Closed') AND t.deleted_at IS NULL AND c.deleted_at IS NULL AND ct.deleted_at IS NULL")->fetchColumn();
     }
 
     public static function supportUnreadCount(): int
     {
         return (int) db()->query("
             SELECT COUNT(*)
-            FROM ticket_messages
-            WHERE sender_type = 'contact'
-              AND user_read_at IS NULL
+            FROM ticket_messages tm
+            JOIN tickets t ON t.id = tm.ticket_id
+            JOIN customers c ON c.id = t.customer_id
+            JOIN contacts ct ON ct.id = t.contact_id
+            WHERE tm.sender_type = 'contact'
+              AND tm.user_read_at IS NULL
+              AND t.deleted_at IS NULL
+              AND c.deleted_at IS NULL
+              AND ct.deleted_at IS NULL
         ")->fetchColumn();
     }
 

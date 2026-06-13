@@ -92,6 +92,11 @@
         <textarea name="sms_portal_credentials_template"><?= e($settings['sms_portal_credentials_template'] ?? '') ?></textarea>
         <p class="muted">Placeholderهای قابل استفاده: <code>{app_title}</code>، <code>{contact_name}</code>، <code>{customer_name}</code>، <code>{email}</code>، <code>{password}</code>، <code>{portal_url}</code></p>
     </div>
+    <div style="margin-top:14px">
+        <label>قالب پیام دعوتنامه ثبت‌نام مخاطب</label>
+        <textarea name="contact_invite_message_template"><?= e($settings['contact_invite_message_template'] ?? '') ?></textarea>
+        <p class="muted">Placeholderهای قابل استفاده: <code>{customer_name}</code>، <code>{app_title}</code>، <code>{invite_url}</code></p>
+    </div>
 
     <h2 style="margin-top:22px">تنظیمات ایمیل</h2>
     <div class="grid grid-2">

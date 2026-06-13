@@ -6,7 +6,7 @@ class Contact
 {
     public static function search(array $filters = []): array
     {
-        $sql = 'SELECT ct.*, c.customer_name, u.name AS default_support_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE 1=1';
+        $sql = 'SELECT ct.*, c.customer_name, u.name AS default_support_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.deleted_at IS NULL AND c.deleted_at IS NULL';
         $params = [];
         if (!empty($filters['q'])) {
             $sql .= ' AND (ct.contact_name LIKE ? OR ct.mobile LIKE ? OR ct.email LIKE ? OR c.customer_name LIKE ?)';
@@ -29,28 +29,28 @@ class Contact
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT ct.*, u.name AS default_support_name FROM contacts ct LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.customer_id = ? ORDER BY ct.is_primary DESC, ct.id DESC');
+        $stmt = db()->prepare('SELECT ct.*, u.name AS default_support_name FROM contacts ct LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.customer_id = ? AND ct.deleted_at IS NULL ORDER BY ct.is_primary DESC, ct.id DESC');
         $stmt->execute([$customerId]);
         return $stmt->fetchAll();
     }
 
     public static function primaryByCustomer(int $customerId): ?array
     {
-        $stmt = db()->prepare('SELECT ct.*, c.customer_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.customer_id = ? AND ct.email IS NOT NULL AND ct.email <> "" ORDER BY ct.is_primary DESC, ct.id DESC LIMIT 1');
+        $stmt = db()->prepare('SELECT ct.*, c.customer_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.customer_id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL AND ct.email IS NOT NULL AND ct.email <> "" ORDER BY ct.is_primary DESC, ct.id DESC LIMIT 1');
         $stmt->execute([$customerId]);
         return $stmt->fetch() ?: null;
     }
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT ct.*, c.customer_name, u.name AS default_support_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.id = ?');
+        $stmt = db()->prepare('SELECT ct.*, c.customer_name, u.name AS default_support_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL');
         $stmt->execute([$id]);
         return $stmt->fetch() ?: null;
     }
 
     public static function findPortalByEmail(string $email): ?array
     {
-        $stmt = db()->prepare('SELECT ct.*, c.customer_name, c.is_vip FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.email = ? AND ct.portal_enabled = 1 LIMIT 1');
+        $stmt = db()->prepare('SELECT ct.*, c.customer_name, c.is_vip FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.email = ? AND ct.portal_enabled = 1 AND ct.deleted_at IS NULL AND c.deleted_at IS NULL LIMIT 1');
         $stmt->execute([$email]);
         return $stmt->fetch() ?: null;
     }
@@ -60,7 +60,7 @@ class Contact
         if (trim($email) === '') {
             return false;
         }
-        $stmt = db()->prepare('SELECT COUNT(*) FROM contacts WHERE email = ?');
+        $stmt = db()->prepare('SELECT COUNT(*) FROM contacts WHERE email = ? AND deleted_at IS NULL');
         $stmt->execute([trim($email)]);
         return (int) $stmt->fetchColumn() > 0;
     }
@@ -120,7 +120,16 @@ class Contact
 
     public static function delete(int $id): void
     {
-        db()->prepare('DELETE FROM contacts WHERE id = ?')->execute([$id]);
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('UPDATE contacts SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE id = ?')->execute([$id]);
+            $pdo->prepare('UPDATE tickets SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE contact_id = ?')->execute([$id]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
     }
 
     private static function payload(array $data): array

@@ -11,7 +11,7 @@ class Contract
                 JOIN customers c ON c.id = ct.customer_id
                 LEFT JOIN deals d ON d.id = ct.deal_id
                 LEFT JOIN users u ON u.id = ct.owner_user_id
-                WHERE 1=1';
+                WHERE ct.deleted_at IS NULL AND c.deleted_at IS NULL';
         $params = [];
 
         if (!empty($filters['q'])) {
@@ -37,14 +37,14 @@ class Contract
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT ct.*, d.deal_name, u.name AS owner_name FROM contracts ct LEFT JOIN deals d ON d.id = ct.deal_id LEFT JOIN users u ON u.id = ct.owner_user_id WHERE ct.customer_id = ? ORDER BY ct.end_date DESC, ct.id DESC');
+        $stmt = db()->prepare('SELECT ct.*, d.deal_name, u.name AS owner_name FROM contracts ct LEFT JOIN deals d ON d.id = ct.deal_id LEFT JOIN users u ON u.id = ct.owner_user_id WHERE ct.customer_id = ? AND ct.deleted_at IS NULL ORDER BY ct.end_date DESC, ct.id DESC');
         $stmt->execute([$customerId]);
         return $stmt->fetchAll();
     }
 
     public static function byDeal(int $dealId): array
     {
-        $stmt = db()->prepare('SELECT ct.*, c.customer_name, u.name AS owner_name FROM contracts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.owner_user_id WHERE ct.deal_id = ? ORDER BY ct.end_date DESC, ct.id DESC');
+        $stmt = db()->prepare('SELECT ct.*, c.customer_name, u.name AS owner_name FROM contracts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.owner_user_id WHERE ct.deal_id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY ct.end_date DESC, ct.id DESC');
         $stmt->execute([$dealId]);
         return $stmt->fetchAll();
     }
@@ -56,7 +56,7 @@ class Contract
             JOIN customers c ON c.id = ct.customer_id
             LEFT JOIN deals d ON d.id = ct.deal_id
             LEFT JOIN users u ON u.id = ct.owner_user_id
-            WHERE ct.id = ?');
+            WHERE ct.id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL');
         $stmt->execute([$id]);
         return $stmt->fetch() ?: null;
     }
@@ -87,19 +87,19 @@ class Contract
 
     public static function delete(int $id): void
     {
-        db()->prepare('DELETE FROM contracts WHERE id = ?')->execute([$id]);
+        db()->prepare('UPDATE contracts SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE id = ?')->execute([$id]);
     }
 
     public static function transferOwner(int $fromUserId, int $toUserId): int
     {
-        $stmt = db()->prepare("UPDATE contracts SET owner_user_id = ? WHERE owner_user_id = ? AND status IN ('Active','Renewal Due')");
+        $stmt = db()->prepare("UPDATE contracts SET owner_user_id = ? WHERE owner_user_id = ? AND status IN ('Active','Renewal Due') AND deleted_at IS NULL");
         $stmt->execute([$toUserId, $fromUserId]);
         return $stmt->rowCount();
     }
 
     public static function renewalDue(int $limit = 6): array
     {
-        $stmt = db()->prepare("SELECT ct.*, c.customer_name FROM contracts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.renewal_reminder_date <= CURDATE() AND ct.status IN ('Active','Renewal Due') ORDER BY ct.renewal_reminder_date ASC LIMIT ?");
+        $stmt = db()->prepare("SELECT ct.*, c.customer_name FROM contracts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.renewal_reminder_date <= CURDATE() AND ct.status IN ('Active','Renewal Due') AND ct.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY ct.renewal_reminder_date ASC LIMIT ?");
         $stmt->bindValue(1, $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();

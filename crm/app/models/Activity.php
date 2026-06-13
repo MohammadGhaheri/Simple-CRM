@@ -6,7 +6,7 @@ class Activity
 {
     public static function search(array $filters = []): array
     {
-        $sql = 'SELECT a.*, c.customer_name, d.deal_name, ct.contract_title, u.name AS owner_name FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id LEFT JOIN users u ON u.id = a.owner_user_id WHERE 1=1';
+        $sql = 'SELECT a.*, c.customer_name, d.deal_name, ct.contract_title, u.name AS owner_name FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id LEFT JOIN users u ON u.id = a.owner_user_id WHERE a.deleted_at IS NULL AND c.deleted_at IS NULL';
         $params = [];
         if (!empty($filters['q'])) {
             $sql .= ' AND (a.summary LIKE ? OR c.customer_name LIKE ? OR d.deal_name LIKE ? OR ct.contract_title LIKE ?)';
@@ -35,35 +35,35 @@ class Activity
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT a.*, d.deal_name, ct.contract_title FROM activities a LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id WHERE a.customer_id = ? ORDER BY a.activity_date DESC, a.id DESC');
+        $stmt = db()->prepare('SELECT a.*, d.deal_name, ct.contract_title FROM activities a LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id WHERE a.customer_id = ? AND a.deleted_at IS NULL ORDER BY a.activity_date DESC, a.id DESC');
         $stmt->execute([$customerId]);
         return $stmt->fetchAll();
     }
 
     public static function byDeal(int $dealId): array
     {
-        $stmt = db()->prepare('SELECT a.*, c.customer_name, ct.contract_title FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN contracts ct ON ct.id = a.contract_id WHERE a.deal_id = ? ORDER BY a.activity_date DESC, a.id DESC');
+        $stmt = db()->prepare('SELECT a.*, c.customer_name, ct.contract_title FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN contracts ct ON ct.id = a.contract_id WHERE a.deal_id = ? AND a.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY a.activity_date DESC, a.id DESC');
         $stmt->execute([$dealId]);
         return $stmt->fetchAll();
     }
 
     public static function byContract(int $contractId): array
     {
-        $stmt = db()->prepare('SELECT a.*, c.customer_name, d.deal_name FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN deals d ON d.id = a.deal_id WHERE a.contract_id = ? ORDER BY a.activity_date DESC, a.id DESC');
+        $stmt = db()->prepare('SELECT a.*, c.customer_name, d.deal_name FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN deals d ON d.id = a.deal_id WHERE a.contract_id = ? AND a.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY a.activity_date DESC, a.id DESC');
         $stmt->execute([$contractId]);
         return $stmt->fetchAll();
     }
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT * FROM activities WHERE id = ?');
+        $stmt = db()->prepare('SELECT * FROM activities WHERE id = ? AND deleted_at IS NULL');
         $stmt->execute([$id]);
         return $stmt->fetch() ?: null;
     }
 
     public static function findForOwner(int $id, int $ownerId): ?array
     {
-        $stmt = db()->prepare('SELECT * FROM activities WHERE id = ? AND owner_user_id = ?');
+        $stmt = db()->prepare('SELECT * FROM activities WHERE id = ? AND owner_user_id = ? AND deleted_at IS NULL');
         $stmt->execute([$id, $ownerId]);
         return $stmt->fetch() ?: null;
     }
@@ -87,12 +87,12 @@ class Activity
 
     public static function delete(int $id): void
     {
-        db()->prepare('DELETE FROM activities WHERE id = ?')->execute([$id]);
+        db()->prepare('UPDATE activities SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE id = ?')->execute([$id]);
     }
 
     public static function recent(int $limit = 6): array
     {
-        $stmt = db()->prepare('SELECT a.*, c.customer_name FROM activities a JOIN customers c ON c.id = a.customer_id ORDER BY a.activity_date DESC, a.id DESC LIMIT ?');
+        $stmt = db()->prepare('SELECT a.*, c.customer_name FROM activities a JOIN customers c ON c.id = a.customer_id WHERE a.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY a.activity_date DESC, a.id DESC LIMIT ?');
         $stmt->bindValue(1, $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
@@ -100,7 +100,7 @@ class Activity
 
     public static function upcoming(int $limit = 6): array
     {
-        $stmt = db()->prepare("SELECT a.*, c.customer_name FROM activities a JOIN customers c ON c.id = a.customer_id WHERE a.next_followup_date >= CURDATE() AND a.status <> 'Done' ORDER BY a.next_followup_date ASC LIMIT ?");
+        $stmt = db()->prepare("SELECT a.*, c.customer_name FROM activities a JOIN customers c ON c.id = a.customer_id WHERE a.next_followup_date >= CURDATE() AND a.status <> 'Done' AND a.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY a.next_followup_date ASC LIMIT ?");
         $stmt->bindValue(1, $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
@@ -108,7 +108,7 @@ class Activity
 
     public static function overdueCount(): int
     {
-        return (int) db()->query("SELECT COUNT(*) FROM activities WHERE next_followup_date < CURDATE() AND status <> 'Done'")->fetchColumn();
+        return (int) db()->query("SELECT COUNT(*) FROM activities a JOIN customers c ON c.id = a.customer_id WHERE a.next_followup_date < CURDATE() AND a.status <> 'Done' AND a.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn();
     }
 
     public static function agendaForOwner(int $ownerId, string $bucket): array
@@ -117,6 +117,8 @@ class Activity
             'a.owner_user_id = ?',
             "a.status <> 'Done'",
             'a.next_followup_date IS NOT NULL',
+            'a.deleted_at IS NULL',
+            'c.deleted_at IS NULL',
         ];
         $params = [$ownerId];
 
@@ -151,6 +153,7 @@ class Activity
                 SUM(CASE WHEN status = 'Open' THEN 1 ELSE 0 END) AS open_count
             FROM activities
             WHERE owner_user_id = ?
+              AND deleted_at IS NULL
         ");
         $stmt->execute([$ownerId]);
         $row = $stmt->fetch() ?: [];
@@ -164,13 +167,13 @@ class Activity
 
     public static function markDoneForOwner(int $id, int $ownerId): void
     {
-        $stmt = db()->prepare("UPDATE activities SET status = 'Done' WHERE id = ? AND owner_user_id = ?");
+        $stmt = db()->prepare("UPDATE activities SET status = 'Done' WHERE id = ? AND owner_user_id = ? AND deleted_at IS NULL");
         $stmt->execute([$id, $ownerId]);
     }
 
     public static function transferOwner(int $fromUserId, int $toUserId): int
     {
-        $stmt = db()->prepare("UPDATE activities SET owner_user_id = ? WHERE owner_user_id = ? AND status <> 'Done'");
+        $stmt = db()->prepare("UPDATE activities SET owner_user_id = ? WHERE owner_user_id = ? AND status <> 'Done' AND deleted_at IS NULL");
         $stmt->execute([$toUserId, $fromUserId]);
         return $stmt->rowCount();
     }
@@ -183,7 +186,7 @@ class Activity
         }
 
         if (!in_array(($contract['status'] ?? 'Active'), ['Active', 'Renewal Due'], true)) {
-            $stmt = db()->prepare("UPDATE activities SET status = 'Cancelled' WHERE contract_id = ? AND activity_type = 'Contract Renewal' AND status <> 'Done'");
+            $stmt = db()->prepare("UPDATE activities SET status = 'Cancelled' WHERE contract_id = ? AND activity_type = 'Contract Renewal' AND status <> 'Done' AND deleted_at IS NULL");
             $stmt->execute([$contractId]);
             return;
         }
@@ -206,7 +209,7 @@ class Activity
             'notes' => 'این فعالیت به صورت خودکار از قرارداد ساخته یا به‌روزرسانی شده است.',
         ];
 
-        $existing = db()->prepare("SELECT id FROM activities WHERE contract_id = ? AND activity_type = 'Contract Renewal' AND status <> 'Done' ORDER BY id DESC LIMIT 1");
+        $existing = db()->prepare("SELECT id FROM activities WHERE contract_id = ? AND activity_type = 'Contract Renewal' AND status <> 'Done' AND deleted_at IS NULL ORDER BY id DESC LIMIT 1");
         $existing->execute([$contractId]);
         $activityId = (int) ($existing->fetchColumn() ?: 0);
         if ($activityId > 0) {
@@ -239,7 +242,7 @@ class Activity
         if (empty($data['customer_id'])) {
             return;
         }
-        $stmt = db()->prepare('UPDATE customers SET last_followup_date = ?, next_followup_date = COALESCE(?, next_followup_date) WHERE id = ?');
+        $stmt = db()->prepare('UPDATE customers SET last_followup_date = ?, next_followup_date = COALESCE(?, next_followup_date) WHERE id = ? AND deleted_at IS NULL');
         $stmt->execute([db_date($data['activity_date'] ?? null) ?: date('Y-m-d'), db_date($data['next_followup_date'] ?? null), (int) $data['customer_id']]);
     }
 }

@@ -137,6 +137,7 @@ try {
                     'options_ticket_statuses' => trim($_POST['options_ticket_statuses'] ?? ''),
                     'options_ticket_priorities' => trim($_POST['options_ticket_priorities'] ?? ''),
                     'options_ticket_categories' => trim($_POST['options_ticket_categories'] ?? ''),
+                    'contact_invite_message_template' => trim($_POST['contact_invite_message_template'] ?? ''),
                     'sms_enabled' => isset($_POST['sms_enabled']) ? '1' : '0',
                     'sms_ticket_created_enabled' => isset($_POST['sms_ticket_created_enabled']) ? '1' : '0',
                     'sms_ticket_answered_enabled' => isset($_POST['sms_ticket_answered_enabled']) ? '1' : '0',
@@ -313,14 +314,14 @@ try {
 
     if ($page === 'dashboard') {
         $stats = [
-            'customers' => (int) db()->query('SELECT COUNT(*) FROM customers')->fetchColumn(),
-            'open_deals' => (int) db()->query("SELECT COUNT(*) FROM deals WHERE deal_stage NOT IN ('Won','Lost')")->fetchColumn(),
-            'pipeline' => (float) db()->query("SELECT COALESCE(SUM(estimated_amount),0) FROM deals WHERE deal_stage NOT IN ('Won','Lost')")->fetchColumn(),
-            'weighted' => (float) db()->query("SELECT COALESCE(SUM(weighted_amount),0) FROM deals WHERE deal_stage NOT IN ('Won','Lost')")->fetchColumn(),
-            'won_value' => (float) db()->query("SELECT COALESCE(SUM(estimated_amount),0) FROM deals WHERE deal_stage = 'Won'")->fetchColumn(),
-            'lost_count' => (int) db()->query("SELECT COUNT(*) FROM deals WHERE deal_stage = 'Lost'")->fetchColumn(),
+            'customers' => (int) db()->query('SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL')->fetchColumn(),
+            'open_deals' => (int) db()->query("SELECT COUNT(*) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage NOT IN ('Won','Lost') AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
+            'pipeline' => (float) db()->query("SELECT COALESCE(SUM(d.estimated_amount),0) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage NOT IN ('Won','Lost') AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
+            'weighted' => (float) db()->query("SELECT COALESCE(SUM(d.weighted_amount),0) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage NOT IN ('Won','Lost') AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
+            'won_value' => (float) db()->query("SELECT COALESCE(SUM(d.estimated_amount),0) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage = 'Won' AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
+            'lost_count' => (int) db()->query("SELECT COUNT(*) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage = 'Lost' AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
             'overdue' => Activity::overdueCount(),
-            'renewal_due' => (int) db()->query("SELECT COUNT(*) FROM contracts WHERE renewal_reminder_date <= CURDATE() AND status IN ('Active','Renewal Due')")->fetchColumn(),
+            'renewal_due' => (int) db()->query("SELECT COUNT(*) FROM contracts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.renewal_reminder_date <= CURDATE() AND ct.status IN ('Active','Renewal Due') AND ct.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
         ];
         render('dashboard/index', [
             'title' => 'داشبورد فروش',
@@ -336,6 +337,7 @@ try {
 
     if ($page === 'customers') {
         if ($action === 'delete' && is_post()) {
+            require_admin();
             delete_action(fn() => Customer::delete($id), url('customers'));
         }
         if ($action === 'create') {
@@ -401,8 +403,15 @@ try {
             $token = Customer::ensureInviteToken($id);
             $settings = Setting::all();
             $inviteUrl = absolute_public_url('portal.php', ['action' => 'contact_invite', 'token' => $token]);
-            $inviteText = "سلام، شما به عنوان همکار " . $customer['customer_name'] . " برای ایجاد حساب کاربری در سامانه " . ($settings['app_title'] ?? 'Elm Simple CRM') . " دعوت شده‌اید.\n"
-                . "لینک اختصاصی ثبت‌نام:\n" . $inviteUrl;
+            $template = trim((string) ($settings['contact_invite_message_template'] ?? ''));
+            if ($template === '') {
+                $template = Setting::defaults()['contact_invite_message_template'];
+            }
+            $inviteText = strtr($template, [
+                '{customer_name}' => (string) $customer['customer_name'],
+                '{app_title}' => (string) ($settings['app_title'] ?? 'Elm Simple CRM'),
+                '{invite_url}' => $inviteUrl,
+            ]);
             render('customers/invite', [
                 'title' => 'دعوتنامه مخاطبین',
                 'customer' => $customer,
@@ -422,6 +431,7 @@ try {
 
     if ($page === 'contacts') {
         if ($action === 'delete' && is_post()) {
+            require_admin();
             $contact = Contact::find($id);
             delete_action(fn() => Contact::delete($id), url('customers', ['action' => 'show', 'id' => (int) ($contact['customer_id'] ?? 0)]));
         }
@@ -546,6 +556,10 @@ try {
     }
 
     if ($page === 'tickets') {
+        if ($action === 'delete' && is_post()) {
+            require_admin();
+            delete_action(fn() => Ticket::delete($id), url('tickets'));
+        }
         if ($action === 'edit') {
             $ticket = Ticket::find($id);
             if (!$ticket) {

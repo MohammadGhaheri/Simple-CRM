@@ -119,8 +119,8 @@ class SmsService
             return false;
         }
         $openTickets = Ticket::needsReviewCount();
-        $customers = (int) db()->query('SELECT COUNT(*) FROM customers')->fetchColumn();
-        $openDeals = (int) db()->query("SELECT COUNT(*) FROM deals WHERE deal_stage NOT IN ('Won','Lost')")->fetchColumn();
+        $customers = (int) db()->query('SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL')->fetchColumn();
+        $openDeals = (int) db()->query("SELECT COUNT(*) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage NOT IN ('Won','Lost') AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn();
         $overdue = Activity::overdueCount();
         $message = "خلاصه روزانه CRM\nمشتریان: $customers\nفرصت‌های باز: $openDeals\nپیگیری عقب‌افتاده: $overdue\nتیکت نیازمند بررسی: $openTickets";
         return self::send($settings['sms_admin_mobile'] ?? '', $message);

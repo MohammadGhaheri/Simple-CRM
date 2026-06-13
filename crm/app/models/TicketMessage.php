@@ -30,7 +30,7 @@ class TicketMessage
             WHERE ticket_id = ?
               AND sender_type = 'user'
               AND contact_read_at IS NULL
-              AND ticket_id IN (SELECT id FROM tickets WHERE id = ? AND contact_id = ?)
+              AND ticket_id IN (SELECT id FROM tickets WHERE id = ? AND contact_id = ? AND deleted_at IS NULL)
         ")->execute([$ticketId, $ticketId, $contactId]);
     }
 

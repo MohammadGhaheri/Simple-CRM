@@ -6,7 +6,7 @@ class Deal
 {
     public static function search(array $filters = []): array
     {
-        $sql = 'SELECT d.*, c.customer_name, u.name AS owner_name FROM deals d JOIN customers c ON c.id = d.customer_id LEFT JOIN users u ON u.id = d.owner_user_id WHERE 1=1';
+        $sql = 'SELECT d.*, c.customer_name, u.name AS owner_name FROM deals d JOIN customers c ON c.id = d.customer_id LEFT JOIN users u ON u.id = d.owner_user_id WHERE d.deleted_at IS NULL AND c.deleted_at IS NULL';
         $params = [];
         if (!empty($filters['q'])) {
             $sql .= ' AND (d.deal_name LIKE ? OR c.customer_name LIKE ?)';
@@ -27,14 +27,14 @@ class Deal
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT * FROM deals WHERE customer_id = ? ORDER BY updated_at DESC');
+        $stmt = db()->prepare('SELECT * FROM deals WHERE customer_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC');
         $stmt->execute([$customerId]);
         return $stmt->fetchAll();
     }
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT d.*, c.customer_name, u.name AS owner_name FROM deals d JOIN customers c ON c.id = d.customer_id LEFT JOIN users u ON u.id = d.owner_user_id WHERE d.id = ?');
+        $stmt = db()->prepare('SELECT d.*, c.customer_name, u.name AS owner_name FROM deals d JOIN customers c ON c.id = d.customer_id LEFT JOIN users u ON u.id = d.owner_user_id WHERE d.id = ? AND d.deleted_at IS NULL AND c.deleted_at IS NULL');
         $stmt->execute([$id]);
         return $stmt->fetch() ?: null;
     }
@@ -56,7 +56,7 @@ class Deal
 
     public static function delete(int $id): void
     {
-        db()->prepare('DELETE FROM deals WHERE id = ?')->execute([$id]);
+        db()->prepare('UPDATE deals SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE id = ?')->execute([$id]);
     }
 
     private static function payload(array $data): array
@@ -81,6 +81,6 @@ class Deal
 
     public static function statsByStage(): array
     {
-        return db()->query('SELECT deal_stage, COUNT(*) AS total, SUM(estimated_amount) AS amount FROM deals GROUP BY deal_stage ORDER BY total DESC')->fetchAll();
+        return db()->query('SELECT d.deal_stage, COUNT(*) AS total, SUM(d.estimated_amount) AS amount FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deleted_at IS NULL AND c.deleted_at IS NULL GROUP BY d.deal_stage ORDER BY total DESC')->fetchAll();
     }
 }

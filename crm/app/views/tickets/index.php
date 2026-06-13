@@ -27,7 +27,12 @@
                 <td><?= e(Ticket::label($ticket['category'])) ?></td>
                 <td><span class="badge <?= e($ticket['priority'] === 'Urgent' || $ticket['priority'] === 'High' ? 'badge-danger' : 'badge-muted') ?>"><?= e(Ticket::label($ticket['priority'])) ?></span></td>
                 <td><span class="badge <?= e(badge_class($ticket['status'])) ?>"><?= e(Ticket::label($ticket['status'])) ?></span></td>
-                <td><a class="btn btn-small <?= $unreadCount > 0 ? 'btn-primary' : 'btn-light' ?>" href="<?= e(url('tickets', ['action' => 'edit', 'id' => $ticket['id']])) ?>"><?= $unreadCount > 0 ? 'مشاهده پیام' : 'بررسی' ?></a></td>
+                <td class="actions">
+                    <a class="btn btn-small <?= $unreadCount > 0 ? 'btn-primary' : 'btn-light' ?>" href="<?= e(url('tickets', ['action' => 'edit', 'id' => $ticket['id']])) ?>"><?= $unreadCount > 0 ? 'مشاهده پیام' : 'بررسی' ?></a>
+                    <?php if (is_admin()): ?>
+                        <form method="post" action="<?= e(url('tickets', ['action' => 'delete', 'id' => $ticket['id']])) ?>" data-confirm="این تیکت از نمایش مخفی شود؟"><?= csrf_field() ?><button class="btn btn-small btn-danger">حذف</button></form>
+                    <?php endif; ?>
+                </td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$tickets): ?><tr><td colspan="8" class="empty">تیکتی یافت نشد.</td></tr><?php endif; ?>

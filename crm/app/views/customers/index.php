@@ -29,7 +29,9 @@
                 <td class="actions">
                     <a class="btn btn-small btn-light" href="<?= e(url('customers', ['action' => 'show', 'id' => $customer['id']])) ?>">نمایش</a>
                     <a class="btn btn-small btn-light" href="<?= e(url('customers', ['action' => 'edit', 'id' => $customer['id']])) ?>">ویرایش</a>
-                    <form method="post" action="<?= e(url('customers', ['action' => 'delete', 'id' => $customer['id']])) ?>" data-confirm="حذف این مشتری همه مخاطب‌ها، فرصت‌ها، قراردادها و فعالیت‌های مرتبط را حذف می‌کند. ادامه می‌دهید؟"><?= csrf_field() ?><button class="btn btn-small btn-danger">حذف</button></form>
+                    <?php if (is_admin()): ?>
+                        <form method="post" action="<?= e(url('customers', ['action' => 'delete', 'id' => $customer['id']])) ?>" data-confirm="این مشتری و زیرمجموعه‌هایش از نمایش مخفی می‌شوند و در دیتابیس قابل برگشت می‌مانند. ادامه می‌دهید؟"><?= csrf_field() ?><button class="btn btn-small btn-danger">حذف</button></form>
+                    <?php endif; ?>
                 </td>
             </tr>
         <?php endforeach; ?>

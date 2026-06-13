@@ -33,7 +33,9 @@
                 <br><span class="muted"><?= e($contact['position']) ?> - <?= e($contact['mobile']) ?> - <?= e($contact['email']) ?></span>
                 <span class="actions" style="margin-top:8px">
                     <a class="btn btn-small btn-light" href="<?= e(url('contacts', ['action' => 'edit', 'id' => $contact['id']])) ?>">ویرایش</a>
-                    <form method="post" action="<?= e(url('contacts', ['action' => 'delete', 'id' => $contact['id']])) ?>" data-confirm="این مخاطب حذف شود؟"><?= csrf_field() ?><button class="btn btn-small btn-danger">حذف</button></form>
+                    <?php if (is_admin()): ?>
+                        <form method="post" action="<?= e(url('contacts', ['action' => 'delete', 'id' => $contact['id']])) ?>" data-confirm="این مخاطب و تیکت‌های مرتبط از نمایش مخفی شوند؟"><?= csrf_field() ?><button class="btn btn-small btn-danger">حذف</button></form>
+                    <?php endif; ?>
                 </span>
             </p>
         <?php endforeach; ?>
