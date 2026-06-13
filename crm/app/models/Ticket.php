@@ -98,13 +98,19 @@ class Ticket
 
     public static function createContactActivationRequest(array $customer, array $contact): int
     {
+        $customerLink = function_exists('absolute_public_url')
+            ? absolute_public_url('index.php', ['page' => 'customers', 'action' => 'show', 'id' => (int) $customer['id']])
+            : 'index.php?page=customers&action=show&id=' . (int) $customer['id'];
+
         $description = "درخواست فعال‌سازی حساب کاربری مخاطب از طریق لینک دعوت مشتری ثبت شد.\n\n"
             . 'نام مخاطب: ' . ($contact['contact_name'] ?? '') . "\n"
             . 'سمت: ' . ($contact['position'] ?? '') . "\n"
             . 'موبایل: ' . ($contact['mobile'] ?? '') . "\n"
             . 'تلفن: ' . ($contact['phone'] ?? '') . "\n"
             . 'ایمیل: ' . ($contact['email'] ?? '') . "\n"
-            . 'توضیحات: ' . ($contact['notes'] ?? '');
+            . 'توضیحات: ' . ($contact['notes'] ?? '') . "\n\n"
+            . "لینک جزئیات مشتری برای بررسی و تکمیل اطلاعات:\n"
+            . $customerLink;
 
         $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description, assigned_user_id)
                 VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description, :assigned_user_id)';
