@@ -20,7 +20,10 @@
         <?php foreach ($tickets as $ticket): ?>
             <?php $unreadCount = (int) ($ticket['unread_count'] ?? 0); ?>
             <tr class="<?= $unreadCount > 0 ? 'ticket-row-unread' : '' ?>">
-                <td><?= e($ticket['ticket_code']) ?></td>
+                <td>
+                    <?= e($ticket['ticket_code']) ?>
+                    <span class="ticket-list-date"><?= e(fa_datetime($ticket['created_at'])) ?></span>
+                </td>
                 <td><strong><?= e($ticket['subject']) ?></strong><?php if ($unreadCount > 0): ?> <span class="badge badge-primary unread-badge"><?= e((string) $unreadCount) ?> جدید</span><?php endif; ?></td>
                 <td><?= e($ticket['customer_name']) ?> <?= (int) ($ticket['is_vip'] ?? 0) === 1 ? '<span class="badge badge-warning">VIP</span>' : '' ?></td>
                 <td><?= e($ticket['contact_name']) ?></td>

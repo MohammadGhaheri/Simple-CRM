@@ -33,7 +33,7 @@ class Ticket
                 $params[] = $filters[$field];
             }
         }
-        $sql .= ' ORDER BY t.updated_at DESC, t.id DESC';
+        $sql .= ' ORDER BY t.created_at DESC, t.id DESC';
         $stmt = db()->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
