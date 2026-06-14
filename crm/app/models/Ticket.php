@@ -108,9 +108,9 @@ class Ticket
 
     public static function createContactActivationRequest(array $customer, array $contact): int
     {
-        $customerLink = function_exists('absolute_public_url')
-            ? absolute_public_url('index.php', ['page' => 'customers', 'action' => 'show', 'id' => (int) $customer['id']])
-            : 'index.php?page=customers&action=show&id=' . (int) $customer['id'];
+        $contactLink = function_exists('absolute_public_url')
+            ? absolute_public_url('index.php', ['page' => 'contacts', 'action' => 'edit', 'id' => (int) $contact['id']])
+            : 'index.php?page=contacts&action=edit&id=' . (int) $contact['id'];
 
         $description = "درخواست فعال‌سازی حساب کاربری مخاطب از طریق لینک دعوت مشتری ثبت شد.\n\n"
             . 'نام مخاطب: ' . ($contact['contact_name'] ?? '') . "\n"
@@ -119,8 +119,8 @@ class Ticket
             . 'تلفن: ' . ($contact['phone'] ?? '') . "\n"
             . 'ایمیل: ' . ($contact['email'] ?? '') . "\n"
             . 'توضیحات: ' . ($contact['notes'] ?? '') . "\n\n"
-            . "لینک جزئیات مشتری برای بررسی و تکمیل اطلاعات:\n"
-            . $customerLink;
+            . "لینک ویرایش مخاطب برای بررسی و تکمیل اطلاعات:\n"
+            . $contactLink;
 
         $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description, assigned_user_id)
                 VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description, :assigned_user_id)';
@@ -139,6 +139,22 @@ class Ticket
             TicketMessage::createFromContact($ticketId, (int) $contact['id'], $description, null);
         }
         return $ticketId;
+    }
+
+    public static function latestActivationRequestForContact(int $contactId): ?array
+    {
+        $stmt = db()->prepare("
+            SELECT *
+            FROM tickets
+            WHERE contact_id = ?
+              AND deleted_at IS NULL
+              AND status NOT IN ('Resolved','Closed')
+              AND subject = ?
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$contactId, 'درخواست فعال‌سازی حساب کاربری مخاطب']);
+        return $stmt->fetch() ?: null;
     }
 
     public static function update(int $id, array $data): void

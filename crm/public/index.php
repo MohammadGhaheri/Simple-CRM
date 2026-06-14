@@ -138,6 +138,8 @@ try {
                     'options_ticket_priorities' => trim($_POST['options_ticket_priorities'] ?? ''),
                     'options_ticket_categories' => trim($_POST['options_ticket_categories'] ?? ''),
                     'contact_invite_message_template' => trim($_POST['contact_invite_message_template'] ?? ''),
+                    'contact_activation_auto_reply_enabled' => isset($_POST['contact_activation_auto_reply_enabled']) ? '1' : '0',
+                    'contact_activation_auto_reply_template' => trim($_POST['contact_activation_auto_reply_template'] ?? ''),
                     'sms_enabled' => isset($_POST['sms_enabled']) ? '1' : '0',
                     'sms_ticket_created_enabled' => isset($_POST['sms_ticket_created_enabled']) ? '1' : '0',
                     'sms_ticket_answered_enabled' => isset($_POST['sms_ticket_answered_enabled']) ? '1' : '0',
@@ -526,7 +528,27 @@ try {
                     }
                 }
                 if (!$errors) {
+                    $wasPending = ($contact['approval_status'] ?? 'approved') === 'pending' || (int) ($contact['portal_enabled'] ?? 0) !== 1;
+                    $willBeApproved = ($_POST['approval_status'] ?? '') === 'approved' && !empty($_POST['portal_enabled']);
                     Contact::update($id, $_POST);
+                    if ($wasPending && $willBeApproved) {
+                        $activationTicket = Ticket::latestActivationRequestForContact($id);
+                        if ($activationTicket) {
+                            if (Setting::get('contact_activation_auto_reply_enabled') === '1') {
+                                $template = trim(Setting::get('contact_activation_auto_reply_template'));
+                                if ($template === '') {
+                                    $template = Setting::defaults()['contact_activation_auto_reply_template'];
+                                }
+                                $message = strtr($template, [
+                                    '{support_name}' => (string) ($_SESSION['user']['name'] ?? ''),
+                                    '{contact_name}' => (string) ($_POST['contact_name'] ?? ''),
+                                    '{customer_name}' => (string) ($contact['customer_name'] ?? ''),
+                                ]);
+                                TicketMessage::createFromUser((int) $activationTicket['id'], current_user_id(), $message, null);
+                            }
+                            Ticket::close((int) $activationTicket['id']);
+                        }
+                    }
                     if (!empty($_POST['send_portal_sms'])) {
                         $updatedContact = Contact::find($id);
                         if ($updatedContact) {

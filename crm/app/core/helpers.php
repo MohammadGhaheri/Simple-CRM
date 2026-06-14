@@ -39,6 +39,26 @@ function e(?string $value): string
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
+function linkify_text(?string $value): string
+{
+    $text = (string) $value;
+    $result = '';
+    $offset = 0;
+
+    if (preg_match_all('~https?://[^\s<]+~u', $text, $matches, PREG_OFFSET_CAPTURE)) {
+        foreach ($matches[0] as [$match, $position]) {
+            $result .= e(substr($text, $offset, $position - $offset));
+            $url = rtrim($match, ".,؛،)");
+            $suffix = substr($match, strlen($url));
+            $result .= '<a href="' . e($url) . '" target="_blank" rel="noopener">' . e($url) . '</a>' . e($suffix);
+            $offset = $position + strlen($match);
+        }
+    }
+
+    $result .= e(substr($text, $offset));
+    return nl2br($result);
+}
+
 function redirect(string $path): never
 {
     header('Location: ' . $path);

@@ -21,7 +21,7 @@
             <div><span>اولویت</span><?= e(Ticket::label($ticket['priority'])) ?></div>
             <div><span>وضعیت</span><span class="badge <?= e(badge_class($ticket['status'])) ?>"><?= e(Ticket::label($ticket['status'])) ?></span></div>
         </div>
-        <p><?= nl2br(e($ticket['description'])) ?></p>
+        <p><?= linkify_text($ticket['description']) ?></p>
     </div>
 
     <form class="card" method="post">
@@ -57,7 +57,7 @@
                     <strong><?= e($message['sender_type'] === 'contact' ? ($message['contact_name'] ?? 'مشتری') : ($message['user_name'] ?? 'پشتیبانی')) ?></strong>
                     <span><?= e(fa_datetime($message['created_at'])) ?></span>
                 </div>
-                <?php if (trim((string) $message['message']) !== ''): ?><p><?= nl2br(e($message['message'])) ?></p><?php endif; ?>
+                <?php if (trim((string) $message['message']) !== ''): ?><p><?= linkify_text($message['message']) ?></p><?php endif; ?>
                 <?php if (!empty($message['attachment_path'])): ?>
                     <a class="ticket-attachment" href="<?= e($message['attachment_path']) ?>" target="_blank" rel="noopener">
                         <img src="<?= e($message['attachment_path']) ?>" alt="">

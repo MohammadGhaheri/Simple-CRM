@@ -97,6 +97,12 @@
         <textarea name="contact_invite_message_template"><?= e($settings['contact_invite_message_template'] ?? '') ?></textarea>
         <p class="muted">Placeholderهای قابل استفاده: <code>{customer_name}</code>، <code>{app_title}</code>، <code>{invite_url}</code></p>
     </div>
+    <p><label><input type="checkbox" name="contact_activation_auto_reply_enabled" value="1" <?= checked(($settings['contact_activation_auto_reply_enabled'] ?? '1') === '1') ?> style="width:auto"> ثبت پاسخ خودکار بعد از تأیید مخاطب</label></p>
+    <div style="margin-top:14px">
+        <label>متن پاسخ خودکار تأیید مخاطب</label>
+        <textarea name="contact_activation_auto_reply_template"><?= e($settings['contact_activation_auto_reply_template'] ?? '') ?></textarea>
+        <p class="muted">Placeholderهای قابل استفاده: <code>{support_name}</code>، <code>{contact_name}</code>، <code>{customer_name}</code></p>
+    </div>
 
     <h2 style="margin-top:22px">تنظیمات ایمیل</h2>
     <div class="grid grid-2">

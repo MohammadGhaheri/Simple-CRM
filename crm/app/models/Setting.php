@@ -75,6 +75,8 @@ class Setting
             'sms_portal_credentials_enabled' => '1',
             'sms_portal_credentials_template' => "سلام {contact_name}\nدسترسی شما به پرتال مشتری {app_title} فعال شد.\nنام کاربری: {email}\nرمز عبور: {password}\nورود: {portal_url}",
             'contact_invite_message_template' => "سلام، شما به عنوان همکار {customer_name} برای ایجاد حساب کاربری در سامانه {app_title} دعوت شده‌اید.\nلینک اختصاصی ثبت‌نام:\n{invite_url}",
+            'contact_activation_auto_reply_enabled' => '1',
+            'contact_activation_auto_reply_template' => "با سلام، احتراما پروفایل شما تایید و فعال شد\nبا سپاس {support_name}",
             'sms_daily_summary_enabled' => '0',
             'sms_api_key' => '',
             'sms_line_number' => '',

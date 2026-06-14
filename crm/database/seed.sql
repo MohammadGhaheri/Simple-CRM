@@ -23,6 +23,9 @@ INSERT INTO app_settings (setting_key, setting_value) VALUES
 ('contact_invite_message_template', 'سلام، شما به عنوان همکار {customer_name} برای ایجاد حساب کاربری در سامانه {app_title} دعوت شده‌اید.
 لینک اختصاصی ثبت‌نام:
 {invite_url}'),
+('contact_activation_auto_reply_enabled', '1'),
+('contact_activation_auto_reply_template', 'با سلام، احتراما پروفایل شما تایید و فعال شد
+با سپاس {support_name}'),
 ('options_customer_types', 'B2B Fleet|ناوگان سازمانی
 B2C Owner|مالک شخصی
 B2D Dealer|نمایندگی
