@@ -60,7 +60,58 @@
 <div class="card" style="margin-top:16px">
     <h3>فعالیت‌ها</h3>
     <?php foreach ($activities as $activity): ?>
-        <p><strong><?= e(fa_label($activity['activity_type'])) ?></strong> <span class="badge <?= e(badge_class($activity['status'])) ?>"><?= e(fa_label($activity['status'])) ?></span><br><span class="muted"><?= e(fa_date($activity['activity_date'])) ?> - <?= e($activity['summary']) ?></span></p>
+        <?php
+        $activityDetail = [
+            'type' => fa_label($activity['activity_type']),
+            'status' => fa_label($activity['status']),
+            'date' => fa_date($activity['activity_date']),
+            'summary' => $activity['summary'],
+            'next_action' => $activity['next_action'],
+            'next_followup' => fa_date($activity['next_followup_date']),
+            'owner' => $activity['owner_name'],
+            'deal' => $activity['deal_name'],
+            'contract' => $activity['contract_title'],
+            'notes' => $activity['notes'],
+            'is_internal_task' => (int) ($activity['is_internal_task'] ?? 0) === 1,
+            'attachment_url' => !empty($activity['attachment_path']) ? url('activities', ['action' => 'attachment', 'id' => $activity['id']]) : '',
+            'attachment_name' => $activity['attachment_name'] ?? '',
+        ];
+        ?>
+        <button
+            class="activity-summary-button"
+            type="button"
+            data-activity-dialog-open
+            data-activity-detail="<?= e(json_encode($activityDetail, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>"
+        >
+            <span><strong><?= e(fa_label($activity['activity_type'])) ?></strong> <span class="badge <?= e(badge_class($activity['status'])) ?>"><?= e(fa_label($activity['status'])) ?></span><?php if (!empty($activity['is_internal_task'])): ?> <span class="badge badge-warning">داخلی</span><?php endif; ?></span>
+            <span class="muted"><?= e(fa_date($activity['activity_date'])) ?> - <?= e($activity['summary']) ?></span>
+        </button>
     <?php endforeach; ?>
     <?php if (!$activities): ?><div class="empty">فعالیتی ثبت نشده است.</div><?php endif; ?>
 </div>
+
+<dialog class="activity-dialog" data-activity-dialog>
+    <div class="dialog-header">
+        <div>
+            <h3 data-activity-value="summary">جزئیات فعالیت</h3>
+            <span class="badge badge-warning" data-activity-internal hidden>تسک داخلی</span>
+        </div>
+        <button class="dialog-close" type="button" data-dialog-close aria-label="بستن">×</button>
+    </div>
+    <div class="detail-list">
+        <div><span>نوع فعالیت</span><strong data-activity-value="type"></strong></div>
+        <div><span>وضعیت</span><strong data-activity-value="status"></strong></div>
+        <div><span>تاریخ فعالیت</span><strong data-activity-value="date"></strong></div>
+        <div><span>مسئول</span><strong data-activity-value="owner"></strong></div>
+        <div><span>فرصت مرتبط</span><strong data-activity-value="deal"></strong></div>
+        <div><span>قرارداد مرتبط</span><strong data-activity-value="contract"></strong></div>
+        <div><span>اقدام بعدی</span><strong data-activity-value="next_action"></strong></div>
+        <div><span>پیگیری بعدی</span><strong data-activity-value="next_followup"></strong></div>
+    </div>
+    <div class="dialog-notes">
+        <span>یادداشت</span>
+        <p data-activity-value="notes"></p>
+    </div>
+    <a class="btn btn-light" href="#" data-activity-attachment hidden>دریافت فایل پیوست</a>
+    <div class="form-actions"><button class="btn btn-primary" type="button" data-dialog-close>بستن</button></div>
+</dialog>

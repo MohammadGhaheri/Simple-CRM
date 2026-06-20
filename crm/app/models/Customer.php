@@ -34,6 +34,29 @@ class Customer
         return $stmt->fetch() ?: null;
     }
 
+    public static function autocomplete(string $query, int $limit = 15): array
+    {
+        $query = trim($query);
+        if (preg_match_all('/./u', $query) < 2) {
+            return [];
+        }
+        $stmt = db()->prepare('
+            SELECT id, customer_code, customer_name, city
+            FROM customers
+            WHERE deleted_at IS NULL
+              AND (customer_name LIKE ? OR customer_code LIKE ? OR city LIKE ?)
+            ORDER BY customer_name
+            LIMIT ?
+        ');
+        $like = '%' . $query . '%';
+        $stmt->bindValue(1, $like);
+        $stmt->bindValue(2, $like);
+        $stmt->bindValue(3, $like);
+        $stmt->bindValue(4, max(1, min($limit, 30)), PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
     public static function create(array $data): int
     {
         $sql = 'INSERT INTO customers (customer_code, customer_name, customer_type, industry, city, lead_source, interested_product, vehicle_count, estimated_contract_value, sales_status, owner_user_id, last_followup_date, next_followup_date, is_vip, notes) VALUES (:customer_code, :customer_name, :customer_type, :industry, :city, :lead_source, :interested_product, :vehicle_count, :estimated_contract_value, :sales_status, :owner_user_id, :last_followup_date, :next_followup_date, :is_vip, :notes)';

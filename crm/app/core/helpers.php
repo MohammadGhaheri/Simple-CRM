@@ -180,6 +180,97 @@ function upload_ticket_image(string $field): ?array
     ];
 }
 
+function activity_attachment_root(): string
+{
+    return dirname(__DIR__, 2) . '/storage/activity-attachments';
+}
+
+function upload_activity_attachment(string $field): ?array
+{
+    $error = (int) ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($error === UPLOAD_ERR_NO_FILE) {
+        return null;
+    }
+    if ($error !== UPLOAD_ERR_OK || empty($_FILES[$field]['tmp_name']) || !is_uploaded_file($_FILES[$field]['tmp_name'])) {
+        throw new RuntimeException('آپلود فایل فعالیت ناموفق بود.');
+    }
+    if ((int) ($_FILES[$field]['size'] ?? 0) > 5 * 1024 * 1024) {
+        throw new RuntimeException('حجم فایل فعالیت نباید بیشتر از ۵ مگابایت باشد.');
+    }
+
+    $originalName = basename((string) ($_FILES[$field]['name'] ?? 'attachment'));
+    $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    $allowedMimes = [
+        'jpg' => ['image/jpeg'],
+        'jpeg' => ['image/jpeg'],
+        'png' => ['image/png'],
+        'webp' => ['image/webp'],
+        'pdf' => ['application/pdf'],
+        'doc' => ['application/msword', 'application/CDFV2', 'application/x-ole-storage', 'application/vnd.ms-office'],
+        'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip'],
+    ];
+    if (!isset($allowedMimes[$extension])) {
+        throw new RuntimeException('فقط تصویر، PDF و فایل Word برای فعالیت مجاز است.');
+    }
+
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = (string) $finfo->file($_FILES[$field]['tmp_name']);
+    if (!in_array($mime, $allowedMimes[$extension], true)) {
+        throw new RuntimeException('نوع واقعی فایل فعالیت با پسوند آن سازگار نیست.');
+    }
+    if ($extension === 'docx' && $mime === 'application/zip') {
+        if (!class_exists('ZipArchive')) {
+            throw new RuntimeException('افزونه ZIP برای بررسی امنیتی فایل Word روی سرور فعال نیست.');
+        }
+        $zip = new ZipArchive();
+        $opened = $zip->open($_FILES[$field]['tmp_name']);
+        $isDocx = $opened === true
+            && $zip->locateName('[Content_Types].xml') !== false
+            && $zip->locateName('word/document.xml') !== false;
+        if ($opened === true) {
+            $zip->close();
+        }
+        if (!$isDocx) {
+            throw new RuntimeException('فایل انتخاب‌شده یک سند Word معتبر نیست.');
+        }
+    }
+
+    $relativeDir = date('Y/m');
+    $dir = activity_attachment_root() . '/' . $relativeDir;
+    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+        throw new RuntimeException('پوشه نگهداری فایل فعالیت ساخته نشد.');
+    }
+    if (!is_writable($dir)) {
+        throw new RuntimeException('پوشه نگهداری فایل فعالیت قابل نوشتن نیست.');
+    }
+
+    $filename = bin2hex(random_bytes(16)) . '.' . $extension;
+    if (!move_uploaded_file($_FILES[$field]['tmp_name'], $dir . '/' . $filename)) {
+        throw new RuntimeException('ذخیره فایل فعالیت ناموفق بود.');
+    }
+
+    return [
+        'path' => $relativeDir . '/' . $filename,
+        'name' => $originalName,
+        'mime' => $mime,
+        'size' => (int) ($_FILES[$field]['size'] ?? 0),
+    ];
+}
+
+function delete_activity_attachment(?string $relativePath): void
+{
+    $relativePath = str_replace('\\', '/', trim((string) $relativePath));
+    if ($relativePath === '' || str_contains($relativePath, '..')) {
+        return;
+    }
+
+    $root = realpath(activity_attachment_root());
+    $target = realpath(activity_attachment_root() . '/' . ltrim($relativePath, '/'));
+    if ($root && $target && str_starts_with($target, $root . DIRECTORY_SEPARATOR) && is_file($target)) {
+        @unlink($target);
+    }
+}
+
 function public_upload_root(): string
 {
     $projectRoot = dirname(__DIR__, 2);

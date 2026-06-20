@@ -84,6 +84,147 @@ document.addEventListener('click', function (event) {
   }
 });
 
+document.querySelectorAll('[data-activity-dependent-form]').forEach(function (wrapper) {
+  const searchInput = wrapper.querySelector('[data-customer-search]');
+  const results = wrapper.querySelector('[data-customer-results]');
+  const customerSelect = wrapper.querySelector('[data-customer-select]');
+  const dealSelect = wrapper.querySelector('[data-dependent-select="deals"]');
+  const contractSelect = wrapper.querySelector('[data-dependent-select="contracts"]');
+  let selectedDealId = dealSelect?.getAttribute('data-selected') || '';
+  let selectedContractId = contractSelect?.getAttribute('data-selected') || '';
+  let searchTimer = null;
+  let searchController = null;
+
+  function fillSelect(select, items, emptyLabel, labelKey) {
+    if (!(select instanceof HTMLSelectElement)) return;
+    const selected = select === dealSelect ? selectedDealId : selectedContractId;
+    select.innerHTML = '';
+    select.appendChild(new Option(emptyLabel, ''));
+    items.forEach(function (item) {
+      select.appendChild(new Option(item[labelKey] || '', String(item.id), false, String(item.id) === selected));
+    });
+  }
+
+  function loadDependencies(customerId) {
+    fillSelect(dealSelect, [], customerId ? 'در حال بارگذاری...' : 'بدون فرصت', 'deal_name');
+    fillSelect(contractSelect, [], customerId ? 'در حال بارگذاری...' : 'بدون قرارداد', 'contract_title');
+    if (!customerId) return;
+
+    fetch('index.php?page=activities&action=customer_dependencies&customer_id=' + encodeURIComponent(customerId), {
+      headers: { Accept: 'application/json' }
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error('Dependency request failed');
+        return response.json();
+      })
+      .then(function (data) {
+        fillSelect(dealSelect, data.deals || [], 'بدون فرصت', 'deal_name');
+        fillSelect(contractSelect, data.contracts || [], 'بدون قرارداد', 'contract_title');
+        selectedDealId = '';
+        selectedContractId = '';
+      })
+      .catch(function () {
+        fillSelect(dealSelect, [], 'خطا در بارگذاری فرصت‌ها', 'deal_name');
+        fillSelect(contractSelect, [], 'خطا در بارگذاری قراردادها', 'contract_title');
+      });
+  }
+
+  function chooseCustomer(item) {
+    if (!(customerSelect instanceof HTMLSelectElement)) return;
+    customerSelect.value = String(item.id);
+    if (searchInput instanceof HTMLInputElement) searchInput.value = item.customer_name || '';
+    if (results instanceof HTMLElement) results.hidden = true;
+    selectedDealId = '';
+    selectedContractId = '';
+    loadDependencies(String(item.id));
+  }
+
+  customerSelect?.addEventListener('change', function () {
+    const selectedOption = customerSelect.options[customerSelect.selectedIndex];
+    if (searchInput instanceof HTMLInputElement) {
+      searchInput.value = customerSelect.value ? selectedOption.text.split(' - ')[0] : '';
+    }
+    selectedDealId = '';
+    selectedContractId = '';
+    loadDependencies(customerSelect.value);
+  });
+
+  searchInput?.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    const query = searchInput.value.trim();
+    if (query.length < 2) {
+      if (results instanceof HTMLElement) results.hidden = true;
+      return;
+    }
+    searchTimer = setTimeout(function () {
+      searchController?.abort();
+      searchController = new AbortController();
+      fetch('index.php?page=activities&action=customer_lookup&q=' + encodeURIComponent(query), {
+        headers: { Accept: 'application/json' },
+        signal: searchController.signal
+      })
+        .then(function (response) {
+          if (!response.ok) throw new Error('Search request failed');
+          return response.json();
+        })
+        .then(function (items) {
+          if (!(results instanceof HTMLElement)) return;
+          results.innerHTML = '';
+          items.forEach(function (item) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.innerHTML = '<strong></strong><span></span>';
+            button.querySelector('strong').textContent = item.customer_name || '';
+            button.querySelector('span').textContent = [item.customer_code, item.city].filter(Boolean).join(' - ');
+            button.addEventListener('click', function () { chooseCustomer(item); });
+            results.appendChild(button);
+          });
+          if (!items.length) {
+            const empty = document.createElement('div');
+            empty.className = 'autocomplete-empty';
+            empty.textContent = 'مشتری‌ای پیدا نشد.';
+            results.appendChild(empty);
+          }
+          results.hidden = false;
+        })
+        .catch(function (error) {
+          if (error.name !== 'AbortError' && results instanceof HTMLElement) results.hidden = true;
+        });
+    }, 250);
+  });
+
+  document.addEventListener('click', function (event) {
+    if (results instanceof HTMLElement && !wrapper.contains(event.target)) results.hidden = true;
+  });
+});
+
+const activityDialog = document.querySelector('[data-activity-dialog]');
+document.addEventListener('click', function (event) {
+  const opener = event.target instanceof Element ? event.target.closest('[data-activity-dialog-open]') : null;
+  if (opener && activityDialog instanceof HTMLDialogElement) {
+    const data = JSON.parse(opener.getAttribute('data-activity-detail') || '{}');
+    activityDialog.querySelectorAll('[data-activity-value]').forEach(function (element) {
+      const key = element.getAttribute('data-activity-value');
+      element.textContent = data[key] || '—';
+    });
+    const badge = activityDialog.querySelector('[data-activity-internal]');
+    if (badge instanceof HTMLElement) badge.hidden = !data.is_internal_task;
+    const attachment = activityDialog.querySelector('[data-activity-attachment]');
+    if (attachment instanceof HTMLAnchorElement) {
+      attachment.hidden = !data.attachment_url;
+      attachment.href = data.attachment_url || '#';
+      attachment.textContent = data.attachment_name || 'دریافت فایل پیوست';
+    }
+    activityDialog.showModal();
+  }
+
+  const closeButton = event.target instanceof Element ? event.target.closest('[data-dialog-close]') : null;
+  if (closeButton) {
+    const dialog = closeButton.closest('dialog');
+    if (dialog instanceof HTMLDialogElement) dialog.close();
+  }
+});
+
 const persianMonths = [
   'فروردین',
   'اردیبهشت',

@@ -739,6 +739,39 @@ try {
     }
 
     if ($page === 'activities') {
+        if ($action === 'customer_lookup') {
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(Customer::autocomplete((string) ($_GET['q'] ?? '')), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+        if ($action === 'customer_dependencies') {
+            $customerId = (int) ($_GET['customer_id'] ?? 0);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode([
+                'deals' => $customerId > 0 ? Deal::byCustomer($customerId) : [],
+                'contracts' => $customerId > 0 ? Contract::byCustomer($customerId) : [],
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+        if ($action === 'attachment') {
+            $activity = Activity::find($id);
+            if (!$activity || empty($activity['attachment_path'])) {
+                http_response_code(404);
+                exit('File not found.');
+            }
+            $root = realpath(activity_attachment_root());
+            $file = realpath(activity_attachment_root() . '/' . ltrim((string) $activity['attachment_path'], '/\\'));
+            if (!$root || !$file || !str_starts_with($file, $root . DIRECTORY_SEPARATOR) || !is_file($file)) {
+                http_response_code(404);
+                exit('File not found.');
+            }
+            header('Content-Type: ' . ($activity['attachment_mime'] ?: 'application/octet-stream'));
+            header('Content-Length: ' . filesize($file));
+            header("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode((string) ($activity['attachment_name'] ?: basename($file))));
+            header('X-Content-Type-Options: nosniff');
+            readfile($file);
+            exit;
+        }
         if ($action === 'delete' && is_post()) {
             delete_action(fn() => Activity::delete($id), url('activities'));
         }
@@ -757,6 +790,31 @@ try {
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'activity_date' => 'تاریخ فعالیت', 'summary' => 'خلاصه']);
+                $customerId = (int) ($_POST['customer_id'] ?? 0);
+                if (!Customer::find($customerId)) {
+                    $errors[] = 'مشتری انتخاب‌شده معتبر نیست.';
+                }
+                if (!Deal::belongsToCustomer((int) ($_POST['deal_id'] ?? 0), $customerId)) {
+                    $errors[] = 'فرصت فروش انتخاب‌شده متعلق به این مشتری نیست.';
+                }
+                if (!Contract::belongsToCustomer((int) ($_POST['contract_id'] ?? 0), $customerId)) {
+                    $errors[] = 'قرارداد انتخاب‌شده متعلق به این مشتری نیست.';
+                }
+                if (!$errors) {
+                    try {
+                        $attachment = upload_activity_attachment('attachment');
+                        if ($attachment) {
+                            $_POST = array_merge($_POST, [
+                                'attachment_path' => $attachment['path'],
+                                'attachment_name' => $attachment['name'],
+                                'attachment_mime' => $attachment['mime'],
+                                'attachment_size' => $attachment['size'],
+                            ]);
+                        }
+                    } catch (RuntimeException $e) {
+                        $errors[] = $e->getMessage();
+                    }
+                }
                 if (!$errors) {
                     $createdActivityId = Activity::create($_POST);
                     if (!empty($_POST['send_activity_email'])) {
@@ -783,7 +841,16 @@ try {
                 $activity = $_POST;
                 $activity['complete_id'] = $sourceActivity ? $completeId : 0;
             }
-            render('activities/create', ['title' => 'فعالیت جدید', 'activity' => $activity, 'customers' => Customer::search(), 'deals' => Deal::search(), 'users' => $users, 'errors' => $errors]);
+            $selectedCustomerId = (int) ($activity['customer_id'] ?? 0);
+            render('activities/create', [
+                'title' => 'فعالیت جدید',
+                'activity' => $activity,
+                'customers' => Customer::search(),
+                'deals' => $selectedCustomerId ? Deal::byCustomer($selectedCustomerId) : [],
+                'contracts' => $selectedCustomerId ? Contract::byCustomer($selectedCustomerId) : [],
+                'users' => $users,
+                'errors' => $errors,
+            ]);
             exit;
         }
         if ($action === 'edit') {
@@ -794,13 +861,60 @@ try {
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'activity_date' => 'تاریخ فعالیت', 'summary' => 'خلاصه']);
+                $customerId = (int) ($_POST['customer_id'] ?? 0);
+                if (!Customer::find($customerId)) {
+                    $errors[] = 'مشتری انتخاب‌شده معتبر نیست.';
+                }
+                if (!Deal::belongsToCustomer((int) ($_POST['deal_id'] ?? 0), $customerId)) {
+                    $errors[] = 'فرصت فروش انتخاب‌شده متعلق به این مشتری نیست.';
+                }
+                if (!Contract::belongsToCustomer((int) ($_POST['contract_id'] ?? 0), $customerId)) {
+                    $errors[] = 'قرارداد انتخاب‌شده متعلق به این مشتری نیست.';
+                }
+                $_POST['attachment_path'] = $activity['attachment_path'] ?? null;
+                $_POST['attachment_name'] = $activity['attachment_name'] ?? null;
+                $_POST['attachment_mime'] = $activity['attachment_mime'] ?? null;
+                $_POST['attachment_size'] = $activity['attachment_size'] ?? null;
+                $oldAttachmentPath = (string) ($activity['attachment_path'] ?? '');
+                if (!$errors) {
+                    try {
+                        $attachment = upload_activity_attachment('attachment');
+                        if ($attachment) {
+                            $_POST = array_merge($_POST, [
+                                'attachment_path' => $attachment['path'],
+                                'attachment_name' => $attachment['name'],
+                                'attachment_mime' => $attachment['mime'],
+                                'attachment_size' => $attachment['size'],
+                            ]);
+                        } elseif (!empty($_POST['remove_attachment'])) {
+                            $_POST['attachment_path'] = null;
+                            $_POST['attachment_name'] = null;
+                            $_POST['attachment_mime'] = null;
+                            $_POST['attachment_size'] = null;
+                        }
+                    } catch (RuntimeException $e) {
+                        $errors[] = $e->getMessage();
+                    }
+                }
                 if (!$errors) {
                     Activity::update($id, $_POST);
+                    if ($oldAttachmentPath !== '' && $oldAttachmentPath !== (string) ($_POST['attachment_path'] ?? '')) {
+                        delete_activity_attachment($oldAttachmentPath);
+                    }
                     redirect(url('activities'));
                 }
                 $activity = array_merge($activity, $_POST);
             }
-            render('activities/edit', ['title' => 'ویرایش فعالیت', 'activity' => $activity, 'customers' => Customer::search(), 'deals' => Deal::search(), 'users' => $users, 'errors' => $errors]);
+            $selectedCustomerId = (int) ($activity['customer_id'] ?? 0);
+            render('activities/edit', [
+                'title' => 'ویرایش فعالیت',
+                'activity' => $activity,
+                'customers' => Customer::search(),
+                'deals' => $selectedCustomerId ? Deal::byCustomer($selectedCustomerId) : [],
+                'contracts' => $selectedCustomerId ? Contract::byCustomer($selectedCustomerId) : [],
+                'users' => $users,
+                'errors' => $errors,
+            ]);
             exit;
         }
         render('activities/index', ['title' => 'فعالیت‌ها', 'activities' => Activity::search($_GET), 'users' => $users, 'filters' => $_GET]);

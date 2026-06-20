@@ -42,6 +42,16 @@ class Contract
         return $stmt->fetchAll();
     }
 
+    public static function belongsToCustomer(int $id, int $customerId): bool
+    {
+        if ($id <= 0) {
+            return true;
+        }
+        $stmt = db()->prepare('SELECT COUNT(*) FROM contracts WHERE id = ? AND customer_id = ? AND deleted_at IS NULL');
+        $stmt->execute([$id, $customerId]);
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
     public static function byDeal(int $dealId): array
     {
         $stmt = db()->prepare('SELECT ct.*, c.customer_name, u.name AS owner_name FROM contracts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.owner_user_id WHERE ct.deal_id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY ct.end_date DESC, ct.id DESC');

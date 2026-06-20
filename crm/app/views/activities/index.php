@@ -8,6 +8,7 @@
     <select name="status"><option value="">همه وضعیت‌ها</option><?php foreach (activity_status_options() as $option): ?><option value="<?= e($option) ?>" <?= selected($filters['status'] ?? '', $option) ?>><?= e(fa_label($option)) ?></option><?php endforeach; ?></select>
     <select name="activity_type"><option value="">همه نوع‌ها</option><?php foreach (activity_type_options() as $option): ?><option value="<?= e($option) ?>" <?= selected($filters['activity_type'] ?? '', $option) ?>><?= e(fa_label($option)) ?></option><?php endforeach; ?></select>
     <select name="owner_user_id"><option value="">همه مالک‌ها</option><?php foreach ($users as $user): ?><option value="<?= e((string) $user['id']) ?>" <?= selected($filters['owner_user_id'] ?? '', $user['id']) ?>><?= e($user['name']) ?></option><?php endforeach; ?></select>
+    <select name="is_internal_task"><option value="">همه فعالیت‌ها</option><option value="1" <?= selected($filters['is_internal_task'] ?? '', '1') ?>>فقط تسک‌های داخلی</option><option value="0" <?= selected($filters['is_internal_task'] ?? '', '0') ?>>فقط فعالیت‌های مشتری</option></select>
     <input class="date-input" name="date_from" placeholder="از تاریخ شمسی" value="<?= e($filters['date_from'] ?? '') ?>">
     <input class="date-input" name="date_to" placeholder="تا تاریخ شمسی" value="<?= e($filters['date_to'] ?? '') ?>">
     <button class="btn btn-light">اعمال فیلتر</button>
@@ -23,7 +24,12 @@
                 <td><?= e($activity['deal_name']) ?></td>
                 <td><?= e($activity['contract_title']) ?></td>
                 <td><?= e(fa_label($activity['activity_type'])) ?></td>
-                <td><strong><?= e($activity['summary']) ?></strong><br><span class="muted"><?= e($activity['next_action']) ?></span></td>
+                <td>
+                    <strong><?= e($activity['summary']) ?></strong>
+                    <?php if (!empty($activity['is_internal_task'])): ?><span class="badge badge-warning">داخلی</span><?php endif; ?>
+                    <?php if (!empty($activity['attachment_path'])): ?><a class="badge badge-muted" href="<?= e(url('activities', ['action' => 'attachment', 'id' => $activity['id']])) ?>">پیوست</a><?php endif; ?>
+                    <br><span class="muted"><?= e($activity['next_action']) ?></span>
+                </td>
                 <td><?= e(fa_date($activity['next_followup_date'])) ?></td>
                 <td><span class="badge <?= e(badge_class($activity['status'])) ?>"><?= e(fa_label($activity['status'])) ?></span></td>
                 <td><?= e($activity['owner_name']) ?></td>

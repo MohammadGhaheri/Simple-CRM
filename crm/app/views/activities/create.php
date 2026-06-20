@@ -1,4 +1,4 @@
-<form class="card" method="post">
+<form class="card" method="post" enctype="multipart/form-data">
     <?= csrf_field() ?>
     <?php if (!empty($activity['complete_id'])): ?>
         <input type="hidden" name="complete_id" value="<?= e((string) $activity['complete_id']) ?>">

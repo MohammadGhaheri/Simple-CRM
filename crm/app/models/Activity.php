@@ -19,6 +19,10 @@ class Activity
                 $params[] = $filters[$field];
             }
         }
+        if (isset($filters['is_internal_task']) && $filters['is_internal_task'] !== '') {
+            $sql .= ' AND a.is_internal_task = ?';
+            $params[] = (int) $filters['is_internal_task'];
+        }
         if (!empty($filters['date_from'])) {
             $sql .= ' AND a.activity_date >= ?';
             $params[] = db_date($filters['date_from']);
@@ -35,7 +39,7 @@ class Activity
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT a.*, d.deal_name, ct.contract_title FROM activities a LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id WHERE a.customer_id = ? AND a.deleted_at IS NULL ORDER BY a.activity_date DESC, a.id DESC');
+        $stmt = db()->prepare('SELECT a.*, d.deal_name, ct.contract_title, u.name AS owner_name FROM activities a LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id LEFT JOIN users u ON u.id = a.owner_user_id WHERE a.customer_id = ? AND a.deleted_at IS NULL ORDER BY a.activity_date DESC, a.id DESC');
         $stmt->execute([$customerId]);
         return $stmt->fetchAll();
     }
@@ -56,7 +60,15 @@ class Activity
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT * FROM activities WHERE id = ? AND deleted_at IS NULL');
+        $stmt = db()->prepare('
+            SELECT a.*, c.customer_name, d.deal_name, ct.contract_title, u.name AS owner_name
+            FROM activities a
+            JOIN customers c ON c.id = a.customer_id
+            LEFT JOIN deals d ON d.id = a.deal_id
+            LEFT JOIN contracts ct ON ct.id = a.contract_id
+            LEFT JOIN users u ON u.id = a.owner_user_id
+            WHERE a.id = ? AND a.deleted_at IS NULL AND c.deleted_at IS NULL
+        ');
         $stmt->execute([$id]);
         return $stmt->fetch() ?: null;
     }
@@ -70,7 +82,7 @@ class Activity
 
     public static function create(array $data): int
     {
-        $sql = 'INSERT INTO activities (customer_id, deal_id, contract_id, activity_date, activity_type, summary, next_action, next_followup_date, owner_user_id, status, notes) VALUES (:customer_id, :deal_id, :contract_id, :activity_date, :activity_type, :summary, :next_action, :next_followup_date, :owner_user_id, :status, :notes)';
+        $sql = 'INSERT INTO activities (customer_id, deal_id, contract_id, activity_date, activity_type, summary, next_action, next_followup_date, owner_user_id, status, is_internal_task, attachment_path, attachment_name, attachment_mime, attachment_size, notes) VALUES (:customer_id, :deal_id, :contract_id, :activity_date, :activity_type, :summary, :next_action, :next_followup_date, :owner_user_id, :status, :is_internal_task, :attachment_path, :attachment_name, :attachment_mime, :attachment_size, :notes)';
         db()->prepare($sql)->execute(self::payload($data));
         self::syncCustomerFollowup($data);
         return (int) db()->lastInsertId();
@@ -78,7 +90,7 @@ class Activity
 
     public static function update(int $id, array $data): void
     {
-        $sql = 'UPDATE activities SET customer_id=:customer_id, deal_id=:deal_id, contract_id=:contract_id, activity_date=:activity_date, activity_type=:activity_type, summary=:summary, next_action=:next_action, next_followup_date=:next_followup_date, owner_user_id=:owner_user_id, status=:status, notes=:notes WHERE id=:id';
+        $sql = 'UPDATE activities SET customer_id=:customer_id, deal_id=:deal_id, contract_id=:contract_id, activity_date=:activity_date, activity_type=:activity_type, summary=:summary, next_action=:next_action, next_followup_date=:next_followup_date, owner_user_id=:owner_user_id, status=:status, is_internal_task=:is_internal_task, attachment_path=:attachment_path, attachment_name=:attachment_name, attachment_mime=:attachment_mime, attachment_size=:attachment_size, notes=:notes WHERE id=:id';
         $payload = self::payload($data);
         $payload['id'] = $id;
         db()->prepare($sql)->execute($payload);
@@ -233,6 +245,11 @@ class Activity
             'next_followup_date' => db_date($data['next_followup_date'] ?? null),
             'owner_user_id' => (int) ($data['owner_user_id'] ?? current_user_id()),
             'status' => $data['status'] ?? 'Open',
+            'is_internal_task' => isset($data['is_internal_task']) ? 1 : 0,
+            'attachment_path' => !empty($data['attachment_path']) ? (string) $data['attachment_path'] : null,
+            'attachment_name' => !empty($data['attachment_name']) ? (string) $data['attachment_name'] : null,
+            'attachment_mime' => !empty($data['attachment_mime']) ? (string) $data['attachment_mime'] : null,
+            'attachment_size' => !empty($data['attachment_size']) ? (int) $data['attachment_size'] : null,
             'notes' => trim($data['notes'] ?? ''),
         ];
     }
