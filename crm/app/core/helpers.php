@@ -72,7 +72,10 @@ function is_post(): bool
 
 function asset(string $path): string
 {
-    return 'assets/' . ltrim($path, '/');
+    $relativePath = 'assets/' . ltrim($path, '/');
+    $file = public_upload_root() . '/' . $relativePath;
+    $version = is_file($file) ? (string) filemtime($file) : app_version();
+    return $relativePath . '?v=' . rawurlencode($version);
 }
 
 function app_version(): string
