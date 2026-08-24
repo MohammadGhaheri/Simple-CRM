@@ -15,6 +15,7 @@ require __DIR__ . '/../app/models/Contract.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/TicketMessage.php';
+require __DIR__ . '/../app/models/Announcement.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/services/SmsService.php';
@@ -192,6 +193,64 @@ try {
 
     if ($page === 'help') {
         render('help/index', ['title' => 'راهنمای سیستم']);
+        exit;
+    }
+
+    if ($page === 'announcements') {
+        if (!is_admin() && in_array($action, ['create', 'edit', 'delete'], true)) {
+            require_admin();
+        }
+        if ($action === 'delete' && is_post()) {
+            require_admin();
+            delete_action(fn() => Announcement::delete($id), url('announcements'));
+        }
+        if ($action === 'create') {
+            require_admin();
+            $announcement = ['audience_type' => 'all', 'published_at' => fa_date(date('Y-m-d')), 'is_active' => 1];
+            if (is_post()) {
+                verify_csrf();
+                $announcement = array_merge($announcement, $_POST);
+                $errors = required_fields($_POST, ['title' => 'عنوان', 'body' => 'متن اطلاعیه']);
+                if (($_POST['audience_type'] ?? 'all') === 'customer') {
+                    $customer = Customer::find((int) ($_POST['customer_id'] ?? 0));
+                    if (!$customer) {
+                        $errors[] = 'مشتری انتخاب‌شده برای مخاطب اطلاعیه معتبر نیست.';
+                    }
+                }
+                if (!$errors) {
+                    Announcement::create($_POST, current_user_id());
+                    redirect(url('announcements'));
+                }
+            }
+            render('announcements/create', ['title' => 'اطلاعیه جدید', 'announcement' => $announcement, 'customers' => Customer::search(), 'errors' => $errors]);
+            exit;
+        }
+        if ($action === 'edit') {
+            require_admin();
+            $announcement = Announcement::find($id);
+            if (!$announcement) {
+                redirect(url('announcements'));
+            }
+            $announcement['published_at'] = fa_date($announcement['published_at'] ?? '');
+            if (is_post()) {
+                verify_csrf();
+                $announcement = array_merge($announcement, $_POST);
+                $errors = required_fields($_POST, ['title' => 'عنوان', 'body' => 'متن اطلاعیه']);
+                if (($_POST['audience_type'] ?? 'all') === 'customer') {
+                    $customer = Customer::find((int) ($_POST['customer_id'] ?? 0));
+                    if (!$customer) {
+                        $errors[] = 'مشتری انتخاب‌شده برای مخاطب اطلاعیه معتبر نیست.';
+                    }
+                }
+                if (!$errors) {
+                    Announcement::update($id, $_POST);
+                    redirect(url('announcements'));
+                }
+            }
+            render('announcements/edit', ['title' => 'ویرایش اطلاعیه', 'announcement' => $announcement, 'customers' => Customer::search(), 'errors' => $errors]);
+            exit;
+        }
+        render('announcements/index', ['title' => 'اطلاعیه‌ها', 'announcements' => Announcement::search()]);
         exit;
     }
 
@@ -578,9 +637,72 @@ try {
     }
 
     if ($page === 'tickets') {
+        if ($action === 'contacts_by_customer') {
+            $customerId = (int) ($_GET['customer_id'] ?? 0);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode($customerId > 0 ? Contact::byCustomer($customerId) : [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
         if ($action === 'delete' && is_post()) {
             require_admin();
             delete_action(fn() => Ticket::delete($id), url('tickets'));
+        }
+        if ($action === 'create') {
+            $ticket = [
+                'customer_id' => (int) ($_GET['customer_id'] ?? 0),
+                'contact_id' => 0,
+                'category' => Ticket::categories()[0] ?? 'Support',
+                'priority' => in_array('Normal', Ticket::priorities(), true) ? 'Normal' : (Ticket::priorities()[0] ?? 'Normal'),
+                'assigned_user_id' => current_user_id(),
+            ];
+            if (is_post()) {
+                verify_csrf();
+                $ticket = array_merge($ticket, $_POST);
+                $errors = required_fields($_POST, [
+                    'customer_id' => 'مشتری',
+                    'contact_id' => 'مخاطب',
+                    'subject' => 'موضوع',
+                    'message' => 'متن اولین پیام',
+                ]);
+                $customerId = (int) ($_POST['customer_id'] ?? 0);
+                $contactId = (int) ($_POST['contact_id'] ?? 0);
+                $customer = $customerId > 0 ? Customer::find($customerId) : null;
+                $contact = ($customer && $contactId > 0) ? Contact::findForCustomer($contactId, $customerId) : null;
+                if (!$customer) {
+                    $errors[] = 'مشتری انتخاب‌شده معتبر نیست.';
+                }
+                if (!$contact) {
+                    $errors[] = 'مخاطب انتخاب‌شده متعلق به این مشتری نیست یا حذف شده است.';
+                }
+
+                $attachment = null;
+                if (!$errors) {
+                    try {
+                        $attachment = upload_ticket_image('attachment');
+                    } catch (RuntimeException $e) {
+                        $errors[] = $e->getMessage();
+                    }
+                }
+                if (!$errors && $customer && $contact) {
+                    $newId = Ticket::createFromUser($customer, $contact, current_user_id(), $_POST, $attachment);
+                    $created = Ticket::find($newId);
+                    if ($created) {
+                        SmsService::notifyTicketAnswered($created);
+                        EmailService::notifyTicketAnswered($created);
+                    }
+                    redirect(url('tickets', ['action' => 'edit', 'id' => $newId]));
+                }
+            }
+            $selectedCustomerId = (int) ($ticket['customer_id'] ?? 0);
+            render('tickets/create', [
+                'title' => 'تیکت جدید برای مشتری',
+                'ticket' => $ticket,
+                'customers' => Customer::search(),
+                'contacts' => $selectedCustomerId > 0 ? Contact::byCustomer($selectedCustomerId) : [],
+                'users' => $users,
+                'errors' => $errors,
+            ]);
+            exit;
         }
         if ($action === 'edit') {
             $ticket = Ticket::find($id);

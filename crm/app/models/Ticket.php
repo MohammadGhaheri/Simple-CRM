@@ -106,6 +106,35 @@ class Ticket
         return $ticketId;
     }
 
+    public static function createFromUser(array $customer, array $contact, int $userId, array $data, ?array $attachment = null): int
+    {
+        $message = trim((string) ($data['message'] ?? ''));
+        $subject = trim((string) ($data['subject'] ?? ''));
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description, assigned_user_id)
+                    VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description, :assigned_user_id)';
+            $pdo->prepare($sql)->execute([
+                'ticket_code' => self::nextCode(),
+                'customer_id' => (int) $customer['id'],
+                'contact_id' => (int) $contact['id'],
+                'subject' => $subject,
+                'category' => self::validCategory($data['category'] ?? 'Support'),
+                'priority' => self::validPriority($data['priority'] ?? 'Normal'),
+                'description' => $message,
+                'assigned_user_id' => !empty($data['assigned_user_id']) ? (int) $data['assigned_user_id'] : $userId,
+            ]);
+            $ticketId = (int) $pdo->lastInsertId();
+            TicketMessage::createFromUser($ticketId, $userId, $message, $attachment);
+            $pdo->commit();
+            return $ticketId;
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
     public static function createContactActivationRequest(array $customer, array $contact): int
     {
         $contactLink = function_exists('absolute_public_url')

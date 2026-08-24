@@ -34,6 +34,22 @@ class Contact
         return $stmt->fetchAll();
     }
 
+    public static function findForCustomer(int $id, int $customerId): ?array
+    {
+        $stmt = db()->prepare('
+            SELECT ct.*, c.customer_name, c.is_vip
+            FROM contacts ct
+            JOIN customers c ON c.id = ct.customer_id
+            WHERE ct.id = ?
+              AND ct.customer_id = ?
+              AND ct.deleted_at IS NULL
+              AND c.deleted_at IS NULL
+            LIMIT 1
+        ');
+        $stmt->execute([$id, $customerId]);
+        return $stmt->fetch() ?: null;
+    }
+
     public static function primaryByCustomer(int $customerId): ?array
     {
         $stmt = db()->prepare('SELECT ct.*, c.customer_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id WHERE ct.customer_id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL AND ct.email IS NOT NULL AND ct.email <> "" ORDER BY ct.is_primary DESC, ct.id DESC LIMIT 1');

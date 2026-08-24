@@ -26,6 +26,7 @@
                 <span class="nav-badge"><?= e((string) $ticketNeedsReview) ?></span>
             <?php endif; ?>
         </a>
+        <a class="<?= ($page ?? '') === 'announcements' ? 'active' : '' ?>" href="<?= e(url('announcements')) ?>">اطلاعیه‌ها</a>
         <?php if (is_admin()): ?>
             <a class="<?= ($page ?? '') === 'reports' ? 'active' : '' ?>" href="<?= e(url('reports')) ?>">گزارش‌ها</a>
             <a class="<?= ($page ?? '') === 'users' ? 'active' : '' ?>" href="<?= e(url('users')) ?>">کاربران</a>

@@ -1,7 +1,10 @@
 <div class="toolbar">
     <h2>تیکت‌های مشتریان</h2>
-    <?php $totalUnread = array_sum(array_map(static fn($ticket) => (int) ($ticket['unread_count'] ?? 0), $tickets)); ?>
-    <?php if ($totalUnread > 0): ?><span class="badge badge-primary"><?= e((string) $totalUnread) ?> پیام جدید</span><?php endif; ?>
+    <div class="actions">
+        <?php $totalUnread = array_sum(array_map(static fn($ticket) => (int) ($ticket['unread_count'] ?? 0), $tickets)); ?>
+        <?php if ($totalUnread > 0): ?><span class="badge badge-primary"><?= e((string) $totalUnread) ?> پیام جدید</span><?php endif; ?>
+        <a class="btn btn-primary" href="<?= e(url('tickets', ['action' => 'create'])) ?>">تیکت جدید برای مشتری</a>
+    </div>
 </div>
 
 <form class="filters" method="get">

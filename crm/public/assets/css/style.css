@@ -368,6 +368,47 @@ tr:last-child td { border-bottom: 0; }
 .autocomplete-results span { display: block; }
 .autocomplete-results span { margin-top: 3px; color: var(--muted); font-size: 12px; }
 .autocomplete-empty { padding: 14px; color: var(--muted); text-align: center; }
+
+.announcement-list {
+  display: grid;
+  gap: 10px;
+}
+.announcement-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.announcement-item.is-unread {
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+.announcement-item strong,
+.announcement-item span {
+  display: block;
+}
+.announcement-item span {
+  margin-top: 5px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.announcement-item small { color: var(--muted); white-space: nowrap; }
+.announcement-item em {
+  font-style: normal;
+  color: var(--primary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.announcement-detail p {
+  line-height: 2;
+  white-space: normal;
+}
 .activity-flags { display: grid; align-content: start; gap: 12px; padding-top: 27px; }
 .current-attachment { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 12px; }
 

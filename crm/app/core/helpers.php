@@ -59,6 +59,24 @@ function linkify_text(?string $value): string
     return nl2br($result);
 }
 
+function text_excerpt(?string $value, int $length = 120): string
+{
+    $text = trim((string) $value);
+    if ($text === '' || $length <= 0) {
+        return '';
+    }
+
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+        return mb_strlen($text, 'UTF-8') > $length ? mb_substr($text, 0, $length, 'UTF-8') . '...' : $text;
+    }
+
+    if (preg_match_all('/./us', $text, $matches) && count($matches[0]) > $length) {
+        return implode('', array_slice($matches[0], 0, $length)) . '...';
+    }
+
+    return $text;
+}
+
 function redirect(string $path): never
 {
     header('Location: ' . $path);

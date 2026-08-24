@@ -10,6 +10,7 @@ require __DIR__ . '/../app/models/Customer.php';
 require __DIR__ . '/../app/models/Contact.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/TicketMessage.php';
+require __DIR__ . '/../app/models/Announcement.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/models/User.php';
@@ -41,6 +42,7 @@ function portal_layout(string $title, callable $content): void
 {
     $contact = portal_contact();
     $appSettings = Setting::all();
+    $announcementUnread = $contact ? Announcement::unreadCountForContact($contact) : 0;
     ?>
     <!doctype html>
     <html lang="fa" dir="rtl">
@@ -66,6 +68,7 @@ function portal_layout(string $title, callable $content): void
                         <span class="user-avatar user-avatar-initial">م</span>
                     <?php endif; ?>
                     <span><?= e($contact['contact_name']) ?> - <?= e($contact['customer_name']) ?></span>
+                    <a class="btn btn-light portal-nav-link" href="portal.php?action=announcements">اطلاعیه‌ها<?php if ($announcementUnread > 0): ?> <span class="nav-badge"><?= e((string) $announcementUnread) ?></span><?php endif; ?></a>
                     <a class="btn btn-light" href="portal.php?action=profile">پروفایل من</a>
                     <a class="btn btn-light" href="portal.php?action=logout">خروج</a>
                 </div>
@@ -490,14 +493,64 @@ if ($action === 'ticket') {
     exit;
 }
 
+if ($action === 'announcements') {
+    $announcements = Announcement::forContact($contact);
+    portal_layout('اطلاعیه‌ها', function () use ($announcements) {
+        ?>
+        <div class="toolbar">
+            <h2>اطلاعیه‌ها</h2>
+            <a class="btn btn-light" href="portal.php">بازگشت</a>
+        </div>
+        <div class="announcement-list">
+            <?php foreach ($announcements as $announcement): ?>
+                <?php $isUnread = empty($announcement['read_at']); ?>
+                <a class="announcement-item <?= $isUnread ? 'is-unread' : '' ?>" href="portal.php?action=announcement&id=<?= e((string) $announcement['id']) ?>">
+                    <div>
+                        <strong><?= e($announcement['title']) ?></strong>
+                        <span><?= e(text_excerpt($announcement['body'] ?? '', 120)) ?></span>
+                    </div>
+                    <small><?= e(fa_datetime($announcement['published_at'])) ?></small>
+                    <em><?= $isUnread ? 'خوانده‌نشده' : 'خوانده‌شده' ?></em>
+                </a>
+            <?php endforeach; ?>
+            <?php if (!$announcements): ?><div class="empty">اطلاعیه‌ای برای شما ثبت نشده است.</div><?php endif; ?>
+        </div>
+        <?php
+    });
+    exit;
+}
+
+if ($action === 'announcement') {
+    $announcement = Announcement::findForContact((int) ($_GET['id'] ?? 0), $contact);
+    if (!$announcement) {
+        redirect('portal.php?action=announcements');
+    }
+    Announcement::markRead((int) $announcement['id'], (int) $contact['id']);
+    portal_layout('مشاهده اطلاعیه', function () use ($announcement) {
+        ?>
+        <div class="toolbar">
+            <h2><?= e($announcement['title']) ?></h2>
+            <a class="btn btn-light" href="portal.php?action=announcements">بازگشت</a>
+        </div>
+        <article class="card announcement-detail">
+            <div class="muted"><?= e(fa_datetime($announcement['published_at'])) ?></div>
+            <p><?= nl2br(e($announcement['body'])) ?></p>
+        </article>
+        <?php
+    });
+    exit;
+}
+
 $tickets = Ticket::byContact((int) $contact['id']);
 $totalUnread = array_sum(array_map(static fn($ticket) => (int) ($ticket['unread_count'] ?? 0), $tickets));
-portal_layout('داشبورد', function () use ($tickets, $totalUnread) {
+$announcementUnread = Announcement::unreadCountForContact($contact);
+portal_layout('داشبورد', function () use ($tickets, $totalUnread, $announcementUnread) {
     ?>
     <div class="toolbar">
         <h2>تیکت‌های من</h2>
         <div class="toolbar-actions">
             <?php if ($totalUnread > 0): ?><span class="badge badge-primary"><?= e((string) $totalUnread) ?> پیام جدید</span><?php endif; ?>
+            <?php if ($announcementUnread > 0): ?><a class="badge badge-warning" href="portal.php?action=announcements"><?= e((string) $announcementUnread) ?> اطلاعیه جدید</a><?php endif; ?>
             <a class="btn btn-primary" href="portal.php?action=create_ticket">ثبت تیکت جدید</a>
         </div>
     </div>

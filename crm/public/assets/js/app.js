@@ -198,6 +198,47 @@ document.querySelectorAll('[data-activity-dependent-form]').forEach(function (wr
   });
 });
 
+document.querySelectorAll('[data-ticket-create-form]').forEach(function (form) {
+  const customerSelect = form.querySelector('[data-ticket-customer-select]');
+  const contactSelect = form.querySelector('[data-ticket-contact-select]');
+  let selectedContactId = contactSelect?.getAttribute('data-selected') || '';
+
+  function fillContacts(items, emptyLabel) {
+    if (!(contactSelect instanceof HTMLSelectElement)) return;
+    contactSelect.innerHTML = '';
+    contactSelect.appendChild(new Option(emptyLabel, ''));
+    items.forEach(function (item) {
+      const detail = [item.position, item.mobile].filter(Boolean).join(' - ');
+      const label = detail ? (item.contact_name + ' - ' + detail) : item.contact_name;
+      contactSelect.appendChild(new Option(label || '', String(item.id), false, String(item.id) === selectedContactId));
+    });
+    selectedContactId = '';
+  }
+
+  function loadContacts(customerId) {
+    fillContacts([], customerId ? 'در حال بارگذاری...' : 'ابتدا مشتری را انتخاب کنید');
+    if (!customerId) return;
+    fetch('index.php?page=tickets&action=contacts_by_customer&customer_id=' + encodeURIComponent(customerId), {
+      headers: { Accept: 'application/json' }
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error('Contacts request failed');
+        return response.json();
+      })
+      .then(function (items) {
+        fillContacts(items || [], items && items.length ? 'انتخاب مخاطب' : 'برای این مشتری مخاطبی ثبت نشده است');
+      })
+      .catch(function () {
+        fillContacts([], 'خطا در بارگذاری مخاطبین');
+      });
+  }
+
+  customerSelect?.addEventListener('change', function () {
+    selectedContactId = '';
+    loadContacts(customerSelect.value);
+  });
+});
+
 const activityDialog = document.querySelector('[data-activity-dialog]');
 document.addEventListener('click', function (event) {
   const opener = event.target instanceof Element ? event.target.closest('[data-activity-dialog-open]') : null;
