@@ -200,29 +200,81 @@ try {
         if (!is_admin() && in_array($action, ['create', 'edit', 'delete'], true)) {
             require_admin();
         }
+        if ($action === 'attachment') {
+            require_admin();
+            $attachment = Announcement::attachment($id);
+            if (!$attachment) {
+                http_response_code(404);
+                exit('File not found.');
+            }
+            $root = realpath(announcement_attachment_root());
+            $file = realpath(announcement_attachment_root() . '/' . ltrim((string) $attachment['file_path'], '/\\'));
+            if (!$root || !$file || !str_starts_with($file, $root . DIRECTORY_SEPARATOR) || !is_file($file)) {
+                http_response_code(404);
+                exit('File not found.');
+            }
+            header('Content-Type: ' . ($attachment['mime_type'] ?: 'application/octet-stream'));
+            header('Content-Length: ' . filesize($file));
+            header("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode((string) ($attachment['file_name'] ?: basename($file))));
+            header('X-Content-Type-Options: nosniff');
+            readfile($file);
+            exit;
+        }
+        if ($action === 'delete_attachment' && is_post()) {
+            require_admin();
+            verify_csrf();
+            $attachment = Announcement::deleteAttachment($id);
+            if ($attachment) {
+                delete_announcement_attachment((string) $attachment['file_path']);
+                redirect(url('announcements', ['action' => 'edit', 'id' => (int) $attachment['announcement_id']]));
+            }
+            redirect(url('announcements'));
+        }
         if ($action === 'delete' && is_post()) {
             require_admin();
             delete_action(fn() => Announcement::delete($id), url('announcements'));
         }
         if ($action === 'create') {
             require_admin();
-            $announcement = ['audience_type' => 'all', 'published_at' => fa_date(date('Y-m-d')), 'is_active' => 1];
+            $announcement = ['audience_type' => 'all', 'published_at' => fa_date(date('Y-m-d')), 'is_active' => 1, 'target_customer_ids' => []];
             if (is_post()) {
                 verify_csrf();
                 $announcement = array_merge($announcement, $_POST);
                 $errors = required_fields($_POST, ['title' => 'عنوان', 'body' => 'متن اطلاعیه']);
-                if (($_POST['audience_type'] ?? 'all') === 'customer') {
-                    $customer = Customer::find((int) ($_POST['customer_id'] ?? 0));
-                    if (!$customer) {
-                        $errors[] = 'مشتری انتخاب‌شده برای مخاطب اطلاعیه معتبر نیست.';
+                $safeBody = sanitize_rich_html($_POST['body'] ?? '');
+                if (trim(strip_tags($safeBody)) === '' && stripos($safeBody, '<img') === false) {
+                    $errors[] = 'متن اطلاعیه الزامی است.';
+                }
+                if (in_array(($_POST['audience_type'] ?? 'all'), ['customer', 'customers'], true)) {
+                    $targetIds = array_filter(array_map('intval', (array) ($_POST['target_customer_ids'] ?? [])));
+                    if (!$targetIds) {
+                        $errors[] = 'حداقل یک مشتری را برای مخاطب اطلاعیه انتخاب کنید.';
+                    }
+                    if (($_POST['audience_type'] ?? 'all') === 'customer' && count($targetIds) !== 1) {
+                        $errors[] = 'برای حالت یک مشتری مشخص، فقط یک مشتری را انتخاب کنید.';
+                    }
+                    foreach ($targetIds as $targetId) {
+                        if (!Customer::find((int) $targetId)) {
+                            $errors[] = 'یکی از مشتریان انتخاب‌شده معتبر نیست.';
+                            break;
+                        }
+                    }
+                }
+                $attachments = [];
+                if (!$errors) {
+                    try {
+                        $attachments = upload_announcement_attachments('attachments');
+                    } catch (RuntimeException $e) {
+                        $errors[] = $e->getMessage();
                     }
                 }
                 if (!$errors) {
-                    Announcement::create($_POST, current_user_id());
+                    $newId = Announcement::create($_POST, current_user_id());
+                    Announcement::addAttachments($newId, $attachments);
                     redirect(url('announcements'));
                 }
             }
-            render('announcements/create', ['title' => 'اطلاعیه جدید', 'announcement' => $announcement, 'customers' => Customer::search(), 'errors' => $errors]);
+            render('announcements/create', ['title' => 'اطلاعیه جدید', 'announcement' => $announcement, 'attachments' => [], 'customers' => Customer::search(), 'errors' => $errors]);
             exit;
         }
         if ($action === 'edit') {
@@ -232,22 +284,52 @@ try {
                 redirect(url('announcements'));
             }
             $announcement['published_at'] = fa_date($announcement['published_at'] ?? '');
+            $announcement['target_customer_ids'] = array_filter(explode(',', (string) ($announcement['target_customer_ids'] ?? '')));
             if (is_post()) {
                 verify_csrf();
                 $announcement = array_merge($announcement, $_POST);
                 $errors = required_fields($_POST, ['title' => 'عنوان', 'body' => 'متن اطلاعیه']);
-                if (($_POST['audience_type'] ?? 'all') === 'customer') {
-                    $customer = Customer::find((int) ($_POST['customer_id'] ?? 0));
-                    if (!$customer) {
-                        $errors[] = 'مشتری انتخاب‌شده برای مخاطب اطلاعیه معتبر نیست.';
+                $safeBody = sanitize_rich_html($_POST['body'] ?? '');
+                if (trim(strip_tags($safeBody)) === '' && stripos($safeBody, '<img') === false) {
+                    $errors[] = 'متن اطلاعیه الزامی است.';
+                }
+                if (in_array(($_POST['audience_type'] ?? 'all'), ['customer', 'customers'], true)) {
+                    $targetIds = array_filter(array_map('intval', (array) ($_POST['target_customer_ids'] ?? [])));
+                    if (!$targetIds) {
+                        $errors[] = 'حداقل یک مشتری را برای مخاطب اطلاعیه انتخاب کنید.';
+                    }
+                    if (($_POST['audience_type'] ?? 'all') === 'customer' && count($targetIds) !== 1) {
+                        $errors[] = 'برای حالت یک مشتری مشخص، فقط یک مشتری را انتخاب کنید.';
+                    }
+                    foreach ($targetIds as $targetId) {
+                        if (!Customer::find((int) $targetId)) {
+                            $errors[] = 'یکی از مشتریان انتخاب‌شده معتبر نیست.';
+                            break;
+                        }
+                    }
+                }
+                $attachments = [];
+                if (!$errors) {
+                    try {
+                        $attachments = upload_announcement_attachments('attachments');
+                    } catch (RuntimeException $e) {
+                        $errors[] = $e->getMessage();
                     }
                 }
                 if (!$errors) {
                     Announcement::update($id, $_POST);
+                    foreach ((array) ($_POST['remove_attachment_ids'] ?? []) as $removeAttachmentId) {
+                        $candidate = Announcement::attachment((int) $removeAttachmentId);
+                        if ($candidate && (int) $candidate['announcement_id'] === $id) {
+                            $removed = Announcement::deleteAttachment((int) $removeAttachmentId);
+                            delete_announcement_attachment((string) $removed['file_path']);
+                        }
+                    }
+                    Announcement::addAttachments($id, $attachments);
                     redirect(url('announcements'));
                 }
             }
-            render('announcements/edit', ['title' => 'ویرایش اطلاعیه', 'announcement' => $announcement, 'customers' => Customer::search(), 'errors' => $errors]);
+            render('announcements/edit', ['title' => 'ویرایش اطلاعیه', 'announcement' => $announcement, 'attachments' => Announcement::attachments($id), 'customers' => Customer::search(), 'errors' => $errors]);
             exit;
         }
         render('announcements/index', ['title' => 'اطلاعیه‌ها', 'announcements' => Announcement::search()]);

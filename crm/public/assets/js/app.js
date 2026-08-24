@@ -239,6 +239,88 @@ document.querySelectorAll('[data-ticket-create-form]').forEach(function (form) {
   });
 });
 
+document.querySelectorAll('[data-rich-editor]').forEach(function (wrapper) {
+  const editor = wrapper.querySelector('.rich-editor-area');
+  const input = wrapper.querySelector('[data-rich-input]');
+  if (!(editor instanceof HTMLElement) || !(input instanceof HTMLTextAreaElement)) return;
+
+  function sync() {
+    input.value = editor.innerHTML;
+  }
+
+  wrapper.querySelectorAll('[data-command]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      editor.focus();
+      document.execCommand(button.getAttribute('data-command'), false, null);
+      sync();
+    });
+  });
+
+  wrapper.querySelectorAll('[data-block]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      editor.focus();
+      document.execCommand('formatBlock', false, button.getAttribute('data-block') || 'p');
+      sync();
+    });
+  });
+
+  wrapper.querySelector('[data-link]')?.addEventListener('click', function () {
+    const url = prompt('آدرس لینک را وارد کنید:');
+    if (!url) return;
+    editor.focus();
+    document.execCommand('createLink', false, url);
+    sync();
+  });
+
+  wrapper.querySelector('[data-image]')?.addEventListener('click', function () {
+    const url = prompt('آدرس تصویر را وارد کنید:');
+    if (!url) return;
+    editor.focus();
+    document.execCommand('insertImage', false, url);
+    sync();
+  });
+
+  editor.addEventListener('input', sync);
+  editor.closest('form')?.addEventListener('submit', sync);
+});
+
+document.querySelectorAll('[data-announcement-audience]').forEach(function (select) {
+  const form = select.closest('form');
+  const targetBox = form?.querySelector('[data-announcement-targets]');
+  const multi = form?.querySelector('[data-multi-select]');
+  const filter = form?.querySelector('[data-multi-select-filter]');
+
+  function updateTargetVisibility() {
+    if (!(targetBox instanceof HTMLElement)) return;
+    const needsTargets = select.value === 'customer' || select.value === 'customers';
+    targetBox.hidden = !needsTargets;
+    if (multi instanceof HTMLSelectElement) {
+      multi.size = select.value === 'customer' ? 6 : 8;
+      if (select.value === 'customer') {
+        Array.from(multi.selectedOptions).slice(1).forEach(function (option) { option.selected = false; });
+      }
+    }
+  }
+
+  select.addEventListener('change', updateTargetVisibility);
+  multi?.addEventListener('change', function () {
+    if (select.value !== 'customer' || !(multi instanceof HTMLSelectElement)) return;
+    const selected = Array.from(multi.selectedOptions);
+    if (selected.length <= 1) return;
+    selected.slice(0, -1).forEach(function (option) { option.selected = false; });
+  });
+
+  filter?.addEventListener('input', function () {
+    if (!(multi instanceof HTMLSelectElement) || !(filter instanceof HTMLInputElement)) return;
+    const query = filter.value.trim().toLowerCase();
+    Array.from(multi.options).forEach(function (option) {
+      option.hidden = query !== '' && !option.textContent.toLowerCase().includes(query);
+    });
+  });
+
+  updateTargetVisibility();
+});
+
 const activityDialog = document.querySelector('[data-activity-dialog]');
 document.addEventListener('click', function (event) {
   const opener = event.target instanceof Element ? event.target.closest('[data-activity-dialog-open]') : null;

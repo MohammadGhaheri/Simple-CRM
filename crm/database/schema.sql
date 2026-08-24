@@ -167,7 +167,7 @@ CREATE TABLE announcements (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(190) NOT NULL,
   body TEXT NOT NULL,
-  audience_type ENUM('all','customer') NOT NULL DEFAULT 'all',
+  audience_type ENUM('all','customer','customers') NOT NULL DEFAULT 'all',
   customer_id INT UNSIGNED NULL,
   published_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_by_user_id INT UNSIGNED NULL,
@@ -190,6 +190,30 @@ CREATE TABLE announcement_reads (
   INDEX idx_announcement_reads_contact (contact_id, read_at),
   CONSTRAINT fk_announcement_reads_announcement FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE,
   CONSTRAINT fk_announcement_reads_contact FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE announcement_targets (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  announcement_id INT UNSIGNED NOT NULL,
+  customer_id INT UNSIGNED NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_announcement_target_customer (announcement_id, customer_id),
+  INDEX idx_announcement_targets_customer (customer_id),
+  CONSTRAINT fk_announcement_targets_announcement FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE,
+  CONSTRAINT fk_announcement_targets_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE announcement_attachments (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  announcement_id INT UNSIGNED NOT NULL,
+  file_path VARCHAR(255) NOT NULL,
+  file_name VARCHAR(190) NOT NULL,
+  mime_type VARCHAR(100) NOT NULL,
+  file_size INT UNSIGNED NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at DATETIME NULL,
+  INDEX idx_announcement_attachments_announcement (announcement_id, deleted_at),
+  CONSTRAINT fk_announcement_attachments_announcement FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE deals (

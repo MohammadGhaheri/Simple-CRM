@@ -61,7 +61,7 @@ function linkify_text(?string $value): string
 
 function text_excerpt(?string $value, int $length = 120): string
 {
-    $text = trim((string) $value);
+    $text = trim(strip_tags((string) $value));
     if ($text === '' || $length <= 0) {
         return '';
     }
@@ -75,6 +75,186 @@ function text_excerpt(?string $value, int $length = 120): string
     }
 
     return $text;
+}
+
+function sanitize_rich_html(?string $html): string
+{
+    $html = trim((string) $html);
+    if ($html === '') {
+        return '';
+    }
+
+    $allowedTags = ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'img'];
+    $allowedAttrs = [
+        'a' => ['href', 'title', 'target', 'rel'],
+        'img' => ['src', 'alt', 'title'],
+    ];
+
+    $dom = new DOMDocument('1.0', 'UTF-8');
+    libxml_use_internal_errors(true);
+    $dom->loadHTML('<?xml encoding="UTF-8"><div>' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+    libxml_clear_errors();
+
+    $cleanNode = static function (DOMNode $node) use (&$cleanNode, $allowedTags, $allowedAttrs): void {
+        if ($node instanceof DOMElement) {
+            $tag = strtolower($node->tagName);
+            if ($tag !== 'div' && !in_array($tag, $allowedTags, true)) {
+                $fragment = $node->ownerDocument->createDocumentFragment();
+                while ($node->firstChild) {
+                    $fragment->appendChild($node->firstChild);
+                }
+                $node->parentNode?->replaceChild($fragment, $node);
+                return;
+            }
+
+            $remove = [];
+            foreach ($node->attributes as $attribute) {
+                $attr = strtolower($attribute->name);
+                if (!in_array($attr, $allowedAttrs[$tag] ?? [], true)) {
+                    $remove[] = $attribute->name;
+                }
+            }
+            foreach ($remove as $attr) {
+                $node->removeAttribute($attr);
+            }
+
+            if ($tag === 'a') {
+                $href = trim($node->getAttribute('href'));
+                if (!preg_match('~^https?://~i', $href) && !str_starts_with($href, 'mailto:')) {
+                    $node->removeAttribute('href');
+                } else {
+                    $node->setAttribute('target', '_blank');
+                    $node->setAttribute('rel', 'noopener noreferrer');
+                }
+            }
+
+            if ($tag === 'img') {
+                $src = trim($node->getAttribute('src'));
+                if (!preg_match('~^https?://~i', $src)) {
+                    $node->parentNode?->removeChild($node);
+                    return;
+                }
+            }
+        }
+
+        foreach (iterator_to_array($node->childNodes) as $child) {
+            $cleanNode($child);
+        }
+    };
+
+    $cleanNode($dom);
+    $body = '';
+    foreach ($dom->documentElement?->childNodes ?? [] as $child) {
+        $body .= $dom->saveHTML($child);
+    }
+
+    return trim($body);
+}
+
+function announcement_attachment_root(): string
+{
+    return dirname(__DIR__, 2) . '/storage/announcement-attachments';
+}
+
+function upload_announcement_attachments(string $field): array
+{
+    if (empty($_FILES[$field]['name'])) {
+        return [];
+    }
+
+    $files = [];
+    $names = is_array($_FILES[$field]['name']) ? $_FILES[$field]['name'] : [$_FILES[$field]['name']];
+    foreach ($names as $index => $name) {
+        $error = is_array($_FILES[$field]['error']) ? (int) $_FILES[$field]['error'][$index] : (int) $_FILES[$field]['error'];
+        if ($error === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+        if ($error !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('آپلود فایل اطلاعیه ناموفق بود.');
+        }
+
+        $tmp = is_array($_FILES[$field]['tmp_name']) ? $_FILES[$field]['tmp_name'][$index] : $_FILES[$field]['tmp_name'];
+        if (!is_uploaded_file($tmp)) {
+            throw new RuntimeException('فایل اطلاعیه معتبر نیست.');
+        }
+
+        $size = is_array($_FILES[$field]['size']) ? (int) $_FILES[$field]['size'][$index] : (int) $_FILES[$field]['size'];
+        if ($size > 5 * 1024 * 1024) {
+            throw new RuntimeException('حجم هر فایل اطلاعیه نباید بیشتر از ۵ مگابایت باشد.');
+        }
+
+        $originalName = basename((string) $name);
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        $allowedMimes = [
+            'jpg' => ['image/jpeg'],
+            'jpeg' => ['image/jpeg'],
+            'png' => ['image/png'],
+            'webp' => ['image/webp'],
+            'pdf' => ['application/pdf'],
+            'doc' => ['application/msword', 'application/CDFV2', 'application/x-ole-storage', 'application/vnd.ms-office'],
+            'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip'],
+        ];
+        if (!isset($allowedMimes[$extension])) {
+            throw new RuntimeException('فرمت فایل اطلاعیه مجاز نیست. تصویر، PDF و Word قابل قبول است.');
+        }
+
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = (string) $finfo->file($tmp);
+        if (!in_array($mime, $allowedMimes[$extension], true)) {
+            throw new RuntimeException('نوع واقعی فایل اطلاعیه با پسوند آن سازگار نیست.');
+        }
+        if ($extension === 'docx' && $mime === 'application/zip') {
+            if (!class_exists('ZipArchive')) {
+                throw new RuntimeException('افزونه ZIP برای بررسی فایل Word روی سرور فعال نیست.');
+            }
+            $zip = new ZipArchive();
+            $opened = $zip->open($tmp);
+            $isDocx = $opened === true && $zip->locateName('[Content_Types].xml') !== false && $zip->locateName('word/document.xml') !== false;
+            if ($opened === true) {
+                $zip->close();
+            }
+            if (!$isDocx) {
+                throw new RuntimeException('فایل Word اطلاعیه معتبر نیست.');
+            }
+        }
+
+        $relativeDir = date('Y/m');
+        $dir = announcement_attachment_root() . '/' . $relativeDir;
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException('پوشه نگهداری فایل اطلاعیه ساخته نشد.');
+        }
+        if (!is_writable($dir)) {
+            throw new RuntimeException('پوشه نگهداری فایل اطلاعیه قابل نوشتن نیست.');
+        }
+
+        $filename = bin2hex(random_bytes(16)) . '.' . $extension;
+        if (!move_uploaded_file($tmp, $dir . '/' . $filename)) {
+            throw new RuntimeException('ذخیره فایل اطلاعیه ناموفق بود.');
+        }
+
+        $files[] = [
+            'path' => $relativeDir . '/' . $filename,
+            'name' => $originalName,
+            'mime' => $mime,
+            'size' => $size,
+        ];
+    }
+
+    return $files;
+}
+
+function delete_announcement_attachment(?string $relativePath): void
+{
+    $relativePath = str_replace('\\', '/', trim((string) $relativePath));
+    if ($relativePath === '' || str_contains($relativePath, '..')) {
+        return;
+    }
+
+    $root = realpath(announcement_attachment_root());
+    $target = realpath(announcement_attachment_root() . '/' . ltrim($relativePath, '/'));
+    if ($root && $target && str_starts_with($target, $root . DIRECTORY_SEPARATOR) && is_file($target)) {
+        @unlink($target);
+    }
 }
 
 function redirect(string $path): never

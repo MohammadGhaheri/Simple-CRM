@@ -409,6 +409,74 @@ tr:last-child td { border-bottom: 0; }
   line-height: 2;
   white-space: normal;
 }
+.rich-editor {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.rich-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  background: #f9fafb;
+  border-bottom: 1px solid var(--line);
+}
+.rich-toolbar button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+.rich-toolbar button:hover { background: #eef2f7; }
+.rich-editor-area {
+  min-height: 220px;
+  padding: 14px;
+  outline: 0;
+  direction: rtl;
+  text-align: right;
+  line-height: 2;
+}
+.rich-editor-area:empty::before {
+  content: 'متن اطلاعیه را اینجا بنویسید...';
+  color: var(--muted);
+}
+.rich-content {
+  direction: rtl;
+  text-align: right;
+  line-height: 2;
+}
+.rich-content img,
+.rich-editor-area img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.announcement-upload-field {
+  margin-top: 14px;
+}
+.announcement-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.attachment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f9fafb;
+}
+.customer-filter-input {
+  margin-bottom: 8px;
+}
 .activity-flags { display: grid; align-content: start; gap: 12px; padding-top: 27px; }
 .current-attachment { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 12px; }
 

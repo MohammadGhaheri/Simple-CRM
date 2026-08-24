@@ -510,7 +510,7 @@ if ($action === 'announcements') {
                         <span><?= e(text_excerpt($announcement['body'] ?? '', 120)) ?></span>
                     </div>
                     <small><?= e(fa_datetime($announcement['published_at'])) ?></small>
-                    <em><?= $isUnread ? 'خوانده‌نشده' : 'خوانده‌شده' ?></em>
+                    <em><?= $isUnread ? 'خوانده‌نشده' : 'خوانده‌شده' ?><?= (int) ($announcement['attachment_count'] ?? 0) > 0 ? ' · پیوست' : '' ?></em>
                 </a>
             <?php endforeach; ?>
             <?php if (!$announcements): ?><div class="empty">اطلاعیه‌ای برای شما ثبت نشده است.</div><?php endif; ?>
@@ -520,13 +520,34 @@ if ($action === 'announcements') {
     exit;
 }
 
+if ($action === 'announcement_attachment') {
+    $attachment = Announcement::attachmentForContact((int) ($_GET['id'] ?? 0), $contact);
+    if (!$attachment) {
+        http_response_code(404);
+        exit('File not found.');
+    }
+    $root = realpath(announcement_attachment_root());
+    $file = realpath(announcement_attachment_root() . '/' . ltrim((string) $attachment['file_path'], '/\\'));
+    if (!$root || !$file || !str_starts_with($file, $root . DIRECTORY_SEPARATOR) || !is_file($file)) {
+        http_response_code(404);
+        exit('File not found.');
+    }
+    header('Content-Type: ' . ($attachment['mime_type'] ?: 'application/octet-stream'));
+    header('Content-Length: ' . filesize($file));
+    header("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode((string) ($attachment['file_name'] ?: basename($file))));
+    header('X-Content-Type-Options: nosniff');
+    readfile($file);
+    exit;
+}
+
 if ($action === 'announcement') {
     $announcement = Announcement::findForContact((int) ($_GET['id'] ?? 0), $contact);
     if (!$announcement) {
         redirect('portal.php?action=announcements');
     }
+    $attachments = Announcement::attachments((int) $announcement['id']);
     Announcement::markRead((int) $announcement['id'], (int) $contact['id']);
-    portal_layout('مشاهده اطلاعیه', function () use ($announcement) {
+    portal_layout('مشاهده اطلاعیه', function () use ($announcement, $attachments) {
         ?>
         <div class="toolbar">
             <h2><?= e($announcement['title']) ?></h2>
@@ -534,7 +555,15 @@ if ($action === 'announcement') {
         </div>
         <article class="card announcement-detail">
             <div class="muted"><?= e(fa_datetime($announcement['published_at'])) ?></div>
-            <p><?= nl2br(e($announcement['body'])) ?></p>
+            <div class="rich-content"><?= sanitize_rich_html($announcement['body'] ?? '') ?></div>
+            <?php if ($attachments): ?>
+                <h3>فایل‌های پیوست</h3>
+                <div class="announcement-attachments">
+                    <?php foreach ($attachments as $attachment): ?>
+                        <a class="badge badge-muted" href="portal.php?action=announcement_attachment&id=<?= e((string) $attachment['id']) ?>"><?= e($attachment['file_name'] ?: 'فایل پیوست') ?></a>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
         </article>
         <?php
     });
