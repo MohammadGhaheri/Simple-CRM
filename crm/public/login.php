@@ -10,6 +10,7 @@ require __DIR__ . '/../app/core/auth.php';
 require __DIR__ . '/../app/models/User.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
+require __DIR__ . '/../app/models/PerformanceAnalytics.php';
 
 if (auth_check()) {
     redirect('index.php');
@@ -26,6 +27,7 @@ if (is_post()) {
     if ($user && password_verify($password, $user['password_hash'])) {
         login_user($user);
         UsageReport::logLogin('user', (int) $user['id']);
+        PerformanceAnalytics::startUserSession((int) $user['id']);
         redirect('index.php');
     }
 

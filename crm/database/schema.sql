@@ -8,11 +8,14 @@ USE simple_crm;
 
 DROP TABLE IF EXISTS activities;
 DROP TABLE IF EXISTS contracts;
+DROP TABLE IF EXISTS ticket_status_events;
 DROP TABLE IF EXISTS ticket_messages;
 DROP TABLE IF EXISTS email_logs;
 DROP TABLE IF EXISTS sms_logs;
 DROP TABLE IF EXISTS usage_events;
 DROP TABLE IF EXISTS login_events;
+DROP TABLE IF EXISTS record_view_events;
+DROP TABLE IF EXISTS user_sessions;
 DROP TABLE IF EXISTS tickets;
 DROP TABLE IF EXISTS deals;
 DROP TABLE IF EXISTS contacts;
@@ -26,7 +29,7 @@ CREATE TABLE users (
   email VARCHAR(190) NOT NULL UNIQUE,
   mobile VARCHAR(40) NULL,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('admin','sales') NOT NULL DEFAULT 'sales',
+  role ENUM('admin','sales','support','operations') NOT NULL DEFAULT 'sales',
   avatar_path VARCHAR(255) NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -56,6 +59,37 @@ CREATE TABLE usage_events (
   action_name VARCHAR(80) NOT NULL,
   ip_address VARCHAR(64) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE record_view_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NULL,
+  entity_type VARCHAR(40) NOT NULL,
+  entity_id INT UNSIGNED NOT NULL,
+  viewed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ip_address VARCHAR(64) NULL,
+  INDEX idx_record_views_user_time (user_id, viewed_at),
+  INDEX idx_record_views_entity (entity_type, entity_id),
+  INDEX idx_record_views_unique_metric (user_id, entity_type, entity_id, viewed_at),
+  CONSTRAINT fk_record_views_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE user_sessions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NULL,
+  session_token_hash CHAR(64) NOT NULL,
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ended_at DATETIME NULL,
+  active_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+  ip_address VARCHAR(64) NULL,
+  user_agent VARCHAR(255) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_user_sessions_token (session_token_hash),
+  INDEX idx_user_sessions_user_started (user_id, started_at),
+  INDEX idx_user_sessions_user_last_seen (user_id, last_seen_at),
+  CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE sms_logs (
@@ -136,6 +170,8 @@ CREATE TABLE tickets (
   description TEXT NOT NULL,
   response TEXT NULL,
   assigned_user_id INT UNSIGNED NULL,
+  origin_type ENUM('contact','user','system') NULL,
+  closed_at DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted_at DATETIME NULL,
@@ -143,6 +179,9 @@ CREATE TABLE tickets (
   CONSTRAINT fk_tickets_contact FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
   CONSTRAINT fk_tickets_assigned_user FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
+
+CREATE INDEX idx_tickets_origin_created ON tickets(origin_type, created_at);
+CREATE INDEX idx_tickets_closed_at ON tickets(closed_at);
 
 CREATE TABLE ticket_messages (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -161,6 +200,22 @@ CREATE TABLE ticket_messages (
   CONSTRAINT fk_ticket_messages_ticket FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
   CONSTRAINT fk_ticket_messages_contact FOREIGN KEY (sender_contact_id) REFERENCES contacts(id) ON DELETE SET NULL,
   CONSTRAINT fk_ticket_messages_user FOREIGN KEY (sender_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE ticket_status_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  ticket_id INT UNSIGNED NOT NULL,
+  from_status VARCHAR(80) NOT NULL,
+  to_status VARCHAR(80) NOT NULL,
+  changed_by_type ENUM('user','contact','system') NOT NULL,
+  changed_by_user_id INT UNSIGNED NULL,
+  changed_by_contact_id INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_ticket_status_events_ticket_time (ticket_id, created_at),
+  INDEX idx_ticket_status_events_user_time (changed_by_user_id, created_at),
+  CONSTRAINT fk_ticket_status_events_ticket FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ticket_status_events_user FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ticket_status_events_contact FOREIGN KEY (changed_by_contact_id) REFERENCES contacts(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE announcements (
@@ -271,6 +326,7 @@ CREATE TABLE activities (
   next_action VARCHAR(255) NULL,
   next_followup_date DATE NULL,
   owner_user_id INT UNSIGNED NULL,
+  created_by_user_id INT UNSIGNED NULL,
   status VARCHAR(80) NOT NULL DEFAULT 'Open',
   is_internal_task TINYINT(1) NOT NULL DEFAULT 0,
   attachment_path VARCHAR(255) NULL,
@@ -284,7 +340,8 @@ CREATE TABLE activities (
   CONSTRAINT fk_activities_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
   CONSTRAINT fk_activities_deal FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE SET NULL,
   CONSTRAINT fk_activities_contract FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE SET NULL,
-  CONSTRAINT fk_activities_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL
+  CONSTRAINT fk_activities_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_activities_created_by FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_customers_status ON customers(sales_status);
@@ -293,3 +350,4 @@ CREATE INDEX idx_ticket_messages_ticket ON ticket_messages(ticket_id, created_at
 CREATE INDEX idx_deals_stage ON deals(deal_stage);
 CREATE INDEX idx_contracts_renewal ON contracts(renewal_reminder_date, status);
 CREATE INDEX idx_activities_followup ON activities(next_followup_date, status);
+CREATE INDEX idx_activities_created_by ON activities(created_by_user_id, created_at);

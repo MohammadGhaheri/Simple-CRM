@@ -74,7 +74,12 @@ class User
 
     public static function roles(): array
     {
-        return ['admin' => 'مدیر سیستم', 'sales' => 'کارشناس فروش'];
+        return [
+            'admin' => 'مدیر سیستم',
+            'sales' => 'کارشناس فروش',
+            'support' => 'کارشناس پشتیبانی',
+            'operations' => 'کارشناس نصب و عملیات',
+        ];
     }
 
     public static function roleLabel(string $role): string
@@ -82,7 +87,7 @@ class User
         return self::roles()[$role] ?? $role;
     }
 
-    private static function validRole(string $role): string
+    public static function validRole(string $role): string
     {
         return array_key_exists($role, self::roles()) ? $role : 'sales';
     }

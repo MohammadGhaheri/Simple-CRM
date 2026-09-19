@@ -80,10 +80,12 @@ class Activity
         return $stmt->fetch() ?: null;
     }
 
-    public static function create(array $data): int
+    public static function create(array $data, ?int $createdByUserId = null): int
     {
-        $sql = 'INSERT INTO activities (customer_id, deal_id, contract_id, activity_date, activity_type, summary, next_action, next_followup_date, owner_user_id, status, is_internal_task, attachment_path, attachment_name, attachment_mime, attachment_size, notes) VALUES (:customer_id, :deal_id, :contract_id, :activity_date, :activity_type, :summary, :next_action, :next_followup_date, :owner_user_id, :status, :is_internal_task, :attachment_path, :attachment_name, :attachment_mime, :attachment_size, :notes)';
-        db()->prepare($sql)->execute(self::payload($data));
+        $sql = 'INSERT INTO activities (customer_id, deal_id, contract_id, activity_date, activity_type, summary, next_action, next_followup_date, owner_user_id, created_by_user_id, status, is_internal_task, attachment_path, attachment_name, attachment_mime, attachment_size, notes) VALUES (:customer_id, :deal_id, :contract_id, :activity_date, :activity_type, :summary, :next_action, :next_followup_date, :owner_user_id, :created_by_user_id, :status, :is_internal_task, :attachment_path, :attachment_name, :attachment_mime, :attachment_size, :notes)';
+        $payload = self::payload($data);
+        $payload['created_by_user_id'] = $createdByUserId && $createdByUserId > 0 ? $createdByUserId : null;
+        db()->prepare($sql)->execute($payload);
         self::syncCustomerFollowup($data);
         return (int) db()->lastInsertId();
     }

@@ -88,7 +88,7 @@ class Ticket
     public static function createFromPortal(array $contact, array $data): int
     {
         $assignedUserId = self::defaultAssignedUserId($contact);
-        $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description, assigned_user_id) VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description, :assigned_user_id)';
+        $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description, assigned_user_id, origin_type) VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description, :assigned_user_id, :origin_type)';
         db()->prepare($sql)->execute([
             'ticket_code' => self::nextCode(),
             'customer_id' => (int) $contact['customer_id'],
@@ -98,6 +98,7 @@ class Ticket
             'priority' => self::validPriority($data['priority'] ?? 'Normal'),
             'description' => trim($data['description'] ?? ''),
             'assigned_user_id' => $assignedUserId,
+            'origin_type' => 'contact',
         ]);
         $ticketId = (int) db()->lastInsertId();
         if (class_exists('TicketMessage')) {
@@ -113,8 +114,8 @@ class Ticket
         $pdo = db();
         $pdo->beginTransaction();
         try {
-            $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description, assigned_user_id)
-                    VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description, :assigned_user_id)';
+            $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description, assigned_user_id, origin_type)
+                    VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description, :assigned_user_id, :origin_type)';
             $pdo->prepare($sql)->execute([
                 'ticket_code' => self::nextCode(),
                 'customer_id' => (int) $customer['id'],
@@ -124,6 +125,7 @@ class Ticket
                 'priority' => self::validPriority($data['priority'] ?? 'Normal'),
                 'description' => $message,
                 'assigned_user_id' => !empty($data['assigned_user_id']) ? (int) $data['assigned_user_id'] : $userId,
+                'origin_type' => 'user',
             ]);
             $ticketId = (int) $pdo->lastInsertId();
             TicketMessage::createFromUser($ticketId, $userId, $message, $attachment);
@@ -151,8 +153,8 @@ class Ticket
             . "لینک ویرایش مخاطب برای بررسی و تکمیل اطلاعات:\n"
             . $contactLink;
 
-        $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description, assigned_user_id)
-                VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description, :assigned_user_id)';
+        $sql = 'INSERT INTO tickets (ticket_code, customer_id, contact_id, subject, category, priority, description, assigned_user_id, origin_type)
+                VALUES (:ticket_code, :customer_id, :contact_id, :subject, :category, :priority, :description, :assigned_user_id, :origin_type)';
         db()->prepare($sql)->execute([
             'ticket_code' => self::nextCode(),
             'customer_id' => (int) $customer['id'],
@@ -162,6 +164,7 @@ class Ticket
             'priority' => in_array('Normal', self::priorities(), true) ? 'Normal' : (self::priorities()[0] ?? 'Normal'),
             'description' => $description,
             'assigned_user_id' => !empty($customer['owner_user_id']) ? (int) $customer['owner_user_id'] : null,
+            'origin_type' => 'system',
         ]);
         $ticketId = (int) db()->lastInsertId();
         if (class_exists('TicketMessage')) {
@@ -186,39 +189,36 @@ class Ticket
         return $stmt->fetch() ?: null;
     }
 
-    public static function update(int $id, array $data): void
+    public static function update(int $id, array $data, ?int $changedByUserId = null): void
     {
-        $sql = 'UPDATE tickets SET status=:status, priority=:priority, category=:category, assigned_user_id=:assigned_user_id, response=:response WHERE id=:id';
-        db()->prepare($sql)->execute([
-            'status' => self::validStatus($data['status'] ?? 'Open'),
-            'priority' => self::validPriority($data['priority'] ?? 'Normal'),
-            'category' => self::validCategory($data['category'] ?? 'Support'),
-            'assigned_user_id' => !empty($data['assigned_user_id']) ? (int) $data['assigned_user_id'] : null,
-            'response' => trim($data['response'] ?? ''),
-            'id' => $id,
-        ]);
+        $actorType = $changedByUserId && $changedByUserId > 0 ? 'user' : 'system';
+        self::updateFieldsAndStatus($id, $data, $actorType, $changedByUserId, null, true);
     }
 
-    public static function updateMeta(int $id, array $data): void
+    public static function updateMeta(int $id, array $data, ?int $changedByUserId = null): void
     {
-        $sql = 'UPDATE tickets SET status=:status, priority=:priority, category=:category, assigned_user_id=:assigned_user_id WHERE id=:id';
-        db()->prepare($sql)->execute([
-            'status' => self::validStatus($data['status'] ?? 'Open'),
-            'priority' => self::validPriority($data['priority'] ?? 'Normal'),
-            'category' => self::validCategory($data['category'] ?? 'Support'),
-            'assigned_user_id' => !empty($data['assigned_user_id']) ? (int) $data['assigned_user_id'] : null,
-            'id' => $id,
-        ]);
+        $actorType = $changedByUserId && $changedByUserId > 0 ? 'user' : 'system';
+        self::updateFieldsAndStatus($id, $data, $actorType, $changedByUserId, null, false);
     }
 
-    public static function close(int $id): void
+    public static function close(int $id, string $changedByType = 'system', ?int $actorId = null): void
     {
-        db()->prepare("UPDATE tickets SET status = 'Closed' WHERE id = ?")->execute([$id]);
+        self::changeStatus(
+            $id,
+            'Closed',
+            $changedByType,
+            $changedByType === 'user' ? $actorId : null,
+            $changedByType === 'contact' ? $actorId : null
+        );
     }
 
     public static function closeForContact(int $id, int $contactId): void
     {
-        db()->prepare("UPDATE tickets SET status = 'Closed' WHERE id = ? AND contact_id = ?")->execute([$id, $contactId]);
+        $stmt = db()->prepare('SELECT id FROM tickets WHERE id = ? AND contact_id = ? AND deleted_at IS NULL');
+        $stmt->execute([$id, $contactId]);
+        if ($stmt->fetchColumn()) {
+            self::changeStatus($id, 'Closed', 'contact', null, $contactId);
+        }
     }
 
     public static function delete(int $id): void
@@ -325,5 +325,129 @@ class Ticket
     private static function validCategory(string $value): string
     {
         return in_array($value, self::categories(), true) ? $value : (self::categories()[0] ?? 'Support');
+    }
+
+    private static function updateFieldsAndStatus(
+        int $id,
+        array $data,
+        string $changedByType,
+        ?int $changedByUserId,
+        ?int $changedByContactId,
+        bool $includeResponse
+    ): void
+    {
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $current = self::statusForUpdate($id);
+            if ($current === null) {
+                $pdo->rollBack();
+                return;
+            }
+
+            $newStatus = self::validStatus($data['status'] ?? $current);
+            $closedAtSql = self::closedAtSql($current, $newStatus);
+            $responseSql = $includeResponse ? ', response=:response' : '';
+            $sql = "UPDATE tickets SET status=:status, priority=:priority, category=:category,
+                    assigned_user_id=:assigned_user_id{$responseSql}, closed_at={$closedAtSql} WHERE id=:id";
+            $payload = [
+                'status' => $newStatus,
+                'priority' => self::validPriority($data['priority'] ?? 'Normal'),
+                'category' => self::validCategory($data['category'] ?? 'Support'),
+                'assigned_user_id' => !empty($data['assigned_user_id']) ? (int) $data['assigned_user_id'] : null,
+                'id' => $id,
+            ];
+            if ($includeResponse) {
+                $payload['response'] = trim((string) ($data['response'] ?? ''));
+            }
+            $pdo->prepare($sql)->execute($payload);
+            self::insertStatusEvent($id, $current, $newStatus, $changedByType, $changedByUserId, $changedByContactId);
+            $pdo->commit();
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $error;
+        }
+    }
+
+    private static function changeStatus(
+        int $id,
+        string $newStatus,
+        string $changedByType,
+        ?int $changedByUserId,
+        ?int $changedByContactId
+    ): void
+    {
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $current = self::statusForUpdate($id);
+            if ($current === null || $current === $newStatus) {
+                $pdo->commit();
+                return;
+            }
+            $safeStatus = in_array($newStatus, ['Closed', 'Resolved'], true)
+                ? $newStatus
+                : self::validStatus($newStatus);
+            $sql = 'UPDATE tickets SET status = ?, closed_at = ' . self::closedAtSql($current, $safeStatus) . ' WHERE id = ?';
+            $pdo->prepare($sql)->execute([$safeStatus, $id]);
+            self::insertStatusEvent($id, $current, $safeStatus, $changedByType, $changedByUserId, $changedByContactId);
+            $pdo->commit();
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $error;
+        }
+    }
+
+    private static function statusForUpdate(int $id): ?string
+    {
+        $stmt = db()->prepare('SELECT status FROM tickets WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+        $stmt->execute([$id]);
+        $status = $stmt->fetchColumn();
+        return $status === false ? null : (string) $status;
+    }
+
+    private static function insertStatusEvent(
+        int $ticketId,
+        string $fromStatus,
+        string $toStatus,
+        string $changedByType,
+        ?int $changedByUserId,
+        ?int $changedByContactId
+    ): void
+    {
+        if ($fromStatus === $toStatus) {
+            return;
+        }
+        $actorType = in_array($changedByType, ['user', 'contact', 'system'], true) ? $changedByType : 'system';
+        $stmt = db()->prepare(
+            'INSERT INTO ticket_status_events
+             (ticket_id, from_status, to_status, changed_by_type, changed_by_user_id, changed_by_contact_id)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([
+            $ticketId,
+            $fromStatus,
+            $toStatus,
+            $actorType,
+            $actorType === 'user' ? $changedByUserId : null,
+            $actorType === 'contact' ? $changedByContactId : null,
+        ]);
+    }
+
+    private static function closedAtSql(string $fromStatus, string $toStatus): string
+    {
+        $wasClosed = in_array($fromStatus, ['Closed', 'Resolved'], true);
+        $isClosed = in_array($toStatus, ['Closed', 'Resolved'], true);
+        if (!$wasClosed && $isClosed) {
+            return 'COALESCE(closed_at, CURRENT_TIMESTAMP)';
+        }
+        if ($wasClosed && !$isClosed) {
+            return 'NULL';
+        }
+        return 'closed_at';
     }
 }

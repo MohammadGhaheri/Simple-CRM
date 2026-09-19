@@ -18,6 +18,7 @@ require __DIR__ . '/../app/models/TicketMessage.php';
 require __DIR__ . '/../app/models/Announcement.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
+require __DIR__ . '/../app/models/PerformanceAnalytics.php';
 require __DIR__ . '/../app/services/SmsService.php';
 require __DIR__ . '/../app/services/EmailService.php';
 require __DIR__ . '/../app/services/BackupService.php';
@@ -90,6 +91,7 @@ function upload_image(string $field, string $folder): ?string
 }
 
 try {
+    PerformanceAnalytics::touchUserSession(current_user_id());
     UsageReport::logUsage('user', current_user_id(), $page, $action);
 
     if ($page === 'reports') {
@@ -523,6 +525,9 @@ try {
             if (!$customer) {
                 redirect(url('customers'));
             }
+            if (!is_post()) {
+                PerformanceAnalytics::logRecordView(current_user_id(), 'customer', $id);
+            }
             render('customers/show', [
                 'title' => $customer['customer_name'],
                 'customer' => $customer,
@@ -687,7 +692,7 @@ try {
                                 ]);
                                 TicketMessage::createFromUser((int) $activationTicket['id'], current_user_id(), $message, null);
                             }
-                            Ticket::close((int) $activationTicket['id']);
+                            Ticket::close((int) $activationTicket['id'], 'system');
                         }
                     }
                     if (!empty($_POST['send_portal_sms'])) {
@@ -791,6 +796,9 @@ try {
             if (!$ticket) {
                 redirect(url('tickets'));
             }
+            if (!is_post()) {
+                PerformanceAnalytics::logRecordView(current_user_id(), 'ticket', $id);
+            }
             if (is_post()) {
                 verify_csrf();
                 try {
@@ -814,10 +822,10 @@ try {
                             redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
                         }
                     } elseif ($ticketAction === 'close') {
-                        Ticket::close($id);
+                        Ticket::close($id, 'user', current_user_id());
                         redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
                     } else {
-                        Ticket::updateMeta($id, $_POST);
+                        Ticket::updateMeta($id, $_POST, current_user_id());
                         redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
                     }
                 } catch (RuntimeException $e) {
@@ -878,6 +886,9 @@ try {
             if (!$deal) {
                 redirect(url('deals'));
             }
+            if (!is_post()) {
+                PerformanceAnalytics::logRecordView(current_user_id(), 'deal', $id);
+            }
             render('deals/show', ['title' => $deal['deal_name'], 'deal' => $deal, 'contracts' => Contract::byDeal($id), 'activities' => Activity::byDeal($id)]);
             exit;
         }
@@ -934,6 +945,9 @@ try {
             $contract = Contract::find($id);
             if (!$contract) {
                 redirect(url('contracts'));
+            }
+            if (!is_post()) {
+                PerformanceAnalytics::logRecordView(current_user_id(), 'contract', $id);
             }
             render('contracts/show', ['title' => $contract['contract_title'], 'contract' => $contract, 'activities' => Activity::byContract($id)]);
             exit;
@@ -1020,7 +1034,7 @@ try {
                     }
                 }
                 if (!$errors) {
-                    $createdActivityId = Activity::create($_POST);
+                    $createdActivityId = Activity::create($_POST, current_user_id());
                     if (!empty($_POST['send_activity_email'])) {
                         $createdActivity = Activity::find($createdActivityId);
                         if ($createdActivity) {
