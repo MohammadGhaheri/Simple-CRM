@@ -19,6 +19,7 @@ require __DIR__ . '/../app/models/Announcement.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/models/PerformanceAnalytics.php';
+require __DIR__ . '/../app/models/PerformanceReport.php';
 require __DIR__ . '/../app/services/SmsService.php';
 require __DIR__ . '/../app/services/EmailService.php';
 require __DIR__ . '/../app/services/BackupService.php';
@@ -96,9 +97,12 @@ try {
 
     if ($page === 'reports') {
         require_admin();
+        $reportFilters = PerformanceReport::normalizeFilters($_GET);
         render('reports/index', [
-            'title' => 'گزارش استفاده',
-            'summary' => UsageReport::summary(),
+            'title' => 'گزارش عملکرد',
+            'performanceReport' => PerformanceReport::build($reportFilters),
+            'reportUsers' => User::all(),
+            'legacySummary' => UsageReport::summary(),
             'userLogins' => UsageReport::loginsByActor('user'),
             'contactLogins' => UsageReport::loginsByActor('contact'),
             'usageByArea' => UsageReport::usageByArea(),
