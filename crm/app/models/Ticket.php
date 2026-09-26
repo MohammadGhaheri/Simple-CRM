@@ -39,6 +39,24 @@ class Ticket
         return $params;
     }
 
+    public static function normalizePostedListContext(array $input): array
+    {
+        $postedContext = [];
+        foreach ([...self::LIST_FILTERS, 'from_ticket_list'] as $field) {
+            $postedContext[$field] = $input['queue_' . $field] ?? null;
+        }
+        return self::normalizeListContext($postedContext);
+    }
+
+    public static function queuePostFields(array $context, bool $withMarker = false): array
+    {
+        $fields = [];
+        foreach (self::listParams($context, $withMarker) as $key => $value) {
+            $fields['queue_' . $key] = $value;
+        }
+        return $fields;
+    }
+
     public static function search(array $filters = []): array
     {
         $filters = self::normalizeListContext($filters);

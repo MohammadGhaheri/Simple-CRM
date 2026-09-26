@@ -7,7 +7,7 @@
 
 <form class="card" method="post" enctype="multipart/form-data" data-ticket-create-form>
     <?= csrf_field() ?>
-    <?php foreach (Ticket::listParams($ticketContext, !empty($ticketContext['from_ticket_list'])) as $key => $value): ?><input type="hidden" name="<?= e($key) ?>" value="<?= e((string) $value) ?>"><?php endforeach; ?>
+    <?php foreach (Ticket::queuePostFields($ticketContext, !empty($ticketContext['from_ticket_list'])) as $key => $value): ?><input type="hidden" name="<?= e($key) ?>" value="<?= e((string) $value) ?>"><?php endforeach; ?>
     <div class="grid grid-2">
         <div>
             <label class="required">مشتری</label>

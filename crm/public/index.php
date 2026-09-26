@@ -758,11 +758,13 @@ try {
         }
         if ($action === 'delete' && is_post()) {
             require_admin();
-            $ticketContext = Ticket::normalizeListContext($_POST);
+            $ticketContext = Ticket::normalizePostedListContext($_POST);
             delete_action(fn() => Ticket::delete($id), ticket_list_url($ticketContext));
         }
         if ($action === 'create') {
-            $ticketContext = Ticket::normalizeListContext(is_post() ? $_POST : $_GET);
+            $ticketContext = is_post()
+                ? Ticket::normalizePostedListContext($_POST)
+                : Ticket::normalizeListContext($_GET);
             $ticket = [
                 'customer_id' => (int) ($_GET['customer_id'] ?? 0),
                 'contact_id' => 0,
@@ -821,7 +823,9 @@ try {
             exit;
         }
         if ($action === 'edit') {
-            $ticketContext = Ticket::normalizeListContext(is_post() ? $_POST : $_GET);
+            $ticketContext = is_post()
+                ? Ticket::normalizePostedListContext($_POST)
+                : Ticket::normalizeListContext($_GET);
             $hasListContext = (int) ($ticketContext['from_ticket_list'] ?? 0) === 1;
             $ticket = Ticket::find($id);
             if (!$ticket) {

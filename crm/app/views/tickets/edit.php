@@ -1,5 +1,5 @@
 <?php
-$contextFields = Ticket::listParams($ticketContext, $hasListContext);
+$contextFields = Ticket::queuePostFields($ticketContext, $hasListContext);
 $backUrl = $hasListContext ? ticket_list_url($ticketContext, (int) $ticket['id']) : url('tickets');
 ?>
 

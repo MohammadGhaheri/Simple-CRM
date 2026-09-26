@@ -81,7 +81,7 @@ if (!empty($filters['assigned_user_id'])) {
                     <?php if (is_admin()): ?>
                         <form method="post" action="<?= e(url('tickets', ['action' => 'delete', 'id' => $ticket['id']])) ?>" data-confirm="این تیکت از نمایش مخفی شود؟">
                             <?= csrf_field() ?>
-                            <?php foreach ($listContext as $key => $value): ?><input type="hidden" name="<?= e($key) ?>" value="<?= e((string) $value) ?>"><?php endforeach; ?>
+                            <?php foreach (Ticket::queuePostFields($listContext, true) as $key => $value): ?><input type="hidden" name="<?= e($key) ?>" value="<?= e((string) $value) ?>"><?php endforeach; ?>
                             <button class="btn btn-small btn-danger">حذف</button>
                         </form>
                     <?php endif; ?>

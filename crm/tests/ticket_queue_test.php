@@ -78,6 +78,32 @@ queue_expect($context === [
 ], 'Only whitelisted, normalized context values may survive.');
 queue_expect(!array_key_exists('return_url', Ticket::listParams($context, true)), 'Raw redirect URLs must never enter list context.');
 
+$postedContext = Ticket::normalizePostedListContext([
+    'queue_q' => '  GPS  ',
+    'queue_status' => 'Open',
+    'queue_priority' => 'High',
+    'queue_category' => 'Support',
+    'queue_assigned_user_id' => '7',
+    'queue_from_ticket_list' => '1',
+    'status' => 'Closed',
+    'priority' => 'Normal',
+    'category' => 'Bug',
+    'assigned_user_id' => '2',
+    'queue_return_url' => 'https://evil.example',
+    'queue_unknown' => 'drop-me',
+]);
+queue_expect($postedContext === $context, 'Editable ticket fields must not overwrite the prefixed queue context.');
+
+$postFields = Ticket::queuePostFields($context, true);
+queue_expect($postFields === [
+    'queue_q' => 'GPS',
+    'queue_status' => 'Open',
+    'queue_priority' => 'High',
+    'queue_category' => 'Support',
+    'queue_assigned_user_id' => 7,
+    'queue_from_ticket_list' => 1,
+], 'Queue context must use a dedicated POST namespace.');
+
 $invalid = Ticket::normalizeListContext([
     'status' => 'Injected',
     'priority' => 'Urgent',
@@ -86,11 +112,31 @@ $invalid = Ticket::normalizeListContext([
 ]);
 queue_expect($invalid === [], 'Invalid filters must be ignored safely.');
 
+$invalidPosted = Ticket::normalizePostedListContext([
+    'queue_status' => 'Injected',
+    'queue_priority' => 'Urgent',
+    'queue_category' => 'Unknown',
+    'queue_assigned_user_id' => '-2',
+    'queue_from_ticket_list' => 'yes',
+    'queue_redirect' => 'https://evil.example',
+]);
+queue_expect($invalidPosted === [], 'Invalid or unknown queue POST values must be ignored safely.');
+
 $ids = Ticket::filteredIds($context);
 queue_expect($ids === [30, 20, 10], 'Filtered IDs must preserve model queue order.');
 queue_expect(str_contains($queueTestDatabase->statement->sql, 't.assigned_user_id = ?'), 'Assigned user must be a prepared filter.');
 queue_expect(end($queueTestDatabase->statement->params) === 7, 'Assigned user id must be bound as an integer parameter.');
 
+$collisionIds = Ticket::filteredIds($postedContext);
+$collisionQueue = Ticket::queuePosition($collisionIds, 20);
+queue_expect(
+    $queueTestDatabase->statement->params === ['%GPS%', '%GPS%', '%GPS%', '%GPS%', 'Open', 'High', 'Support', 7],
+    'Queue SQL must use the original prefixed filters, not editable ticket metadata.'
+);
+queue_expect($collisionQueue['next_id'] === 10, 'Save or reply from the middle ticket must advance within the original queue.');
+
+$first = Ticket::queuePosition([30, 20, 10], 30);
+queue_expect($first['previous_id'] === null && $first['next_id'] === 20 && $first['position'] === 1, 'First ticket must advance to the second ticket.');
 $position = Ticket::queuePosition([30, 20, 10], 20);
 queue_expect($position === ['previous_id' => 30, 'next_id' => 10, 'position' => 2, 'total' => 3], 'Middle ticket navigation is incorrect.');
 $last = Ticket::queuePosition([30, 20, 10], 10);
@@ -101,6 +147,7 @@ queue_expect($outside['position'] === 0 && $outside['total'] === 2, 'A ticket ou
 $source = file_get_contents(__DIR__ . '/../public/index.php');
 queue_expect(str_contains($source, '$nextTicketId = !empty($queue[\'next_id\'])'), 'Next ticket must be captured before mutation.');
 queue_expect(str_contains($source, "in_array(\$action, ['stay', 'back', 'next'], true)"), 'after_action must use a strict whitelist.');
+queue_expect(str_contains($source, 'Ticket::normalizePostedListContext($_POST)'), 'POST actions must use the dedicated queue context parser.');
 queue_expect(!str_contains($source, 'return_url'), 'Controller must not accept a raw return URL.');
 
 echo "Ticket queue tests passed." . PHP_EOL;
