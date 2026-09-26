@@ -335,6 +335,37 @@ tr:last-child td { border-bottom: 0; }
   font-weight: 400;
   white-space: nowrap;
 }
+.ticket-queue-toolbar h2 { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.result-count { color: var(--muted); font-size: 14px; font-weight: 400; }
+.ticket-queue-filters { grid-template-columns: minmax(180px, 1.4fr) repeat(4, minmax(130px, 1fr)) auto; }
+.filter-chip-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: -4px 0 16px; }
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.filter-chip b { font-size: 17px; line-height: 1; }
+.clear-filters { color: var(--danger); padding: 6px; }
+.ticket-queue-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.ticket-queue-position { min-width: 96px; display: grid; gap: 2px; text-align: center; }
+.ticket-queue-position span { color: var(--muted); font-size: 11px; }
+.is-disabled { pointer-events: none; opacity: .45; }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .muted { color: var(--muted); }
 .empty { text-align: center; color: var(--muted); padding: 28px; }
@@ -1161,9 +1192,13 @@ tr:last-child td { border-bottom: 0; }
   .auth-visual { min-height: 310px; padding: 34px; }
   .auth-card, .login-card { padding: 28px; }
   .process-map { grid-template-columns: 1fr; }
+  .ticket-queue-filters { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {
+  .ticket-queue-navigation { justify-content: stretch; flex-wrap: wrap; }
+  .ticket-queue-navigation .btn { flex: 1 1 120px; }
+  .ticket-queue-position { order: -1; flex: 1 0 100%; }
   .portal-topbar {
     align-items: flex-start;
     flex-direction: column;

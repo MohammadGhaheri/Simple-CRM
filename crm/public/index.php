@@ -91,6 +91,28 @@ function upload_image(string $field, string $folder): ?string
     return 'uploads/' . $folder . '/' . $filename;
 }
 
+function ticket_list_url(array $context, ?int $anchorTicketId = null, string $noticeCode = ''): string
+{
+    $params = Ticket::listParams($context);
+    if (in_array($noticeCode, ['queue_end', 'saved_outside'], true)) {
+        $params['notice'] = $noticeCode;
+    }
+    $target = url('tickets', $params);
+    return $anchorTicketId && $anchorTicketId > 0 ? $target . '#ticket-' . $anchorTicketId : $target;
+}
+
+function ticket_edit_url(int $ticketId, array $context): string
+{
+    $withMarker = (int) ($context['from_ticket_list'] ?? 0) === 1;
+    return url('tickets', array_merge(['action' => 'edit', 'id' => $ticketId], Ticket::listParams($context, $withMarker)));
+}
+
+function ticket_after_action(): string
+{
+    $action = (string) ($_POST['after_action'] ?? 'stay');
+    return in_array($action, ['stay', 'back', 'next'], true) ? $action : 'stay';
+}
+
 try {
     PerformanceAnalytics::touchUserSession(current_user_id());
     UsageReport::logUsage('user', current_user_id(), $page, $action);
@@ -736,9 +758,11 @@ try {
         }
         if ($action === 'delete' && is_post()) {
             require_admin();
-            delete_action(fn() => Ticket::delete($id), url('tickets'));
+            $ticketContext = Ticket::normalizeListContext($_POST);
+            delete_action(fn() => Ticket::delete($id), ticket_list_url($ticketContext));
         }
         if ($action === 'create') {
+            $ticketContext = Ticket::normalizeListContext(is_post() ? $_POST : $_GET);
             $ticket = [
                 'customer_id' => (int) ($_GET['customer_id'] ?? 0),
                 'contact_id' => 0,
@@ -781,7 +805,7 @@ try {
                         SmsService::notifyTicketAnswered($created);
                         EmailService::notifyTicketAnswered($created);
                     }
-                    redirect(url('tickets', ['action' => 'edit', 'id' => $newId]));
+                    redirect(ticket_edit_url($newId, $ticketContext));
                 }
             }
             $selectedCustomerId = (int) ($ticket['customer_id'] ?? 0);
@@ -792,14 +816,20 @@ try {
                 'contacts' => $selectedCustomerId > 0 ? Contact::byCustomer($selectedCustomerId) : [],
                 'users' => $users,
                 'errors' => $errors,
+                'ticketContext' => $ticketContext,
             ]);
             exit;
         }
         if ($action === 'edit') {
+            $ticketContext = Ticket::normalizeListContext(is_post() ? $_POST : $_GET);
+            $hasListContext = (int) ($ticketContext['from_ticket_list'] ?? 0) === 1;
             $ticket = Ticket::find($id);
             if (!$ticket) {
-                redirect(url('tickets'));
+                redirect(ticket_list_url($ticketContext));
             }
+            $queue = $hasListContext
+                ? Ticket::queuePosition(Ticket::filteredIds($ticketContext), $id)
+                : ['previous_id' => null, 'next_id' => null, 'position' => 0, 'total' => 0];
             if (!is_post()) {
                 PerformanceAnalytics::logRecordView(current_user_id(), 'ticket', $id);
             }
@@ -807,6 +837,8 @@ try {
                 verify_csrf();
                 try {
                     $ticketAction = $_POST['ticket_action'] ?? 'meta';
+                    $afterAction = ticket_after_action();
+                    $nextTicketId = !empty($queue['next_id']) ? (int) $queue['next_id'] : null;
                     if ($ticketAction === 'reply') {
                         if (Ticket::isClosed($ticket)) {
                             $errors[] = 'این تیکت بسته شده و امکان ارسال پیام جدید ندارد.';
@@ -823,14 +855,27 @@ try {
                                 SmsService::notifyTicketAnswered($after);
                                 EmailService::notifyTicketAnswered($after);
                             }
-                            redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
+                            if ($afterAction === 'next') {
+                                redirect($nextTicketId ? ticket_edit_url($nextTicketId, $ticketContext) : ticket_list_url($ticketContext, null, 'queue_end'));
+                            }
+                            if ($afterAction === 'back') {
+                                redirect(ticket_list_url($ticketContext, $id));
+                            }
+                            redirect(ticket_edit_url($id, $ticketContext));
                         }
                     } elseif ($ticketAction === 'close') {
                         Ticket::close($id, 'user', current_user_id());
-                        redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
+                        redirect(ticket_edit_url($id, $ticketContext));
                     } else {
                         Ticket::updateMeta($id, $_POST, current_user_id());
-                        redirect(url('tickets', ['action' => 'edit', 'id' => $id]));
+                        if ($afterAction === 'next') {
+                            redirect($nextTicketId ? ticket_edit_url($nextTicketId, $ticketContext) : ticket_list_url($ticketContext, null, 'queue_end'));
+                        }
+                        if ($afterAction === 'back') {
+                            $stillMatches = !$hasListContext || in_array($id, Ticket::filteredIds($ticketContext), true);
+                            redirect(ticket_list_url($ticketContext, $stillMatches ? $id : null, $stillMatches ? '' : 'saved_outside'));
+                        }
+                        redirect(ticket_edit_url($id, $ticketContext));
                     }
                 } catch (RuntimeException $e) {
                     $errors[] = $e->getMessage();
@@ -839,13 +884,21 @@ try {
             }
             $messages = TicketMessage::byTicket($id);
             TicketMessage::markReadForUser($id);
-            render('tickets/edit', ['title' => 'جزئیات تیکت', 'ticket' => $ticket, 'messages' => $messages, 'users' => $users, 'errors' => $errors]);
+            render('tickets/edit', ['title' => 'جزئیات تیکت', 'ticket' => $ticket, 'messages' => $messages, 'users' => $users, 'errors' => $errors, 'ticketContext' => $ticketContext, 'hasListContext' => $hasListContext, 'queue' => $queue]);
             exit;
         }
+        $ticketFilters = Ticket::normalizeListContext($_GET);
+        $tickets = Ticket::search($ticketFilters);
+        $noticeMessages = [
+            'queue_end' => 'به انتهای نتایج رسیدید.',
+            'saved_outside' => 'تیکت ذخیره شد و دیگر با فیلتر فعلی مطابقت ندارد.',
+        ];
         render('tickets/index', [
             'title' => 'تیکت‌ها',
-            'tickets' => Ticket::search($_GET),
-            'filters' => $_GET,
+            'tickets' => $tickets,
+            'filters' => $ticketFilters,
+            'users' => $users,
+            'notice' => $noticeMessages[(string) ($_GET['notice'] ?? '')] ?? '',
         ]);
         exit;
     }

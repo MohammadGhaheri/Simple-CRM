@@ -1,12 +1,13 @@
 <div class="toolbar">
     <h2>تیکت جدید برای مشتری</h2>
-    <a class="btn btn-light" href="<?= e(url('tickets')) ?>">بازگشت</a>
+    <a class="btn btn-light" href="<?= e(ticket_list_url($ticketContext)) ?>"><?= !empty($ticketContext['from_ticket_list']) ? 'بازگشت به نتایج' : 'بازگشت' ?></a>
 </div>
 
 <?php if (!empty($errors)): ?><div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
 
 <form class="card" method="post" enctype="multipart/form-data" data-ticket-create-form>
     <?= csrf_field() ?>
+    <?php foreach (Ticket::listParams($ticketContext, !empty($ticketContext['from_ticket_list'])) as $key => $value): ?><input type="hidden" name="<?= e($key) ?>" value="<?= e((string) $value) ?>"><?php endforeach; ?>
     <div class="grid grid-2">
         <div>
             <label class="required">مشتری</label>

@@ -4,8 +4,44 @@ declare(strict_types=1);
 
 class Ticket
 {
+    private const LIST_FILTERS = ['q', 'status', 'priority', 'category', 'assigned_user_id'];
+
+    public static function normalizeListContext(array $input): array
+    {
+        $context = [];
+        $query = trim((string) ($input['q'] ?? ''));
+        if ($query !== '') {
+            $context['q'] = function_exists('mb_substr') ? mb_substr($query, 0, 100, 'UTF-8') : substr($query, 0, 100);
+        }
+        foreach (['status' => self::statuses(), 'priority' => self::priorities(), 'category' => self::categories()] as $field => $allowed) {
+            $value = (string) ($input[$field] ?? '');
+            if ($value !== '' && in_array($value, $allowed, true)) {
+                $context[$field] = $value;
+            }
+        }
+        $assignedUserId = filter_var($input['assigned_user_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($assignedUserId) {
+            $context['assigned_user_id'] = (int) $assignedUserId;
+        }
+        if ((string) ($input['from_ticket_list'] ?? '') === '1') {
+            $context['from_ticket_list'] = 1;
+        }
+        return $context;
+    }
+
+    public static function listParams(array $context, bool $withMarker = false): array
+    {
+        $normalized = self::normalizeListContext($context);
+        $params = array_intersect_key($normalized, array_flip(self::LIST_FILTERS));
+        if ($withMarker) {
+            $params['from_ticket_list'] = 1;
+        }
+        return $params;
+    }
+
     public static function search(array $filters = []): array
     {
+        $filters = self::normalizeListContext($filters);
         $sql = "SELECT t.*, c.customer_name, c.is_vip, ct.contact_name, u.name AS assigned_name,
                     (
                         SELECT COUNT(*)
@@ -21,22 +57,40 @@ class Ticket
                 WHERE t.deleted_at IS NULL
                   AND c.deleted_at IS NULL
                   AND ct.deleted_at IS NULL";
-        $params = [];
-        if (!empty($filters['q'])) {
-            $sql .= ' AND (t.ticket_code LIKE ? OR t.subject LIKE ? OR c.customer_name LIKE ? OR ct.contact_name LIKE ?)';
-            $q = '%' . $filters['q'] . '%';
-            array_push($params, $q, $q, $q, $q);
-        }
-        foreach (['status', 'priority', 'category'] as $field) {
-            if (!empty($filters[$field])) {
-                $sql .= " AND t.$field = ?";
-                $params[] = $filters[$field];
-            }
-        }
+        [$where, $params] = self::filterConditions($filters);
+        $sql .= $where;
         $sql .= ' ORDER BY t.created_at DESC, t.id DESC';
         $stmt = db()->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
+    }
+
+    public static function filteredIds(array $filters = []): array
+    {
+        $filters = self::normalizeListContext($filters);
+        $sql = 'SELECT t.id FROM tickets t
+                JOIN customers c ON c.id = t.customer_id
+                JOIN contacts ct ON ct.id = t.contact_id
+                WHERE t.deleted_at IS NULL AND c.deleted_at IS NULL AND ct.deleted_at IS NULL';
+        [$where, $params] = self::filterConditions($filters);
+        $stmt = db()->prepare($sql . $where . ' ORDER BY t.created_at DESC, t.id DESC');
+        $stmt->execute($params);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    public static function queuePosition(array $ids, int $currentId): array
+    {
+        $ids = array_values(array_map('intval', $ids));
+        $index = array_search($currentId, $ids, true);
+        if ($index === false) {
+            return ['previous_id' => null, 'next_id' => null, 'position' => 0, 'total' => count($ids)];
+        }
+        return [
+            'previous_id' => $index > 0 ? $ids[$index - 1] : null,
+            'next_id' => $index + 1 < count($ids) ? $ids[$index + 1] : null,
+            'position' => $index + 1,
+            'total' => count($ids),
+        ];
     }
 
     public static function byContact(int $contactId): array
@@ -310,6 +364,28 @@ class Ticket
         }
         $settings = class_exists('Setting') ? Setting::all() : [];
         return !empty($settings['sms_default_assigned_user_id']) ? (int) $settings['sms_default_assigned_user_id'] : null;
+    }
+
+    private static function filterConditions(array $filters): array
+    {
+        $sql = '';
+        $params = [];
+        if (!empty($filters['q'])) {
+            $sql .= ' AND (t.ticket_code LIKE ? OR t.subject LIKE ? OR c.customer_name LIKE ? OR ct.contact_name LIKE ?)';
+            $query = '%' . $filters['q'] . '%';
+            array_push($params, $query, $query, $query, $query);
+        }
+        foreach (['status', 'priority', 'category'] as $field) {
+            if (!empty($filters[$field])) {
+                $sql .= " AND t.$field = ?";
+                $params[] = $filters[$field];
+            }
+        }
+        if (!empty($filters['assigned_user_id'])) {
+            $sql .= ' AND t.assigned_user_id = ?';
+            $params[] = (int) $filters['assigned_user_id'];
+        }
+        return [$sql, $params];
     }
 
     private static function validStatus(string $value): string

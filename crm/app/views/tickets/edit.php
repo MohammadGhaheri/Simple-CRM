@@ -1,9 +1,28 @@
+<?php
+$contextFields = Ticket::listParams($ticketContext, $hasListContext);
+$backUrl = $hasListContext ? ticket_list_url($ticketContext, (int) $ticket['id']) : url('tickets');
+?>
+
+<?php if ($hasListContext): ?>
+    <div class="ticket-queue-navigation">
+        <a class="btn btn-light <?= empty($queue['previous_id']) ? 'is-disabled' : '' ?>" href="<?= !empty($queue['previous_id']) ? e(ticket_edit_url((int) $queue['previous_id'], $ticketContext)) : '#' ?>">تیکت قبلی</a>
+        <div class="ticket-queue-position">
+            <?php if ((int) $queue['position'] > 0): ?>
+                <strong><?= e((string) $queue['position']) ?> از <?= e((string) $queue['total']) ?></strong><span>در صف فعلی</span>
+            <?php else: ?>
+                <strong>خارج از صف فعلی</strong><span><?= e((string) $queue['total']) ?> تیکت در نتایج</span>
+            <?php endif; ?>
+        </div>
+        <a class="btn btn-light <?= empty($queue['next_id']) ? 'is-disabled' : '' ?>" href="<?= !empty($queue['next_id']) ? e(ticket_edit_url((int) $queue['next_id'], $ticketContext)) : '#' ?>">تیکت بعدی</a>
+    </div>
+<?php endif; ?>
+
 <div class="toolbar">
     <h2><?= e($ticket['ticket_code']) ?> - <?= e($ticket['subject']) ?></h2>
     <div class="actions">
-        <a class="btn btn-light" href="<?= e(url('tickets')) ?>">بازگشت</a>
+        <a class="btn btn-light" href="<?= e($backUrl) ?>"><?= $hasListContext ? 'بازگشت به نتایج' : 'بازگشت' ?></a>
         <?php if (is_admin()): ?>
-            <form method="post" action="<?= e(url('tickets', ['action' => 'delete', 'id' => $ticket['id']])) ?>" data-confirm="این تیکت از نمایش مخفی شود؟"><?= csrf_field() ?><button class="btn btn-danger">حذف تیکت</button></form>
+            <form method="post" action="<?= e(url('tickets', ['action' => 'delete', 'id' => $ticket['id']])) ?>" data-confirm="این تیکت از نمایش مخفی شود؟"><?= csrf_field() ?><?php foreach ($contextFields as $key => $value): ?><input type="hidden" name="<?= e($key) ?>" value="<?= e((string) $value) ?>"><?php endforeach; ?><button class="btn btn-danger">حذف تیکت</button></form>
         <?php endif; ?>
     </div>
 </div>
@@ -27,6 +46,7 @@
     <form class="card" method="post">
         <?= csrf_field() ?>
         <input type="hidden" name="ticket_action" value="meta">
+        <?php foreach ($contextFields as $key => $value): ?><input type="hidden" name="<?= e($key) ?>" value="<?= e((string) $value) ?>"><?php endforeach; ?>
         <h3>مشخصات رسیدگی</h3>
         <div class="grid grid-2">
             <div><label>وضعیت</label><select name="status"><?php foreach (Ticket::statuses() as $option): ?><option value="<?= e($option) ?>" <?= selected($ticket['status'], $option) ?>><?= e(Ticket::label($option)) ?></option><?php endforeach; ?></select></div>
@@ -35,7 +55,9 @@
             <div><label>پشتیبان مسئول</label><select name="assigned_user_id"><option value="">بدون مسئول</option><?php foreach ($users as $user): ?><option value="<?= e((string) $user['id']) ?>" <?= selected($ticket['assigned_user_id'] ?? '', $user['id']) ?>><?= e($user['name']) ?></option><?php endforeach; ?></select></div>
         </div>
         <div class="form-actions">
-            <button class="btn btn-primary">ذخیره مشخصات</button>
+            <button class="btn btn-primary" name="after_action" value="stay">ذخیره</button>
+            <button class="btn btn-light" name="after_action" value="back">ذخیره و بازگشت</button>
+            <?php if ($hasListContext): ?><button class="btn btn-light" name="after_action" value="next">ذخیره و تیکت بعدی</button><?php endif; ?>
             <?php if (!Ticket::isClosed($ticket)): ?>
                 <button class="btn btn-danger" name="ticket_action" value="close" data-confirm="این تیکت بسته شود؟">بستن تیکت</button>
             <?php endif; ?>
@@ -83,6 +105,7 @@
 <form class="card ticket-reply-card" style="margin-top:16px" method="post" enctype="multipart/form-data">
     <?= csrf_field() ?>
     <input type="hidden" name="ticket_action" value="reply">
+    <?php foreach ($contextFields as $key => $value): ?><input type="hidden" name="<?= e($key) ?>" value="<?= e((string) $value) ?>"><?php endforeach; ?>
     <?php if (Ticket::isClosed($ticket)): ?>
         <div class="empty">این تیکت بسته شده است. برای ادامه مکالمه ابتدا وضعیت را تغییر دهید.</div>
     <?php else: ?>
@@ -95,6 +118,9 @@
             <input type="file" name="attachment" accept="image/jpeg,image/png,image/webp">
             <span class="muted">حداکثر ۲ مگابایت. فرمت‌های مجاز: jpg، png، webp</span>
         </div>
-        <div class="form-actions"><button class="btn btn-primary">ارسال پاسخ</button></div>
+        <div class="form-actions">
+            <button class="btn btn-primary" name="after_action" value="stay">ارسال پاسخ</button>
+            <?php if ($hasListContext): ?><button class="btn btn-light" name="after_action" value="next">ارسال پاسخ و تیکت بعدی</button><?php endif; ?>
+        </div>
     <?php endif; ?>
 </form>
