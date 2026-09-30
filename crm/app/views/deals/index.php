@@ -6,7 +6,7 @@
     <input type="hidden" name="page" value="deals">
     <input name="q" placeholder="جستجو..." value="<?= e($filters['q'] ?? '') ?>">
     <select name="deal_stage"><option value="">همه مراحل</option><?php foreach (deal_stage_options() as $option): ?><option value="<?= e($option) ?>" <?= selected($filters['deal_stage'] ?? '', $option) ?>><?= e(fa_label($option)) ?></option><?php endforeach; ?></select>
-    <select name="product"><option value="">همه محصولات</option><?php foreach (product_options() as $option): ?><option value="<?= e($option) ?>" <?= selected($filters['product'] ?? '', $option) ?>><?= e($option) ?></option><?php endforeach; ?></select>
+    <select name="product"><option value="">همه محصولات</option><?php foreach (product_options() as $option): ?><option value="<?= e($option) ?>" <?= selected($filters['product'] ?? '', $option) ?>><?= e(product_label($option)) ?></option><?php endforeach; ?></select>
     <select name="owner_user_id"><option value="">همه مالک‌ها</option><?php foreach ($users as $user): ?><option value="<?= e((string) $user['id']) ?>" <?= selected($filters['owner_user_id'] ?? '', $user['id']) ?>><?= e($user['name']) ?></option><?php endforeach; ?></select>
     <button class="btn btn-light">اعمال فیلتر</button>
 </form>
@@ -18,7 +18,7 @@
             <tr>
                 <td><strong><?= e($deal['deal_name']) ?></strong></td>
                 <td><?= e($deal['customer_name']) ?></td>
-                <td><?= e($deal['product']) ?></td>
+                <td><?= e(product_label($deal['product'])) ?></td>
                 <td><span class="badge <?= e(badge_class($deal['deal_stage'])) ?>"><?= e(fa_label($deal['deal_stage'])) ?></span></td>
                 <td><?= e(format_money($deal['estimated_amount'])) ?></td>
                 <td><?= e((string) $deal['probability']) ?>٪</td>

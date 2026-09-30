@@ -9,7 +9,7 @@
 <div class="card">
     <div class="detail-list">
         <div><span>مشتری</span><a href="<?= e(url('customers', ['action' => 'show', 'id' => $deal['customer_id']])) ?>"><?= e($deal['customer_name']) ?></a></div>
-        <div><span>محصول</span><?= e($deal['product']) ?></div>
+        <div><span>محصول</span><?= e(product_label($deal['product'])) ?></div>
         <div><span>مرحله</span><span class="badge <?= e(badge_class($deal['deal_stage'])) ?>"><?= e(fa_label($deal['deal_stage'])) ?></span></div>
         <div><span>مبلغ تخمینی</span><?= e(format_money($deal['estimated_amount'])) ?></div>
         <div><span>احتمال</span><?= e((string) $deal['probability']) ?>٪</div>

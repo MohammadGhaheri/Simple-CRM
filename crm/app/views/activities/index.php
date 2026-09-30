@@ -1,6 +1,12 @@
 <div class="toolbar">
     <h2>فعالیت‌ها</h2>
-    <a class="btn btn-primary" href="<?= e(url('activities', ['action' => 'create'])) ?>">فعالیت جدید</a>
+    <div class="actions">
+        <div class="view-switch" aria-label="نوع نمایش">
+            <a class="btn btn-primary" href="<?= e(url('activities', array_filter($filters, static fn($value) => $value !== ''))) ?>">لیست</a>
+            <a class="btn btn-light" href="<?= e(url('activities', array_merge(['view' => 'calendar'], array_intersect_key($filters, array_flip(['status', 'activity_type', 'owner_user_id', 'is_internal_task']))))) ?>">تقویم</a>
+        </div>
+        <a class="btn btn-primary" href="<?= e(url('activities', ['action' => 'create'])) ?>">فعالیت جدید</a>
+    </div>
 </div>
 <form class="filters" method="get">
     <input type="hidden" name="page" value="activities">

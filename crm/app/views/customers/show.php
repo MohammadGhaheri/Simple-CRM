@@ -44,7 +44,7 @@
     <div class="card">
         <h3>فرصت‌ها</h3>
         <?php foreach ($deals as $deal): ?>
-            <p><a href="<?= e(url('deals', ['action' => 'show', 'id' => $deal['id']])) ?>"><strong><?= e($deal['deal_name']) ?></strong></a> <span class="badge <?= e(badge_class($deal['deal_stage'])) ?>"><?= e(fa_label($deal['deal_stage'])) ?></span><br><span class="muted"><?= e($deal['product']) ?> - <?= e(format_money($deal['estimated_amount'])) ?></span></p>
+            <p><a href="<?= e(url('deals', ['action' => 'show', 'id' => $deal['id']])) ?>"><strong><?= e($deal['deal_name']) ?></strong></a> <span class="badge <?= e(badge_class($deal['deal_stage'])) ?>"><?= e(fa_label($deal['deal_stage'])) ?></span><br><span class="muted"><?= e(product_label($deal['product'])) ?> - <?= e(format_money($deal['estimated_amount'])) ?></span></p>
         <?php endforeach; ?>
         <?php if (!$deals): ?><div class="empty">فرصتی ثبت نشده است.</div><?php endif; ?>
     </div>

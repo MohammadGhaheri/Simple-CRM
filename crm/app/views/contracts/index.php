@@ -20,7 +20,7 @@
             <tr>
                 <td><strong><?= e($contract['contract_title']) ?></strong><br><span class="muted"><?= e($contract['contract_number']) ?></span></td>
                 <td><?= e($contract['customer_name']) ?></td>
-                <td><?= e($contract['product']) ?></td>
+                <td><?= e(product_label($contract['product'])) ?></td>
                 <td><?= e(format_money($contract['contract_amount'])) ?></td>
                 <td><?= e(fa_date($contract['end_date'])) ?></td>
                 <td><?= e(fa_date($contract['renewal_reminder_date'])) ?></td>

@@ -1057,11 +1057,12 @@ try {
         if ($action === 'create') {
             $completeId = (int) ($_GET['complete_id'] ?? ($_POST['complete_id'] ?? 0));
             $sourceActivity = $completeId > 0 ? Activity::findForOwner($completeId, current_user_id()) : null;
+            $requestedActivityDate = normalize_jalali_date((string) ($_GET['activity_date'] ?? ''));
             $activity = [
                 'customer_id' => (int) ($sourceActivity['customer_id'] ?? ($_GET['customer_id'] ?? 0)),
                 'deal_id' => (int) ($sourceActivity['deal_id'] ?? ($_GET['deal_id'] ?? 0)),
                 'contract_id' => (int) ($sourceActivity['contract_id'] ?? ($_GET['contract_id'] ?? 0)),
-                'activity_date' => fa_date(date('Y-m-d')),
+                'activity_date' => $requestedActivityDate ?? fa_date(date('Y-m-d')),
                 'status' => 'Open',
                 'activity_type' => $sourceActivity['activity_type'] ?? 'Follow-up',
                 'complete_id' => $sourceActivity ? $completeId : 0,
@@ -1193,6 +1194,24 @@ try {
                 'contracts' => $selectedCustomerId ? Contract::byCustomer($selectedCustomerId) : [],
                 'users' => $users,
                 'errors' => $errors,
+            ]);
+            exit;
+        }
+        if ((string) ($_GET['view'] ?? '') === 'calendar') {
+            $calendar = jalali_month_context((string) ($_GET['month'] ?? ''));
+            $calendarFilters = Activity::normalizeCalendarFilters($_GET);
+            $occurrences = Activity::calendarForRange($calendar['start'], $calendar['end'], $calendarFilters);
+            $occurrencesByDate = [];
+            foreach ($occurrences as $occurrence) {
+                $occurrencesByDate[$occurrence['occurrence_date']][] = $occurrence;
+            }
+            render('activities/calendar', [
+                'title' => 'تقویم فعالیت‌ها',
+                'calendar' => $calendar,
+                'occurrences' => $occurrences,
+                'occurrencesByDate' => $occurrencesByDate,
+                'filters' => $calendarFilters,
+                'users' => $users,
             ]);
             exit;
         }

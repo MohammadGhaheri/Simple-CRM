@@ -3,7 +3,7 @@
 <div class="grid grid-3">
     <div><label class="required">نام فرصت</label><input required name="deal_name" value="<?= e($deal['deal_name'] ?? '') ?>"></div>
     <div><label class="required">مشتری</label><select required name="customer_id"><?php foreach ($customers as $customer): ?><option value="<?= e((string) $customer['id']) ?>" <?= selected($deal['customer_id'] ?? '', $customer['id']) ?>><?= e($customer['customer_name']) ?></option><?php endforeach; ?></select></div>
-    <div><label>محصول</label><select name="product"><?php foreach (product_options() as $option): ?><option value="<?= e($option) ?>" <?= selected($deal['product'] ?? '', $option) ?>><?= e($option) ?></option><?php endforeach; ?></select></div>
+    <div><label>محصول</label><select name="product"><?php foreach (product_options() as $option): ?><option value="<?= e($option) ?>" <?= selected($deal['product'] ?? '', $option) ?>><?= e(product_label($option)) ?></option><?php endforeach; ?></select></div>
     <div><label>تعداد خودرو</label><input type="number" min="0" name="vehicle_count" value="<?= e((string) ($deal['vehicle_count'] ?? 0)) ?>"></div>
     <div><label>مبلغ تخمینی</label><input type="number" min="0" step="1000" name="estimated_amount" value="<?= e((string) ($deal['estimated_amount'] ?? 0)) ?>"></div>
     <div><label>احتمال موفقیت</label><input type="number" min="0" max="100" name="probability" value="<?= e((string) ($deal['probability'] ?? 20)) ?>"></div>

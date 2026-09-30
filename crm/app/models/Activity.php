@@ -4,6 +4,96 @@ declare(strict_types=1);
 
 class Activity
 {
+    public static function normalizeCalendarFilters(array $input): array
+    {
+        $filters = [];
+        $activityType = (string) ($input['activity_type'] ?? '');
+        if ($activityType !== '' && in_array($activityType, activity_type_options(), true)) {
+            $filters['activity_type'] = $activityType;
+        }
+        $status = (string) ($input['status'] ?? '');
+        if ($status !== '' && in_array($status, activity_status_options(), true)) {
+            $filters['status'] = $status;
+        }
+        $ownerId = filter_var($input['owner_user_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($ownerId) {
+            $filters['owner_user_id'] = (int) $ownerId;
+        }
+        if (isset($input['is_internal_task']) && in_array((string) $input['is_internal_task'], ['0', '1'], true)) {
+            $filters['is_internal_task'] = (int) $input['is_internal_task'];
+        }
+        return $filters;
+    }
+
+    public static function calendarForRange(string $from, string $to, array $filters = []): array
+    {
+        if (!self::isDatabaseDate($from) || !self::isDatabaseDate($to) || $from >= $to) {
+            throw new InvalidArgumentException('Invalid activity calendar range.');
+        }
+        $filters = self::normalizeCalendarFilters($filters);
+        $sql = 'SELECT a.*, c.customer_name, d.deal_name, ct.contract_title, u.name AS owner_name
+                FROM activities a
+                JOIN customers c ON c.id = a.customer_id
+                LEFT JOIN deals d ON d.id = a.deal_id
+                LEFT JOIN contracts ct ON ct.id = a.contract_id
+                LEFT JOIN users u ON u.id = a.owner_user_id
+                WHERE a.deleted_at IS NULL
+                  AND c.deleted_at IS NULL
+                  AND ((a.activity_date >= ? AND a.activity_date < ?)
+                    OR (a.next_followup_date >= ? AND a.next_followup_date < ?))';
+        $params = [$from, $to, $from, $to];
+        foreach (['status', 'activity_type', 'owner_user_id'] as $field) {
+            if (isset($filters[$field])) {
+                $sql .= " AND a.$field = ?";
+                $params[] = $filters[$field];
+            }
+        }
+        if (isset($filters['is_internal_task'])) {
+            $sql .= ' AND a.is_internal_task = ?';
+            $params[] = $filters['is_internal_task'];
+        }
+        $sql .= ' ORDER BY a.activity_date ASC, a.id ASC';
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
+        return self::buildCalendarOccurrences($stmt->fetchAll(), $from, $to);
+    }
+
+    public static function buildCalendarOccurrences(array $activities, string $from, string $to): array
+    {
+        $occurrences = [];
+        foreach ($activities as $activity) {
+            $activityDate = substr((string) ($activity['activity_date'] ?? ''), 0, 10);
+            $followupDate = substr((string) ($activity['next_followup_date'] ?? ''), 0, 10);
+            if ($activityDate >= $from && $activityDate < $to) {
+                $occurrences[] = array_merge($activity, [
+                    'occurrence_date' => $activityDate,
+                    'occurrence_type' => 'activity',
+                    'occurrence_summary' => (string) ($activity['summary'] ?? ''),
+                ]);
+            }
+            if ($followupDate !== '' && $followupDate !== $activityDate && $followupDate >= $from && $followupDate < $to) {
+                $occurrences[] = array_merge($activity, [
+                    'occurrence_date' => $followupDate,
+                    'occurrence_type' => 'followup',
+                    'occurrence_summary' => trim((string) ($activity['next_action'] ?? '')) ?: (string) ($activity['summary'] ?? ''),
+                ]);
+            }
+        }
+        usort($occurrences, static function (array $left, array $right): int {
+            return [$left['occurrence_date'], (int) $left['id'], $left['occurrence_type']]
+                <=> [$right['occurrence_date'], (int) $right['id'], $right['occurrence_type']];
+        });
+        return $occurrences;
+    }
+
+    private static function isDatabaseDate(string $value): bool
+    {
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $matches)) {
+            return false;
+        }
+        return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]);
+    }
+
     public static function search(array $filters = []): array
     {
         $sql = 'SELECT a.*, c.customer_name, d.deal_name, ct.contract_title, u.name AS owner_name FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id LEFT JOIN users u ON u.id = a.owner_user_id WHERE a.deleted_at IS NULL AND c.deleted_at IS NULL';

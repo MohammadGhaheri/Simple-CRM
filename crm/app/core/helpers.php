@@ -696,6 +696,93 @@ function db_date(?string $input): ?string
     return sprintf('%04d-%02d-%02d', $year, $month, $day);
 }
 
+function jalali_is_leap(int $year): bool
+{
+    [$startYear, $startMonth, $startDay] = jalali_to_gregorian($year, 1, 1);
+    [$nextYear, $nextMonth, $nextDay] = jalali_to_gregorian($year + 1, 1, 1);
+    $start = new DateTimeImmutable(sprintf('%04d-%02d-%02d', $startYear, $startMonth, $startDay));
+    $next = new DateTimeImmutable(sprintf('%04d-%02d-%02d', $nextYear, $nextMonth, $nextDay));
+    return (int) $start->diff($next)->format('%a') === 366;
+}
+
+function jalali_month_length(int $year, int $month): int
+{
+    if ($month < 1 || $month > 12) {
+        return 0;
+    }
+    if ($month <= 6) {
+        return 31;
+    }
+    if ($month <= 11) {
+        return 30;
+    }
+    return jalali_is_leap($year) ? 30 : 29;
+}
+
+function normalize_jalali_date(?string $input): ?string
+{
+    $input = trim(normalize_digits((string) $input));
+    $input = str_replace(['-', '.'], '/', $input);
+    if (!preg_match('/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/', $input, $matches)) {
+        return null;
+    }
+    $year = (int) $matches[1];
+    $month = (int) $matches[2];
+    $day = (int) $matches[3];
+    if ($year < 1200 || $year > 1700 || $day < 1 || $day > jalali_month_length($year, $month)) {
+        return null;
+    }
+    return sprintf('%04d/%02d/%02d', $year, $month, $day);
+}
+
+function jalali_month_context(?string $input = null, ?string $todayGregorian = null): array
+{
+    $todayGregorian = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $todayGregorian)
+        ? (string) $todayGregorian
+        : date('Y-m-d');
+    [$todayYear, $todayMonth, $todayDay] = array_map('intval', explode('-', $todayGregorian));
+    [$currentYear, $currentMonth, $currentDay] = gregorian_to_jalali($todayYear, $todayMonth, $todayDay);
+
+    $normalized = trim(normalize_digits((string) $input));
+    if (preg_match('/^(\d{4})-(\d{1,2})$/', $normalized, $matches)
+        && (int) $matches[1] >= 1200
+        && (int) $matches[1] <= 1700
+        && (int) $matches[2] >= 1
+        && (int) $matches[2] <= 12) {
+        $year = (int) $matches[1];
+        $month = (int) $matches[2];
+    } else {
+        $year = $currentYear;
+        $month = $currentMonth;
+    }
+
+    $nextYear = $month === 12 ? $year + 1 : $year;
+    $nextMonth = $month === 12 ? 1 : $month + 1;
+    $previousYear = $month === 1 ? $year - 1 : $year;
+    $previousMonth = $month === 1 ? 12 : $month - 1;
+    [$startYear, $startMonth, $startDay] = jalali_to_gregorian($year, $month, 1);
+    [$endYear, $endMonth, $endDay] = jalali_to_gregorian($nextYear, $nextMonth, 1);
+    $start = sprintf('%04d-%02d-%02d', $startYear, $startMonth, $startDay);
+    $end = sprintf('%04d-%02d-%02d', $endYear, $endMonth, $endDay);
+    $weekday = (int) (new DateTimeImmutable($start))->format('w');
+    $monthNames = [1 => 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+
+    return [
+        'year' => $year,
+        'month' => $month,
+        'key' => sprintf('%04d-%02d', $year, $month),
+        'label' => $monthNames[$month] . ' ' . $year,
+        'days' => jalali_month_length($year, $month),
+        'first_weekday' => ($weekday + 1) % 7,
+        'start' => $start,
+        'end' => $end,
+        'previous' => sprintf('%04d-%02d', $previousYear, $previousMonth),
+        'next' => sprintf('%04d-%02d', $nextYear, $nextMonth),
+        'current' => sprintf('%04d-%02d', $currentYear, $currentMonth),
+        'today_day' => $year === $currentYear && $month === $currentMonth ? $currentDay : null,
+    ];
+}
+
 function required_fields(array $data, array $fields): array
 {
     $errors = [];
@@ -781,6 +868,16 @@ function sales_status_options(): array
 function product_options(): array
 {
     return option_values('options_products');
+}
+
+function product_label(?string $value): string
+{
+    $value = trim((string) $value);
+    if ($value === '') {
+        return '';
+    }
+    $pairs = option_pairs('options_products');
+    return $pairs[$value] ?? $value;
 }
 
 function deal_stage_options(): array

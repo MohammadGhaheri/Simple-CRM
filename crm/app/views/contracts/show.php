@@ -10,7 +10,7 @@
         <div><span>شماره قرارداد</span><?= e($contract['contract_number']) ?></div>
         <div><span>مشتری</span><a href="<?= e(url('customers', ['action' => 'show', 'id' => $contract['customer_id']])) ?>"><?= e($contract['customer_name']) ?></a></div>
         <div><span>فرصت</span><?= !empty($contract['deal_id']) ? '<a href="' . e(url('deals', ['action' => 'show', 'id' => $contract['deal_id']])) . '">' . e($contract['deal_name']) . '</a>' : 'بدون فرصت' ?></div>
-        <div><span>محصول / خدمت</span><?= e($contract['product']) ?></div>
+        <div><span>محصول / خدمت</span><?= e(product_label($contract['product'])) ?></div>
         <div><span>تعداد خودرو</span><?= e((string) $contract['vehicle_count']) ?></div>
         <div><span>مبلغ قرارداد</span><?= e(format_money($contract['contract_amount'])) ?></div>
         <div><span>شروع</span><?= e(fa_date($contract['start_date'])) ?></div>
