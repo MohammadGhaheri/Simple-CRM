@@ -85,6 +85,7 @@
     <p><label><input type="checkbox" name="sms_enabled" value="1" <?= checked(($settings['sms_enabled'] ?? '0') === '1') ?> style="width:auto"> فعال‌سازی کلی پیامک</label></p>
     <p><label><input type="checkbox" name="sms_ticket_created_enabled" value="1" <?= checked(($settings['sms_ticket_created_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال پیامک به مسئول هنگام ثبت تیکت جدید</label></p>
     <p><label><input type="checkbox" name="sms_ticket_answered_enabled" value="1" <?= checked(($settings['sms_ticket_answered_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال پیامک به مخاطب هنگام پاسخ تیکت</label></p>
+    <p><label><input type="checkbox" name="sms_ticket_assignment_enabled" value="1" <?= checked(($settings['sms_ticket_assignment_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال پیامک به مسئول جدید هنگام ارجاع تیکت</label></p>
     <p><label><input type="checkbox" name="sms_portal_credentials_enabled" value="1" <?= checked(($settings['sms_portal_credentials_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال پیامک اطلاعات ورود پرتال برای مخاطب</label></p>
     <p><label><input type="checkbox" name="sms_daily_summary_enabled" value="1" <?= checked(($settings['sms_daily_summary_enabled'] ?? '0') === '1') ?> style="width:auto"> ارسال خلاصه روزانه با cron</label></p>
     <div style="margin-top:14px">

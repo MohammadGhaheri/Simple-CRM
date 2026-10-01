@@ -93,6 +93,7 @@ Other|سایر'),
 ('sms_enabled', '0'),
 ('sms_ticket_created_enabled', '0'),
 ('sms_ticket_answered_enabled', '0'),
+('sms_ticket_assignment_enabled', '0'),
 ('sms_portal_credentials_enabled', '1'),
 ('sms_portal_credentials_template', 'سلام {contact_name}
 دسترسی شما به پرتال مشتری {app_title} فعال شد.

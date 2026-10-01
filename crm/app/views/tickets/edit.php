@@ -28,6 +28,7 @@ $backUrl = $hasListContext ? ticket_list_url($ticketContext, (int) $ticket['id']
 </div>
 
 <?php if (!empty($errors)): ?><div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
+<?php if (($_GET['notice'] ?? '') === 'saved_outside'): ?><div class="alert alert-success">ارجاع انجام شد؛ این تیکت دیگر با فیلتر فعلی مطابقت ندارد.</div><?php endif; ?>
 
 <div class="grid grid-2">
     <div class="card">
@@ -52,7 +53,6 @@ $backUrl = $hasListContext ? ticket_list_url($ticketContext, (int) $ticket['id']
             <div><label>وضعیت</label><select name="status"><?php foreach (Ticket::statuses() as $option): ?><option value="<?= e($option) ?>" <?= selected($ticket['status'], $option) ?>><?= e(Ticket::label($option)) ?></option><?php endforeach; ?></select></div>
             <div><label>اولویت</label><select name="priority"><?php foreach (Ticket::priorities() as $option): ?><option value="<?= e($option) ?>" <?= selected($ticket['priority'], $option) ?>><?= e(Ticket::label($option)) ?></option><?php endforeach; ?></select></div>
             <div><label>دسته</label><select name="category"><?php foreach (Ticket::categories() as $option): ?><option value="<?= e($option) ?>" <?= selected($ticket['category'], $option) ?>><?= e(Ticket::label($option)) ?></option><?php endforeach; ?></select></div>
-            <div><label>پشتیبان مسئول</label><select name="assigned_user_id"><option value="">بدون مسئول</option><?php foreach ($users as $user): ?><option value="<?= e((string) $user['id']) ?>" <?= selected($ticket['assigned_user_id'] ?? '', $user['id']) ?>><?= e($user['name']) ?></option><?php endforeach; ?></select></div>
         </div>
         <div class="form-actions">
             <button class="btn btn-primary" name="after_action" value="stay">ذخیره</button>
@@ -63,6 +63,42 @@ $backUrl = $hasListContext ? ticket_list_url($ticketContext, (int) $ticket['id']
             <?php endif; ?>
         </div>
     </form>
+</div>
+
+<div class="grid grid-2" style="margin-top:16px">
+    <form class="card" method="post">
+        <?= csrf_field() ?>
+        <input type="hidden" name="ticket_action" value="reassign">
+        <?php foreach ($contextFields as $key => $value): ?><input type="hidden" name="<?= e($key) ?>" value="<?= e((string) $value) ?>"><?php endforeach; ?>
+        <h3>ارجاع تیکت به همکار</h3>
+        <p class="muted">مسئول رسیدگی فعلی: <strong><?= e($ticket['assigned_name'] ?? 'بدون مسئول') ?></strong></p>
+        <label>مسئول جدید</label>
+        <select name="new_assigned_user_id">
+            <option value="">بدون مسئول</option>
+            <?php foreach ($users as $user): ?>
+                <?php if ((int) ($user['is_active'] ?? 0) === 1): ?>
+                    <option value="<?= e((string) $user['id']) ?>" <?= selected($ticket['assigned_user_id'] ?? '', $user['id']) ?>><?= e($user['name']) ?></option>
+                <?php endif; ?>
+            <?php endforeach; ?>
+        </select>
+        <div class="form-actions"><button class="btn btn-primary">ارجاع به همکار</button></div>
+    </form>
+
+    <div class="card">
+        <h3>سابقه ارجاع</h3>
+        <?php foreach ($assignmentHistory as $event): ?>
+            <div class="ticket-assignment-event">
+                <strong><?= e($event['changed_by_user_name'] ?? 'سیستم') ?></strong>
+                <?php if ($event['to_user_id'] === null): ?>
+                    مسئول تیکت را از <?= e($event['from_user_name'] ?? 'بدون مسئول') ?> حذف کرد.
+                <?php else: ?>
+                    تیکت را از <?= e($event['from_user_name'] ?? 'بدون مسئول') ?> به <?= e($event['to_user_name'] ?? 'کاربر نامشخص') ?> ارجاع داد.
+                <?php endif; ?>
+                <small><?= e(fa_datetime($event['created_at'])) ?></small>
+            </div>
+        <?php endforeach; ?>
+        <?php if (!$assignmentHistory): ?><div class="empty">هنوز سابقه ارجاعی ثبت نشده است.</div><?php endif; ?>
+    </div>
 </div>
 
 <div class="card ticket-conversation-card" style="margin-top:16px">

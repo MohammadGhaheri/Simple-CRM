@@ -34,7 +34,8 @@ if (!empty($filters['assigned_user_id'])) {
     <div class="actions">
         <?php $totalUnread = array_sum(array_map(static fn($ticket) => (int) ($ticket['unread_count'] ?? 0), $tickets)); ?>
         <?php if ($totalUnread > 0): ?><span class="badge badge-primary"><?= e((string) $totalUnread) ?> پیام جدید</span><?php endif; ?>
-        <a class="btn <?= $isMine ? 'btn-primary' : 'btn-light' ?>" href="<?= e(url('tickets', $mineParams)) ?>"><?= $isMine ? 'نمایش همه مسئول‌ها' : 'تیکت‌های من' ?></a>
+        <?php $myAttentionCount = Ticket::attentionCountForUser($currentUserId); ?>
+        <a class="btn <?= $isMine ? 'btn-primary' : 'btn-light' ?>" href="<?= e(url('tickets', $mineParams)) ?>"><?= $isMine ? 'نمایش همه مسئول‌ها' : 'تیکت‌های من' ?><?= !$isMine && $myAttentionCount > 0 ? ' (' . e((string) $myAttentionCount) . ')' : '' ?></a>
         <a class="btn btn-primary" href="<?= e(url('tickets', array_merge(['action' => 'create'], $listContext))) ?>">تیکت جدید برای مشتری</a>
     </div>
 </div>

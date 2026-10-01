@@ -308,20 +308,72 @@ class Ticket
         return (int) db()->query("SELECT COUNT(*) FROM tickets t JOIN customers c ON c.id = t.customer_id JOIN contacts ct ON ct.id = t.contact_id WHERE t.status NOT IN ('Resolved','Closed') AND t.deleted_at IS NULL AND c.deleted_at IS NULL AND ct.deleted_at IS NULL")->fetchColumn();
     }
 
-    public static function supportUnreadCount(): int
+    public static function attentionCountForUser(int $userId): int
     {
-        return (int) db()->query("
-            SELECT COUNT(*)
-            FROM ticket_messages tm
-            JOIN tickets t ON t.id = tm.ticket_id
+        $stmt = db()->prepare("
+            SELECT COUNT(DISTINCT t.id)
+            FROM tickets t
             JOIN customers c ON c.id = t.customer_id
             JOIN contacts ct ON ct.id = t.contact_id
-            WHERE tm.sender_type = 'contact'
-              AND tm.user_read_at IS NULL
+            WHERE t.assigned_user_id = ?
               AND t.deleted_at IS NULL
               AND c.deleted_at IS NULL
               AND ct.deleted_at IS NULL
-        ")->fetchColumn();
+              AND (
+                  EXISTS (
+                      SELECT 1 FROM ticket_messages tm
+                      WHERE tm.ticket_id = t.id AND tm.sender_type = 'contact' AND tm.user_read_at IS NULL
+                  )
+                  OR EXISTS (
+                      SELECT 1 FROM ticket_assignment_events tae
+                      WHERE tae.ticket_id = t.id AND tae.to_user_id = ? AND tae.seen_at IS NULL
+                  )
+              )
+        ");
+        $stmt->execute([$userId, $userId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public static function reassign(int $id, ?int $newUserId, int $changedByUserId): bool
+    {
+        if ($newUserId !== null) {
+            $target = User::find($newUserId);
+            if (!$target || (int) ($target['is_active'] ?? 0) !== 1) {
+                throw new RuntimeException('کاربر انتخاب‌شده معتبر یا فعال نیست.');
+            }
+        }
+
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare('SELECT assigned_user_id FROM tickets WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+            $stmt->execute([$id]);
+            $current = $stmt->fetchColumn();
+            if ($current === false) {
+                throw new RuntimeException('تیکت پیدا نشد.');
+            }
+            $fromUserId = $current === null ? null : (int) $current;
+            if ($fromUserId === $newUserId) {
+                $pdo->commit();
+                return false;
+            }
+
+            $pdo->prepare('UPDATE tickets SET assigned_user_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+                ->execute([$newUserId, $id]);
+            $seenAt = $newUserId === null || $newUserId === $changedByUserId ? date('Y-m-d H:i:s') : null;
+            $pdo->prepare(
+                'INSERT INTO ticket_assignment_events
+                 (ticket_id, from_user_id, to_user_id, changed_by_user_id, seen_at)
+                 VALUES (?, ?, ?, ?, ?)'
+            )->execute([$id, $fromUserId, $newUserId, $changedByUserId, $seenAt]);
+            $pdo->commit();
+            return true;
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $error;
+        }
     }
 
     public static function statuses(): array
@@ -441,14 +493,13 @@ class Ticket
 
             $newStatus = self::validStatus($data['status'] ?? $current);
             $closedAtSql = self::closedAtSql($current, $newStatus);
-            $responseSql = $includeResponse ? ', response=:response' : '';
+            $responseSql = $includeResponse ? ' response=:response,' : '';
             $sql = "UPDATE tickets SET status=:status, priority=:priority, category=:category,
-                    assigned_user_id=:assigned_user_id{$responseSql}, closed_at={$closedAtSql} WHERE id=:id";
+                    {$responseSql} closed_at={$closedAtSql} WHERE id=:id";
             $payload = [
                 'status' => $newStatus,
                 'priority' => self::validPriority($data['priority'] ?? 'Normal'),
                 'category' => self::validCategory($data['category'] ?? 'Support'),
-                'assigned_user_id' => !empty($data['assigned_user_id']) ? (int) $data['assigned_user_id'] : null,
                 'id' => $id,
             ];
             if ($includeResponse) {

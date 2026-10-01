@@ -34,7 +34,24 @@ class TicketMessage
         ")->execute([$ticketId, $ticketId, $contactId]);
     }
 
-    public static function markReadForUser(int $ticketId): void
+    public static function markReadForAssignedUser(int $ticketId, int $userId): void
+    {
+        db()->prepare("
+            UPDATE ticket_messages
+            SET user_read_at = COALESCE(user_read_at, CURRENT_TIMESTAMP)
+            WHERE ticket_id = ?
+              AND sender_type = 'contact'
+              AND user_read_at IS NULL
+              AND EXISTS (
+                  SELECT 1 FROM tickets t
+                  WHERE t.id = ticket_messages.ticket_id
+                    AND t.assigned_user_id = ?
+                    AND t.deleted_at IS NULL
+              )
+        ")->execute([$ticketId, $userId]);
+    }
+
+    public static function markHandledByInternalReply(int $ticketId): void
     {
         db()->prepare("
             UPDATE ticket_messages
@@ -62,7 +79,7 @@ class TicketMessage
 
     public static function createFromUser(int $ticketId, int $userId, string $message, ?array $attachment = null): int
     {
-        return self::create([
+        $messageId = self::create([
             'ticket_id' => $ticketId,
             'sender_type' => 'user',
             'sender_contact_id' => null,
@@ -73,6 +90,8 @@ class TicketMessage
             'attachment_mime' => $attachment['mime'] ?? null,
             'attachment_size' => $attachment['size'] ?? null,
         ]);
+        self::markHandledByInternalReply($ticketId);
+        return $messageId;
     }
 
     private static function create(array $data): int

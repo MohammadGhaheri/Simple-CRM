@@ -9,6 +9,7 @@ USE simple_crm;
 DROP TABLE IF EXISTS activities;
 DROP TABLE IF EXISTS contracts;
 DROP TABLE IF EXISTS ticket_status_events;
+DROP TABLE IF EXISTS ticket_assignment_events;
 DROP TABLE IF EXISTS ticket_messages;
 DROP TABLE IF EXISTS email_logs;
 DROP TABLE IF EXISTS sms_logs;
@@ -216,6 +217,22 @@ CREATE TABLE ticket_status_events (
   CONSTRAINT fk_ticket_status_events_ticket FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
   CONSTRAINT fk_ticket_status_events_user FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_ticket_status_events_contact FOREIGN KEY (changed_by_contact_id) REFERENCES contacts(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE ticket_assignment_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  ticket_id INT UNSIGNED NOT NULL,
+  from_user_id INT UNSIGNED NULL,
+  to_user_id INT UNSIGNED NULL,
+  changed_by_user_id INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  seen_at DATETIME NULL,
+  INDEX idx_ticket_assignment_ticket_time (ticket_id, created_at),
+  INDEX idx_ticket_assignment_recipient_seen (to_user_id, seen_at),
+  CONSTRAINT fk_ticket_assignment_ticket FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ticket_assignment_from_user FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ticket_assignment_to_user FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ticket_assignment_changed_by FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE announcements (

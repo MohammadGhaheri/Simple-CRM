@@ -88,6 +88,20 @@ class SmsService
         self::send($contact['mobile'] ?? '', 'نتیجه تیکت شما ثبت شد: ' . $ticket['ticket_code'] . "\n" . $link);
     }
 
+    public static function notifyTicketAssigned(array $ticket, array $targetUser): bool
+    {
+        $settings = Setting::all();
+        if (($settings['sms_ticket_assignment_enabled'] ?? '0') !== '1') {
+            return false;
+        }
+        $mobile = trim((string) ($targetUser['mobile'] ?? ''));
+        if ($mobile === '') {
+            return false;
+        }
+        $link = self::baseUrl() . '/index.php?page=tickets&action=edit&id=' . (int) $ticket['id'];
+        return self::send($mobile, 'تیکت ' . $ticket['ticket_code'] . " به شما ارجاع شد.\n" . $link);
+    }
+
     public static function sendPortalCredentials(array $contact, string $plainPassword): bool
     {
         $settings = Setting::all();

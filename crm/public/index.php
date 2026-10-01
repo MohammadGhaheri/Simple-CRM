@@ -15,6 +15,7 @@ require __DIR__ . '/../app/models/Contract.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/TicketMessage.php';
+require __DIR__ . '/../app/models/TicketAssignmentEvent.php';
 require __DIR__ . '/../app/models/Announcement.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
@@ -172,6 +173,7 @@ try {
                     'sms_enabled' => isset($_POST['sms_enabled']) ? '1' : '0',
                     'sms_ticket_created_enabled' => isset($_POST['sms_ticket_created_enabled']) ? '1' : '0',
                     'sms_ticket_answered_enabled' => isset($_POST['sms_ticket_answered_enabled']) ? '1' : '0',
+                    'sms_ticket_assignment_enabled' => isset($_POST['sms_ticket_assignment_enabled']) ? '1' : '0',
                     'sms_portal_credentials_enabled' => isset($_POST['sms_portal_credentials_enabled']) ? '1' : '0',
                     'sms_portal_credentials_template' => trim($_POST['sms_portal_credentials_template'] ?? ''),
                     'sms_daily_summary_enabled' => isset($_POST['sms_daily_summary_enabled']) ? '1' : '0',
@@ -867,6 +869,22 @@ try {
                             }
                             redirect(ticket_edit_url($id, $ticketContext));
                         }
+                    } elseif ($ticketAction === 'reassign') {
+                        $rawTarget = trim((string) ($_POST['new_assigned_user_id'] ?? ''));
+                        $newAssignedUserId = $rawTarget === '' ? null : filter_var($rawTarget, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                        if ($rawTarget !== '' && $newAssignedUserId === false) {
+                            throw new RuntimeException('مسئول جدید معتبر نیست.');
+                        }
+                        $changed = Ticket::reassign($id, $newAssignedUserId === false ? null : $newAssignedUserId, current_user_id());
+                        if ($changed && $newAssignedUserId !== null && $newAssignedUserId !== current_user_id()) {
+                            $after = Ticket::find($id);
+                            $target = User::find($newAssignedUserId);
+                            if ($after && $target) {
+                                SmsService::notifyTicketAssigned($after, $target);
+                            }
+                        }
+                        $stillMatches = !$hasListContext || in_array($id, Ticket::filteredIds($ticketContext), true);
+                        redirect(ticket_edit_url($id, $ticketContext) . ($stillMatches ? '' : '&notice=saved_outside'));
                     } elseif ($ticketAction === 'close') {
                         Ticket::close($id, 'user', current_user_id());
                         redirect(ticket_edit_url($id, $ticketContext));
@@ -886,9 +904,13 @@ try {
                 }
                 $ticket = Ticket::find($id) ?: $ticket;
             }
+            if (!is_post()) {
+                TicketMessage::markReadForAssignedUser($id, current_user_id());
+                TicketAssignmentEvent::markSeenForTicketAndUser($id, current_user_id());
+            }
             $messages = TicketMessage::byTicket($id);
-            TicketMessage::markReadForUser($id);
-            render('tickets/edit', ['title' => 'جزئیات تیکت', 'ticket' => $ticket, 'messages' => $messages, 'users' => $users, 'errors' => $errors, 'ticketContext' => $ticketContext, 'hasListContext' => $hasListContext, 'queue' => $queue]);
+            $assignmentHistory = TicketAssignmentEvent::historyForTicket($id);
+            render('tickets/edit', ['title' => 'جزئیات تیکت', 'ticket' => $ticket, 'messages' => $messages, 'users' => $users, 'errors' => $errors, 'ticketContext' => $ticketContext, 'hasListContext' => $hasListContext, 'queue' => $queue, 'assignmentHistory' => $assignmentHistory]);
             exit;
         }
         $ticketFilters = Ticket::normalizeListContext($_GET);
