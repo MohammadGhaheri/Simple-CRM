@@ -75,6 +75,12 @@ Renewal Due|نیازمند تمدید
 Renewed|تمدید شده
 Expired|منقضی شده
 Cancelled|لغو شده'),
+('options_contract_document_types', 'Contract|نسخه قرارداد
+Addendum|الحاقیه
+Proposal|پیشنهاد
+Minutes|صورتجلسه
+Correspondence|مکاتبات
+Other|سایر'),
 ('options_ticket_statuses', 'Open|باز
 In Progress|در حال بررسی
 Waiting Customer|در انتظار مشتری

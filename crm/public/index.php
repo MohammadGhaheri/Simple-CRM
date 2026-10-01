@@ -12,6 +12,7 @@ require __DIR__ . '/../app/models/Customer.php';
 require __DIR__ . '/../app/models/Contact.php';
 require __DIR__ . '/../app/models/Deal.php';
 require __DIR__ . '/../app/models/Contract.php';
+require __DIR__ . '/../app/models/ContractDocument.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/TicketMessage.php';
@@ -164,6 +165,7 @@ try {
                     'options_activity_types' => trim($_POST['options_activity_types'] ?? ''),
                     'options_activity_statuses' => trim($_POST['options_activity_statuses'] ?? ''),
                     'options_contract_statuses' => trim($_POST['options_contract_statuses'] ?? ''),
+                    'options_contract_document_types' => trim($_POST['options_contract_document_types'] ?? ''),
                     'options_ticket_statuses' => trim($_POST['options_ticket_statuses'] ?? ''),
                     'options_ticket_priorities' => trim($_POST['options_ticket_priorities'] ?? ''),
                     'options_ticket_categories' => trim($_POST['options_ticket_categories'] ?? ''),
@@ -562,6 +564,7 @@ try {
                 'contacts' => Contact::byCustomer($id),
                 'deals' => Deal::byCustomer($id),
                 'contracts' => Contract::byCustomer($id),
+                'contractDocuments' => ContractDocument::byCustomer($id),
                 'activities' => Activity::byCustomer($id),
             ]);
             exit;
@@ -980,6 +983,84 @@ try {
     }
 
     if ($page === 'contracts') {
+        if ($action === 'document_download') {
+            $document = ContractDocument::find((int) ($_GET['document_id'] ?? 0));
+            $file = $document ? contract_document_path((string) $document['file_path']) : null;
+            if (!$document || $file === null) {
+                http_response_code(404);
+                exit('File not found.');
+            }
+            $downloadName = sanitize_uploaded_filename((string) $document['original_name']);
+            header('Content-Type: ' . ($document['mime_type'] ?: 'application/octet-stream'));
+            header('Content-Length: ' . filesize($file));
+            header("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode($downloadName));
+            header('X-Content-Type-Options: nosniff');
+            readfile($file);
+            exit;
+        }
+        if ($action === 'document_delete' && is_post()) {
+            require_admin();
+            verify_csrf();
+            $document = ContractDocument::find((int) ($_POST['document_id'] ?? 0));
+            if (!$document) {
+                http_response_code(404);
+                exit('Document not found.');
+            }
+            ContractDocument::softDelete((int) $document['id']);
+            redirect(url('contracts', ['action' => 'show', 'id' => (int) $document['contract_id'], 'document_deleted' => 1]));
+        }
+        if ($action === 'document_upload' && is_post()) {
+            verify_csrf();
+            $contract = Contract::find($id);
+            if (!$contract) {
+                http_response_code(404);
+                exit('Contract not found.');
+            }
+            $uploaded = null;
+            try {
+                $documentType = trim((string) ($_POST['document_type'] ?? ''));
+                if (!array_key_exists($documentType, ContractDocument::documentTypes())) {
+                    throw new RuntimeException('نوع سند انتخاب‌شده معتبر نیست.');
+                }
+                $uploaded = upload_contract_document('document_file');
+                $title = trim((string) ($_POST['title'] ?? ''));
+                if ($title === '') {
+                    $title = (string) $uploaded['name'];
+                }
+                $title = function_exists('mb_strcut') ? mb_strcut($title, 0, 190, 'UTF-8') : substr($title, 0, 190);
+                if ($title === '') {
+                    throw new RuntimeException('عنوان سند معتبر نیست.');
+                }
+                try {
+                    ContractDocument::create([
+                        'contract_id' => $id,
+                        'document_type' => $documentType,
+                        'title' => $title,
+                        'notes' => $_POST['notes'] ?? '',
+                        'file_path' => $uploaded['path'],
+                        'original_name' => $uploaded['name'],
+                        'mime_type' => $uploaded['mime'],
+                        'file_size' => $uploaded['size'],
+                        'uploaded_by_user_id' => current_user_id(),
+                    ]);
+                } catch (Throwable $e) {
+                    delete_contract_document_file((string) $uploaded['path']);
+                    throw new RuntimeException('ثبت اطلاعات سند ناموفق بود.', 0, $e);
+                }
+                redirect(url('contracts', ['action' => 'show', 'id' => $id, 'document_uploaded' => 1]));
+            } catch (RuntimeException $e) {
+                $errors[] = $e->getMessage();
+            }
+            render('contracts/show', [
+                'title' => $contract['contract_title'],
+                'contract' => $contract,
+                'activities' => Activity::byContract($id),
+                'documents' => ContractDocument::byContract($id),
+                'documentTypes' => ContractDocument::documentTypes(),
+                'errors' => $errors,
+            ]);
+            exit;
+        }
         if ($action === 'delete' && is_post()) {
             delete_action(fn() => Contract::delete($id), url('contracts'));
         }
@@ -1032,7 +1113,14 @@ try {
             if (!is_post()) {
                 PerformanceAnalytics::logRecordView(current_user_id(), 'contract', $id);
             }
-            render('contracts/show', ['title' => $contract['contract_title'], 'contract' => $contract, 'activities' => Activity::byContract($id)]);
+            render('contracts/show', [
+                'title' => $contract['contract_title'],
+                'contract' => $contract,
+                'activities' => Activity::byContract($id),
+                'documents' => ContractDocument::byContract($id),
+                'documentTypes' => ContractDocument::documentTypes(),
+                'notice' => isset($_GET['document_uploaded']) ? 'سند قرارداد با موفقیت ثبت شد.' : (isset($_GET['document_deleted']) ? 'سند قرارداد از نمایش حذف شد.' : ''),
+            ]);
             exit;
         }
         render('contracts/index', ['title' => 'قراردادها', 'contracts' => Contract::search($_GET), 'users' => $users, 'filters' => $_GET]);

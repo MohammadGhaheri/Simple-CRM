@@ -57,6 +57,33 @@
     </div>
 </div>
 
+<?php if (!empty($contractDocuments)): ?>
+    <?php
+    $documentsByContract = [];
+    foreach ($contractDocuments as $document) {
+        $documentsByContract[(int) $document['contract_id']][] = $document;
+    }
+    ?>
+    <div class="card" style="margin-top:16px">
+        <h3>اسناد قراردادها</h3>
+        <?php foreach ($documentsByContract as $contractId => $documents): ?>
+            <div style="margin-top:14px">
+                <a href="<?= e(url('contracts', ['action' => 'show', 'id' => $contractId])) ?>">
+                    <strong><?= e($documents[0]['contract_title']) ?></strong>
+                    <span class="muted"><?= e($documents[0]['contract_number']) ?></span>
+                </a>
+                <?php foreach ($documents as $document): ?>
+                    <p>
+                        <a href="<?= e(url('contracts', ['action' => 'document_download', 'document_id' => $document['id']])) ?>"><?= e($document['title']) ?></a>
+                        <span class="badge badge-muted"><?= e(ContractDocument::label($document['document_type'])) ?></span><br>
+                        <span class="muted"><?= e(fa_datetime($document['created_at'])) ?> - <?= e(format_file_size((int) $document['file_size'])) ?></span>
+                    </p>
+                <?php endforeach; ?>
+            </div>
+        <?php endforeach; ?>
+    </div>
+<?php endif; ?>
+
 <div class="card" style="margin-top:16px">
     <h3>فعالیت‌ها</h3>
     <?php foreach ($activities as $activity): ?>

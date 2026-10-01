@@ -7,6 +7,7 @@ CREATE DATABASE IF NOT EXISTS simple_crm CHARACTER SET utf8mb4 COLLATE utf8mb4_u
 USE simple_crm;
 
 DROP TABLE IF EXISTS activities;
+DROP TABLE IF EXISTS contract_documents;
 DROP TABLE IF EXISTS contracts;
 DROP TABLE IF EXISTS ticket_status_events;
 DROP TABLE IF EXISTS ticket_assignment_events;
@@ -330,6 +331,25 @@ CREATE TABLE contracts (
   CONSTRAINT fk_contracts_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
   CONSTRAINT fk_contracts_deal FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE SET NULL,
   CONSTRAINT fk_contracts_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE contract_documents (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  contract_id INT UNSIGNED NOT NULL,
+  document_type VARCHAR(80) NOT NULL DEFAULT 'Other',
+  title VARCHAR(190) NOT NULL,
+  notes TEXT NULL,
+  file_path VARCHAR(255) NOT NULL,
+  original_name VARCHAR(190) NOT NULL,
+  mime_type VARCHAR(120) NOT NULL,
+  file_size INT UNSIGNED NOT NULL DEFAULT 0,
+  uploaded_by_user_id INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at DATETIME NULL,
+  INDEX idx_contract_documents_contract (contract_id, deleted_at, created_at),
+  INDEX idx_contract_documents_uploader (uploaded_by_user_id, created_at),
+  CONSTRAINT fk_contract_documents_contract FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_contract_documents_uploader FOREIGN KEY (uploaded_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE activities (

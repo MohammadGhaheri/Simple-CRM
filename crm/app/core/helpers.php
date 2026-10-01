@@ -156,6 +156,139 @@ function announcement_attachment_root(): string
     return dirname(__DIR__, 2) . '/storage/announcement-attachments';
 }
 
+function contract_document_root(): string
+{
+    return dirname(__DIR__, 2) . '/storage/contract-documents';
+}
+
+function sanitize_uploaded_filename(string $name, int $maxLength = 190): string
+{
+    $name = basename(str_replace('\\', '/', $name));
+    $name = preg_replace('/[\x00-\x1F\x7F]/u', '', $name) ?? '';
+    $name = trim($name);
+    if ($name === '') {
+        $name = 'document';
+    }
+    return function_exists('mb_strcut') ? mb_strcut($name, 0, $maxLength, 'UTF-8') : substr($name, 0, $maxLength);
+}
+
+function inspect_contract_document_file(string $tmpPath, string $originalName, int $size): array
+{
+    if (!is_file($tmpPath)) {
+        throw new RuntimeException('فایل سند معتبر نیست.');
+    }
+    if ($size <= 0 || $size > 10 * 1024 * 1024) {
+        throw new RuntimeException('حجم سند باید حداکثر ۱۰ مگابایت باشد.');
+    }
+
+    $originalName = sanitize_uploaded_filename($originalName);
+    $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    $allowedMimes = [
+        'jpg' => ['image/jpeg'],
+        'jpeg' => ['image/jpeg'],
+        'png' => ['image/png'],
+        'webp' => ['image/webp'],
+        'pdf' => ['application/pdf'],
+        'doc' => ['application/msword', 'application/CDFV2', 'application/x-ole-storage', 'application/vnd.ms-office'],
+        'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip'],
+    ];
+    if (!isset($allowedMimes[$extension])) {
+        throw new RuntimeException('فقط تصویر، PDF و فایل Word برای سند قرارداد مجاز است.');
+    }
+
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = (string) $finfo->file($tmpPath);
+    if (!in_array($mime, $allowedMimes[$extension], true)) {
+        throw new RuntimeException('نوع واقعی فایل سند با پسوند آن سازگار نیست.');
+    }
+    if ($extension === 'docx' && $mime === 'application/zip') {
+        if (!class_exists('ZipArchive')) {
+            throw new RuntimeException('افزونه ZIP برای بررسی امنیتی فایل Word روی سرور فعال نیست.');
+        }
+        $zip = new ZipArchive();
+        $opened = $zip->open($tmpPath);
+        $isDocx = $opened === true
+            && $zip->locateName('[Content_Types].xml') !== false
+            && $zip->locateName('word/document.xml') !== false;
+        if ($opened === true) {
+            $zip->close();
+        }
+        if (!$isDocx) {
+            throw new RuntimeException('فایل انتخاب‌شده یک سند Word معتبر نیست.');
+        }
+    }
+
+    return ['name' => $originalName, 'extension' => $extension, 'mime' => $mime, 'size' => $size];
+}
+
+function upload_contract_document(string $field): array
+{
+    $file = $_FILES[$field] ?? [];
+    $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($error === UPLOAD_ERR_NO_FILE) {
+        throw new RuntimeException('انتخاب فایل سند الزامی است.');
+    }
+    if ($error !== UPLOAD_ERR_OK || empty($file['tmp_name']) || !is_uploaded_file((string) $file['tmp_name'])) {
+        throw new RuntimeException('آپلود فایل سند ناموفق بود.');
+    }
+
+    $metadata = inspect_contract_document_file(
+        (string) $file['tmp_name'],
+        (string) ($file['name'] ?? 'document'),
+        (int) ($file['size'] ?? 0)
+    );
+    $relativeDir = date('Y/m');
+    $dir = contract_document_root() . '/' . $relativeDir;
+    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+        throw new RuntimeException('پوشه نگهداری اسناد قرارداد ساخته نشد.');
+    }
+    if (!is_writable($dir)) {
+        throw new RuntimeException('پوشه نگهداری اسناد قرارداد قابل نوشتن نیست.');
+    }
+
+    $filename = bin2hex(random_bytes(16)) . '.' . $metadata['extension'];
+    if (!move_uploaded_file((string) $file['tmp_name'], $dir . '/' . $filename)) {
+        throw new RuntimeException('ذخیره فایل سند قرارداد ناموفق بود.');
+    }
+    return [
+        'path' => $relativeDir . '/' . $filename,
+        'name' => $metadata['name'],
+        'mime' => $metadata['mime'],
+        'size' => $metadata['size'],
+    ];
+}
+
+function contract_document_path(?string $relativePath): ?string
+{
+    $relativePath = str_replace('\\', '/', trim((string) $relativePath));
+    if ($relativePath === '' || str_contains($relativePath, '..') || str_starts_with($relativePath, '/')) {
+        return null;
+    }
+    $root = realpath(contract_document_root());
+    $target = realpath(contract_document_root() . '/' . $relativePath);
+    if (!$root || !$target || !is_file($target)) {
+        return null;
+    }
+    $rootPrefix = rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+    return str_starts_with($target, $rootPrefix) ? $target : null;
+}
+
+function delete_contract_document_file(?string $relativePath): void
+{
+    $target = contract_document_path($relativePath);
+    if ($target !== null) {
+        @unlink($target);
+    }
+}
+
+function format_file_size(int $bytes): string
+{
+    if ($bytes >= 1024 * 1024) {
+        return number_format($bytes / (1024 * 1024), 1) . ' MB';
+    }
+    return number_format(max(0, $bytes) / 1024, 1) . ' KB';
+}
+
 function upload_announcement_attachments(string $field): array
 {
     if (empty($_FILES[$field]['name'])) {
@@ -900,6 +1033,11 @@ function contract_status_options(): array
     return option_values('options_contract_statuses');
 }
 
+function contract_document_type_options(): array
+{
+    return option_values('options_contract_document_types');
+}
+
 function fa_label(string $value): string
 {
     foreach ([
@@ -910,6 +1048,7 @@ function fa_label(string $value): string
         'options_activity_types',
         'options_activity_statuses',
         'options_contract_statuses',
+        'options_contract_document_types',
         'options_ticket_statuses',
         'options_ticket_priorities',
         'options_ticket_categories',

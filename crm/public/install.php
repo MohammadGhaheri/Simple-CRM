@@ -139,6 +139,7 @@ function seed_initial_data(PDO $pdo, array $data): void
         'options_activity_types' => "Call|تماس\nMeeting|جلسه\nWhatsApp / Message|پیام\nEmail|ایمیل\nProposal Sent|پیشنهاد ارسال شده\nDemo|دمو\nFollow-up|پیگیری\nContract|قرارداد\nContract Renewal|تمدید قرارداد\nSupport|پشتیبانی\nOther|سایر",
         'options_activity_statuses' => "Open|باز\nDone|انجام شده\nCancelled|لغو شده\nWaiting|در انتظار",
         'options_contract_statuses' => "Active|فعال\nRenewal Due|نیازمند تمدید\nRenewed|تمدید شده\nExpired|منقضی شده\nCancelled|لغو شده",
+        'options_contract_document_types' => "Contract|نسخه قرارداد\nAddendum|الحاقیه\nProposal|پیشنهاد\nMinutes|صورتجلسه\nCorrespondence|مکاتبات\nOther|سایر",
         'options_ticket_statuses' => "Open|باز\nIn Progress|در حال بررسی\nWaiting Customer|در انتظار مشتری\nResolved|حل شده\nClosed|بسته",
         'options_ticket_priorities' => "Low|کم\nNormal|عادی\nHigh|زیاد\nUrgent|فوری",
         'options_ticket_categories' => "Support|پشتیبانی\nRequest|درخواست\nBug|خطا\nTraining|آموزش\nBilling|مالی\nOther|سایر",

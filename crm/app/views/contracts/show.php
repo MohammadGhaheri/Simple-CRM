@@ -5,6 +5,8 @@
         <a class="btn btn-light" href="<?= e(url('contracts', ['action' => 'edit', 'id' => $contract['id']])) ?>">ویرایش</a>
     </div>
 </div>
+<?php if (!empty($errors)): ?><div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
+<?php if (!empty($notice)): ?><div class="alert alert-success"><?= e($notice) ?></div><?php endif; ?>
 <div class="card">
     <div class="detail-list">
         <div><span>شماره قرارداد</span><?= e($contract['contract_number']) ?></div>
@@ -20,6 +22,60 @@
         <div><span>مسئول</span><?= e($contract['owner_name'] ?? '') ?></div>
     </div>
     <?php if ($contract['notes']): ?><p class="muted"><?= nl2br(e($contract['notes'])) ?></p><?php endif; ?>
+</div>
+
+<div class="card" style="margin-top:16px">
+    <h3>اسناد قرارداد</h3>
+    <form method="post" enctype="multipart/form-data" action="<?= e(url('contracts', ['action' => 'document_upload', 'id' => $contract['id']])) ?>">
+        <?= csrf_field() ?>
+        <div class="grid grid-2">
+            <div>
+                <label class="required">نوع سند</label>
+                <select name="document_type" required>
+                    <?php foreach ($documentTypes as $value => $label): ?>
+                        <option value="<?= e($value) ?>" <?= selected($_POST['document_type'] ?? 'Contract', $value) ?>><?= e($label) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div><label>عنوان</label><input name="title" maxlength="190" value="<?= e($_POST['title'] ?? '') ?>" placeholder="در صورت خالی بودن از نام فایل استفاده می‌شود"></div>
+            <div><label class="required">فایل</label><input type="file" name="document_file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" required></div>
+            <div><label>توضیحات</label><textarea name="notes"><?= e($_POST['notes'] ?? '') ?></textarea></div>
+        </div>
+        <p class="muted">فرمت‌های مجاز: تصویر، PDF و Word؛ حداکثر حجم ۱۰ مگابایت.</p>
+        <div class="form-actions"><button class="btn btn-primary" type="submit">افزودن سند</button></div>
+    </form>
+
+    <?php if ($documents): ?>
+        <div class="table-wrap" style="margin-top:16px">
+            <table>
+                <thead><tr><th>عنوان</th><th>نوع</th><th>فایل</th><th>حجم</th><th>آپلودکننده</th><th>تاریخ</th><th>عملیات</th></tr></thead>
+                <tbody>
+                <?php foreach ($documents as $document): ?>
+                    <tr>
+                        <td><strong><?= e($document['title']) ?></strong><?php if (!empty($document['notes'])): ?><br><span class="muted"><?= nl2br(e($document['notes'])) ?></span><?php endif; ?></td>
+                        <td><?= e(ContractDocument::label($document['document_type'])) ?></td>
+                        <td><?= e($document['original_name']) ?></td>
+                        <td><?= e(format_file_size((int) $document['file_size'])) ?></td>
+                        <td><?= e($document['uploaded_by_name'] ?? 'کاربر حذف‌شده') ?></td>
+                        <td><?= e(fa_datetime($document['created_at'])) ?></td>
+                        <td>
+                            <span class="actions">
+                                <a class="btn btn-small btn-light" href="<?= e(url('contracts', ['action' => 'document_download', 'document_id' => $document['id']])) ?>">دانلود</a>
+                                <?php if (is_admin()): ?>
+                                    <form method="post" action="<?= e(url('contracts', ['action' => 'document_delete'])) ?>" data-confirm="این سند از نمایش حذف شود؟">
+                                        <?= csrf_field() ?><input type="hidden" name="document_id" value="<?= e((string) $document['id']) ?>"><button class="btn btn-small btn-danger">حذف</button>
+                                    </form>
+                                <?php endif; ?>
+                            </span>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php else: ?>
+        <div class="empty">هنوز سندی برای این قرارداد ثبت نشده است.</div>
+    <?php endif; ?>
 </div>
 
 <div class="card" style="margin-top:16px">
