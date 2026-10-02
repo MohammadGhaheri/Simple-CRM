@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 require __DIR__ . '/../app/core/helpers.php';
 require __DIR__ . '/../app/models/Setting.php';
+require __DIR__ . '/../app/services/BackupService.php';
+
+BackupService::denyIfRestoreLocked();
 
 $settings = Setting::all();
 ?>

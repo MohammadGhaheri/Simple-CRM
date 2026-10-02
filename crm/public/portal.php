@@ -15,6 +15,9 @@ require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/models/User.php';
 require __DIR__ . '/../app/services/SmsService.php';
+require __DIR__ . '/../app/services/BackupService.php';
+
+BackupService::denyIfRestoreLocked();
 
 $action = $_GET['action'] ?? 'dashboard';
 $errors = [];

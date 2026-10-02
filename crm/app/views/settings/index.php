@@ -154,14 +154,17 @@
 <div class="grid grid-2" style="margin-top:16px">
     <div class="card">
         <h2>پشتیبان‌گیری</h2>
-        <p class="muted">یک فایل SQL از ساختار و داده‌های سیستم دریافت کنید.</p>
-        <a class="btn btn-primary" href="<?= e(url('backup', ['action' => 'download'])) ?>">دانلود فایل بکاپ</a>
+        <p class="muted">بکاپ کامل شامل دیتابیس و فایل‌های بارگذاری‌شده سامانه است.</p>
+        <div class="actions">
+            <a class="btn btn-primary" href="<?= e(url('backup', ['action' => 'download_full'])) ?>">دانلود بکاپ کامل</a>
+            <a class="btn btn-light" href="<?= e(url('backup', ['action' => 'download_sql'])) ?>">دانلود فقط دیتابیس (SQL)</a>
+        </div>
     </div>
     <form class="card" method="post" enctype="multipart/form-data" data-confirm="بازگردانی بکاپ داده‌های فعلی را تغییر می‌دهد. ادامه می‌دهید؟">
         <?= csrf_field() ?>
         <h2>بازگردانی بکاپ</h2>
-        <p class="muted">فقط فایل بکاپ تولیدشده توسط Elm Simple CRM را بارگذاری کنید.</p>
-        <input type="file" name="backup_file" accept=".sql" required>
+        <p class="muted">ZIP دیتابیس و فایل‌ها را کامل بازمی‌گرداند. SQL فقط دیتابیس را بازمی‌گرداند و فایل‌های فعلی را تغییر نمی‌دهد.</p>
+        <input type="file" name="backup_file" accept=".zip,.sql" required>
         <div class="form-actions"><button class="btn btn-danger" name="restore_backup" value="1">بازگردانی بکاپ</button></div>
     </form>
 </div>

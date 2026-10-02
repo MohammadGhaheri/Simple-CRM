@@ -11,6 +11,9 @@ require __DIR__ . '/../app/models/User.php';
 require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/models/PerformanceAnalytics.php';
+require __DIR__ . '/../app/services/BackupService.php';
+
+BackupService::denyIfRestoreLocked();
 
 if (auth_check()) {
     redirect('index.php');

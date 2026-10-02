@@ -26,6 +26,8 @@ require __DIR__ . '/../app/services/SmsService.php';
 require __DIR__ . '/../app/services/EmailService.php';
 require __DIR__ . '/../app/services/BackupService.php';
 
+BackupService::denyIfRestoreLocked();
+
 if (!auth_check()) {
     redirect('home.php');
 }
@@ -137,11 +139,22 @@ try {
     if ($page === 'settings') {
         require_admin();
         $settings = Setting::all();
+        if (!empty($_SESSION['backup_notice'])) {
+            $notice = (string) $_SESSION['backup_notice'];
+            unset($_SESSION['backup_notice']);
+        }
+        if (!empty($_SESSION['backup_error'])) {
+            $errors[] = (string) $_SESSION['backup_error'];
+            unset($_SESSION['backup_error']);
+        }
         if (is_post()) {
             verify_csrf();
             try {
                 if (isset($_POST['restore_backup'])) {
-                    BackupService::restoreUploaded($_FILES['backup_file'] ?? []);
+                    $result = BackupService::restoreUploaded($_FILES['backup_file'] ?? []);
+                    $_SESSION['backup_notice'] = $result['type'] === 'full'
+                        ? 'بکاپ کامل با موفقیت بازگردانی شد. تاریخ بکاپ: ' . $result['generated_at'] . '، نسخه مبدأ: ' . $result['source_app_version'] . '، تعداد فایل‌ها: ' . $result['file_count'] . '، Snapshot ایمنی: ' . $result['snapshot']
+                        : 'بکاپ SQL با موفقیت بازگردانی شد و فایل‌های بارگذاری‌شده تغییر نکردند. Snapshot ایمنی: ' . $result['snapshot'];
                     redirect(url('settings'));
                 }
                 $uploadedIcon = upload_image('app_icon_file', 'settings');
@@ -370,8 +383,15 @@ try {
 
     if ($page === 'backup') {
         require_admin();
-        if ($action === 'download') {
-            BackupService::download();
+        try {
+            if ($action === 'download_full') {
+                BackupService::downloadFull();
+            }
+            if ($action === 'download_sql' || $action === 'download') {
+                BackupService::downloadSql();
+            }
+        } catch (RuntimeException $e) {
+            $_SESSION['backup_error'] = $e->getMessage();
         }
         redirect(url('settings'));
     }
