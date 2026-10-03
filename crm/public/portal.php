@@ -17,6 +17,7 @@ require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/models/User.php';
 require __DIR__ . '/../app/services/SmsService.php';
 require __DIR__ . '/../app/services/BackupService.php';
+require __DIR__ . '/../app/services/LoginRateLimiter.php';
 
 BackupService::denyIfRestoreLocked();
 
@@ -178,18 +179,60 @@ if ($action === 'login') {
         verify_csrf();
         $email = trim($_POST['email'] ?? '');
         $password = (string) ($_POST['password'] ?? '');
-        $contact = Contact::findPortalByEmail($email);
-        if ($contact && !empty($contact['password_hash']) && password_verify($password, $contact['password_hash'])) {
-            session_regenerate_id(true);
-            $_SESSION['portal_contact'] = [
-                'id' => (int) $contact['id'],
-                'name' => $contact['contact_name'],
-                'customer_id' => (int) $contact['customer_id'],
-            ];
-            UsageReport::logLogin('contact', (int) $contact['id']);
-            redirect('portal.php');
+        $rateLimiter = new LoginRateLimiter();
+        $clientIp = LoginRateLimiter::clientIp();
+        $limit = ['blocked' => true, 'retry_after' => 0];
+        try {
+            $limit = $rateLimiter->check('portal', $email, $clientIp);
+        } catch (RuntimeException $error) {
+            error_log('CRM portal login rate limiter failed: ' . $error->getMessage());
+            http_response_code(503);
+            $errors[] = 'ورود موقتاً در دسترس نیست. لطفاً چند دقیقه دیگر دوباره تلاش کنید.';
         }
-        $errors[] = 'ایمیل یا رمز عبور اشتباه است یا دسترسی پرتال فعال نیست.';
+
+        if (!$errors && $limit['blocked']) {
+            http_response_code(429);
+            header('Retry-After: ' . $limit['retry_after']);
+            $errors[] = 'تعداد تلاش‌های ورود بیش از حد مجاز است. چند دقیقه دیگر دوباره تلاش کنید.';
+        }
+
+        if (!$errors) {
+            $contact = Contact::findPortalByEmail($email);
+            if ($contact && !empty($contact['password_hash']) && password_verify($password, $contact['password_hash'])) {
+                try {
+                    $rateLimiter->recordSuccess('portal', $email, $clientIp);
+                } catch (RuntimeException $error) {
+                    error_log('CRM portal login rate limiter failed: ' . $error->getMessage());
+                    http_response_code(503);
+                    $errors[] = 'ورود موقتاً در دسترس نیست. لطفاً چند دقیقه دیگر دوباره تلاش کنید.';
+                }
+                if (!$errors) {
+                    session_regenerate_id(true);
+                    $_SESSION['portal_contact'] = [
+                        'id' => (int) $contact['id'],
+                        'name' => $contact['contact_name'],
+                        'customer_id' => (int) $contact['customer_id'],
+                    ];
+                    UsageReport::logLogin('contact', (int) $contact['id']);
+                    redirect('portal.php');
+                }
+            } else {
+                try {
+                    $limit = $rateLimiter->recordFailure('portal', $email, $clientIp);
+                } catch (RuntimeException $error) {
+                    error_log('CRM portal login rate limiter failed: ' . $error->getMessage());
+                    http_response_code(503);
+                    $errors[] = 'ورود موقتاً در دسترس نیست. لطفاً چند دقیقه دیگر دوباره تلاش کنید.';
+                }
+                if (!$errors && $limit['blocked']) {
+                    http_response_code(429);
+                    header('Retry-After: ' . $limit['retry_after']);
+                    $errors[] = 'تعداد تلاش‌های ورود بیش از حد مجاز است. چند دقیقه دیگر دوباره تلاش کنید.';
+                } elseif (!$errors) {
+                    $errors[] = 'ایمیل یا رمز عبور اشتباه است یا دسترسی پرتال فعال نیست.';
+                }
+            }
+        }
     }
 
     $appSettings = Setting::all();

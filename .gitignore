@@ -20,6 +20,7 @@ crm/public/uploads/settings/*
 !crm/public/uploads/settings/.gitkeep
 crm/storage/activity-attachments/*
 crm/storage/announcement-attachments/*
+crm/storage/rate-limits/*
 
 # Local PHP CLI sessions
 sess_*
