@@ -8,16 +8,18 @@
 <?php if (!empty($errors)): ?><div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
 <?php if (!empty($notice)): ?><div class="alert alert-success"><?= e($notice) ?></div><?php endif; ?>
 <div class="card">
+    <h3><?= ($contract['contract_type'] ?? 'formal') === 'direct_sale' ? 'اطلاعات فروش' : 'اطلاعات قرارداد' ?></h3>
     <div class="detail-list">
-        <div><span>شماره قرارداد</span><?= e($contract['contract_number']) ?></div>
+        <div><span>نوع ثبت</span><?= e(Contract::typeLabel($contract['contract_type'] ?? 'formal')) ?></div>
+        <?php if (!empty($contract['contract_number'])): ?><div><span>شماره قرارداد</span><?= e($contract['contract_number']) ?></div><?php endif; ?>
         <div><span>مشتری</span><a href="<?= e(url('customers', ['action' => 'show', 'id' => $contract['customer_id']])) ?>"><?= e($contract['customer_name']) ?></a></div>
         <div><span>فرصت</span><?= !empty($contract['deal_id']) ? '<a href="' . e(url('deals', ['action' => 'show', 'id' => $contract['deal_id']])) . '">' . e($contract['deal_name']) . '</a>' : 'بدون فرصت' ?></div>
         <div><span>محصول / خدمت</span><?= e(product_label($contract['product'])) ?></div>
         <div><span>تعداد خودرو</span><?= e((string) $contract['vehicle_count']) ?></div>
-        <div><span>مبلغ قرارداد</span><?= e(format_money($contract['contract_amount'])) ?></div>
+        <div><span><?= ($contract['contract_type'] ?? 'formal') === 'direct_sale' ? 'مبلغ فروش' : 'مبلغ قرارداد' ?></span><?= e(format_money($contract['contract_amount'])) ?></div>
         <div><span>شروع</span><?= e(fa_date($contract['start_date'])) ?></div>
-        <div><span>پایان</span><?= e(fa_date($contract['end_date'])) ?></div>
-        <div><span>یادآوری تمدید</span><?= e(fa_date($contract['renewal_reminder_date'])) ?></div>
+        <?php if (!empty($contract['end_date'])): ?><div><span>پایان</span><?= e(fa_date($contract['end_date'])) ?></div><?php endif; ?>
+        <?php if (($contract['contract_type'] ?? 'formal') === 'formal' && !empty($contract['renewal_reminder_date'])): ?><div><span>یادآوری تمدید</span><?= e(fa_date($contract['renewal_reminder_date'])) ?></div><?php endif; ?>
         <div><span>وضعیت</span><span class="badge <?= e(badge_class($contract['status'])) ?>"><?= e(fa_label($contract['status'])) ?></span></div>
         <div><span>مسئول</span><?= e($contract['owner_name'] ?? '') ?></div>
     </div>
@@ -26,9 +28,9 @@
 
 <?php if (can_view_finance()): ?>
 <div class="card" style="margin-top:16px">
-    <h3>وضعیت مالی قرارداد</h3>
+    <h3><?= ($contract['contract_type'] ?? 'formal') === 'direct_sale' ? 'وضعیت مالی فروش' : 'وضعیت مالی قرارداد' ?></h3>
     <div class="stats-grid">
-        <div class="stat-card"><span>مبلغ قرارداد</span><strong><?= e(format_money($financialSummary['contract_amount'])) ?></strong></div>
+        <div class="stat-card"><span><?= ($contract['contract_type'] ?? 'formal') === 'direct_sale' ? 'مبلغ فروش' : 'مبلغ قرارداد' ?></span><strong><?= e(format_money($financialSummary['contract_amount'])) ?></strong></div>
         <div class="stat-card"><span>دریافتی</span><strong><?= e(format_money($financialSummary['received'])) ?></strong></div>
         <div class="stat-card"><span>مانده</span><strong><?= e(format_money($financialSummary['balance'])) ?></strong></div>
     </div>
@@ -46,12 +48,12 @@
             <td><?= e(fa_date($item['payment_date'])) ?></td><td><?= e(format_money($item['amount'])) ?></td><td><?= e(payment_method_label($item['payment_method'])) ?></td><td><?= e($item['reference_number'] ?? '') ?></td><td><?= e($item['created_by_name'] ?? 'کاربر حذف‌شده') ?></td><td><?= nl2br(e($item['notes'] ?? '')) ?></td>
             <?php if (can_manage_finance()): ?><td><span class="actions"><a class="btn btn-small btn-light" href="<?= e(url('contracts', ['action' => 'payment_edit', 'payment_id' => $item['id']])) ?>">ویرایش</a><form method="post" action="<?= e(url('contracts', ['action' => 'payment_delete'])) ?>" data-confirm="این دریافتی از محاسبات مالی حذف شود؟"><?= csrf_field() ?><input type="hidden" name="payment_id" value="<?= e((string) $item['id']) ?>"><button class="btn btn-small btn-danger">حذف</button></form></span></td><?php endif; ?>
         </tr><?php endforeach; ?></tbody>
-    </table><?php if (!$payments): ?><div class="empty">هنوز دریافتی‌ای برای این قرارداد ثبت نشده است.</div><?php endif; ?></div>
+    </table><?php if (!$payments): ?><div class="empty">هنوز دریافتی‌ای برای این رکورد ثبت نشده است.</div><?php endif; ?></div>
 </div>
 <?php endif; ?>
 
 <div class="card" style="margin-top:16px">
-    <h3>اسناد قرارداد</h3>
+    <h3><?= ($contract['contract_type'] ?? 'formal') === 'direct_sale' ? 'اسناد فروش' : 'اسناد قرارداد' ?></h3>
     <form method="post" enctype="multipart/form-data" action="<?= e(url('contracts', ['action' => 'document_upload', 'id' => $contract['id']])) ?>">
         <?= csrf_field() ?>
         <div class="grid grid-2">
@@ -100,14 +102,14 @@
             </table>
         </div>
     <?php else: ?>
-        <div class="empty">هنوز سندی برای این قرارداد ثبت نشده است.</div>
+        <div class="empty"><?= ($contract['contract_type'] ?? 'formal') === 'direct_sale' ? 'هنوز سندی برای این فروش ثبت نشده است.' : 'هنوز سندی برای این قرارداد ثبت نشده است.' ?></div>
     <?php endif; ?>
 </div>
 
 <div class="card" style="margin-top:16px">
-    <h3>فعالیت‌های مرتبط با قرارداد</h3>
+    <h3>فعالیت‌های مرتبط</h3>
     <?php foreach ($activities as $activity): ?>
         <p><strong><?= e(fa_label($activity['activity_type'])) ?></strong> <span class="badge <?= e(badge_class($activity['status'])) ?>"><?= e(fa_label($activity['status'])) ?></span><br><span class="muted"><?= e(fa_date($activity['next_followup_date'] ?: $activity['activity_date'])) ?> - <?= e($activity['summary']) ?></span></p>
     <?php endforeach; ?>
-    <?php if (!$activities): ?><div class="empty">فعالیتی برای این قرارداد ثبت نشده است.</div><?php endif; ?>
+    <?php if (!$activities): ?><div class="empty">فعالیتی برای این رکورد ثبت نشده است.</div><?php endif; ?>
 </div>

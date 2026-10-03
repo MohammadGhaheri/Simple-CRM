@@ -3,7 +3,7 @@
     <div class="actions">
         <a class="btn btn-primary" href="<?= e(url('activities', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">ثبت فعالیت</a>
         <a class="btn btn-light" href="<?= e(url('deals', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">فرصت جدید</a>
-        <a class="btn btn-light" href="<?= e(url('contracts', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">قرارداد جدید</a>
+        <a class="btn btn-light" href="<?= e(url('contracts', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">ثبت قرارداد / فروش</a>
         <a class="btn btn-light" href="<?= e(url('contacts', ['action' => 'create', 'customer_id' => $customer['id']])) ?>">مخاطب جدید</a>
         <a class="btn btn-light" href="<?= e(url('customers', ['action' => 'invite_contacts', 'id' => $customer['id']])) ?>">دعوتنامه مخاطب</a>
     </div>
@@ -49,11 +49,11 @@
         <?php if (!$deals): ?><div class="empty">فرصتی ثبت نشده است.</div><?php endif; ?>
     </div>
     <div class="card">
-        <h3>قراردادها</h3>
+        <h3>قراردادها و فروش‌ها</h3>
         <?php foreach ($contracts as $contract): ?>
-            <p><a href="<?= e(url('contracts', ['action' => 'show', 'id' => $contract['id']])) ?>"><strong><?= e($contract['contract_title']) ?></strong></a> <span class="badge <?= e(badge_class($contract['status'])) ?>"><?= e(fa_label($contract['status'])) ?></span><br><span class="muted"><?= e($contract['contract_number']) ?> - پایان: <?= e(fa_date($contract['end_date'])) ?> - <?= e(format_money($contract['contract_amount'])) ?></span></p>
+            <p><a href="<?= e(url('contracts', ['action' => 'show', 'id' => $contract['id']])) ?>"><strong><?= e($contract['contract_title']) ?></strong></a> <span class="badge badge-muted"><?= e(Contract::typeLabel($contract['contract_type'] ?? 'formal')) ?></span> <span class="badge <?= e(badge_class($contract['status'])) ?>"><?= e(fa_label($contract['status'])) ?></span><br><span class="muted"><?= e($contract['contract_number'] ?: '—') ?><?= !empty($contract['end_date']) ? ' - پایان: ' . e(fa_date($contract['end_date'])) : '' ?> - <?= e(format_money($contract['contract_amount'])) ?></span></p>
         <?php endforeach; ?>
-        <?php if (!$contracts): ?><div class="empty">قراردادی ثبت نشده است.</div><?php endif; ?>
+        <?php if (!$contracts): ?><div class="empty">قرارداد یا فروشی ثبت نشده است.</div><?php endif; ?>
     </div>
 </div>
 

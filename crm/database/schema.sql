@@ -313,7 +313,8 @@ CREATE TABLE deals (
 
 CREATE TABLE contracts (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  contract_number VARCHAR(80) NOT NULL,
+  contract_type VARCHAR(40) NOT NULL DEFAULT 'formal',
+  contract_number VARCHAR(80) NULL,
   contract_title VARCHAR(190) NOT NULL,
   customer_id INT UNSIGNED NOT NULL,
   deal_id INT UNSIGNED NULL,
@@ -321,7 +322,7 @@ CREATE TABLE contracts (
   vehicle_count INT UNSIGNED NOT NULL DEFAULT 0,
   contract_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
   start_date DATE NULL,
-  end_date DATE NOT NULL,
+  end_date DATE NULL,
   renewal_reminder_date DATE NULL,
   owner_user_id INT UNSIGNED NULL,
   status VARCHAR(80) NOT NULL DEFAULT 'Active',

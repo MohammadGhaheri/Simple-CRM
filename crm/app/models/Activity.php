@@ -303,7 +303,7 @@ class Activity
             return;
         }
 
-        if (!in_array(($contract['status'] ?? 'Active'), ['Active', 'Renewal Due'], true)) {
+        if (($contract['contract_type'] ?? 'formal') !== 'formal' || !in_array(($contract['status'] ?? 'Active'), ['Active', 'Renewal Due'], true)) {
             $stmt = db()->prepare("UPDATE activities SET status = 'Cancelled' WHERE contract_id = ? AND activity_type = 'Contract Renewal' AND status <> 'Done' AND deleted_at IS NULL");
             $stmt->execute([$contractId]);
             return;

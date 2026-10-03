@@ -1151,6 +1151,7 @@ try {
             $dealId = (int) ($_GET['deal_id'] ?? 0);
             $deal = $dealId > 0 ? Deal::find($dealId) : null;
             $contract = [
+                'contract_type' => 'formal',
                 'customer_id' => (int) ($deal['customer_id'] ?? ($_GET['customer_id'] ?? 0)),
                 'deal_id' => $dealId,
                 'product' => $deal['product'] ?? 'Other',
@@ -1161,7 +1162,7 @@ try {
             ];
             if (is_post()) {
                 verify_csrf();
-                $errors = required_fields($_POST, ['contract_number' => 'شماره قرارداد', 'contract_title' => 'عنوان قرارداد', 'customer_id' => 'مشتری', 'end_date' => 'تاریخ پایان']);
+                $errors = required_fields($_POST, ['contract_title' => 'عنوان ثبت', 'customer_id' => 'مشتری']);
                 if (!$errors) {
                     try {
                         $newId = Contract::create($_POST);
@@ -1172,7 +1173,7 @@ try {
                 }
                 $contract = $_POST;
             }
-            render('contracts/create', ['title' => 'قرارداد جدید', 'contract' => $contract, 'customers' => Customer::search(), 'deals' => Deal::search(), 'users' => $users, 'errors' => $errors]);
+            render('contracts/create', ['title' => 'ثبت قرارداد / فروش', 'contract' => $contract, 'customers' => Customer::search(), 'deals' => Deal::search(), 'users' => $users, 'errors' => $errors]);
             exit;
         }
         if ($action === 'edit') {
@@ -1182,7 +1183,7 @@ try {
             }
             if (is_post()) {
                 verify_csrf();
-                $errors = required_fields($_POST, ['contract_number' => 'شماره قرارداد', 'contract_title' => 'عنوان قرارداد', 'customer_id' => 'مشتری', 'end_date' => 'تاریخ پایان']);
+                $errors = required_fields($_POST, ['contract_title' => 'عنوان ثبت', 'customer_id' => 'مشتری']);
                 if (!$errors) {
                     try {
                         Contract::update($id, $_POST);
@@ -1193,7 +1194,7 @@ try {
                 }
                 $contract = array_merge($contract, $_POST);
             }
-            render('contracts/edit', ['title' => 'ویرایش قرارداد', 'contract' => $contract, 'customers' => Customer::search(), 'deals' => Deal::search(), 'users' => $users, 'errors' => $errors]);
+            render('contracts/edit', ['title' => 'ویرایش قرارداد / فروش', 'contract' => $contract, 'customers' => Customer::search(), 'deals' => Deal::search(), 'users' => $users, 'errors' => $errors]);
             exit;
         }
         if ($action === 'show') {
@@ -1219,7 +1220,7 @@ try {
             ]);
             exit;
         }
-        render('contracts/index', ['title' => 'قراردادها', 'contracts' => Contract::search($_GET), 'users' => $users, 'filters' => $_GET]);
+        render('contracts/index', ['title' => 'قراردادها و فروش‌ها', 'contracts' => Contract::search($_GET), 'users' => $users, 'filters' => $_GET]);
         exit;
     }
 

@@ -94,20 +94,20 @@ class ContractPayment
 
     public static function financialRows(array $filters = [], ?PDO $pdo = null): array
     {
-        $sql = 'SELECT ct.id, ct.contract_title, ct.contract_number, ct.status, ct.contract_amount, c.customer_name, u.name AS owner_name, COALESCE(SUM(cp.amount), 0.00) AS received_amount FROM contracts ct JOIN customers c ON c.id=ct.customer_id LEFT JOIN users u ON u.id=ct.owner_user_id LEFT JOIN contract_payments cp ON cp.contract_id=ct.id AND cp.deleted_at IS NULL WHERE ct.deleted_at IS NULL AND c.deleted_at IS NULL';
+        $sql = 'SELECT ct.id, ct.contract_type, ct.contract_title, ct.contract_number, ct.status, ct.contract_amount, c.customer_name, u.name AS owner_name, COALESCE(SUM(cp.amount), 0.00) AS received_amount FROM contracts ct JOIN customers c ON c.id=ct.customer_id LEFT JOIN users u ON u.id=ct.owner_user_id LEFT JOIN contract_payments cp ON cp.contract_id=ct.id AND cp.deleted_at IS NULL WHERE ct.deleted_at IS NULL AND c.deleted_at IS NULL';
         $params = [];
         if (!empty($filters['q'])) {
             $sql .= ' AND (c.customer_name LIKE ? OR ct.contract_title LIKE ? OR ct.contract_number LIKE ?)';
             $q = '%' . trim((string) $filters['q']) . '%';
             array_push($params, $q, $q, $q);
         }
-        foreach (['status', 'owner_user_id'] as $field) {
+        foreach (['status', 'owner_user_id', 'contract_type'] as $field) {
             if (!empty($filters[$field])) {
                 $sql .= " AND ct.$field = ?";
                 $params[] = $filters[$field];
             }
         }
-        $sql .= ' GROUP BY ct.id, ct.contract_title, ct.contract_number, ct.status, ct.contract_amount, c.customer_name, u.name ORDER BY ct.id DESC';
+        $sql .= ' GROUP BY ct.id, ct.contract_type, ct.contract_title, ct.contract_number, ct.status, ct.contract_amount, c.customer_name, u.name ORDER BY ct.id DESC';
         $stmt = ($pdo ?: db())->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll();

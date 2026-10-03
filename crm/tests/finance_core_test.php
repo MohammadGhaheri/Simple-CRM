@@ -77,7 +77,7 @@ try {
     $server->exec("CREATE DATABASE `$database` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo = new PDO(sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $config['host'], $config['port'] ?? 3306, $database), $config['username'], $config['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
     $pdo->exec("CREATE TABLE users (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(120), role ENUM('admin','sales','support','operations') NOT NULL DEFAULT 'sales') ENGINE=InnoDB");
-    $pdo->exec("CREATE TABLE contracts (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, contract_amount DECIMAL(18,2) NOT NULL, deleted_at DATETIME NULL) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE contracts (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, contract_type VARCHAR(40) NOT NULL DEFAULT 'formal', contract_amount DECIMAL(18,2) NOT NULL, deleted_at DATETIME NULL) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE app_settings (setting_key VARCHAR(80) PRIMARY KEY, setting_value TEXT NULL) ENGINE=InnoDB");
     foreach (array_filter(array_map('trim', explode(';', preg_replace('/^SET NAMES utf8mb4;\s*/', '', $migration)))) as $statement) {
         $pdo->exec($statement);
@@ -91,7 +91,7 @@ try {
     $foreignKeys = $pdo->query("SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=" . $pdo->quote($database) . " AND TABLE_NAME='contract_payments'")->fetchColumn();
     finance_expect((int) $foreignKeys === 4, 'Payment foreign keys were not created.');
     $pdo->exec("INSERT INTO users (id,name,role) VALUES (1,'Admin','admin')");
-    $pdo->exec("INSERT INTO contracts (id,contract_amount) VALUES (1,100000000.00),(2,10.00),(3,100.00)");
+    $pdo->exec("INSERT INTO contracts (id,contract_type,contract_amount) VALUES (1,'formal',100000000.00),(2,'direct_sale',10.00),(3,'direct_sale',100.00)");
     $first = ContractPayment::create(['contract_id' => 1, 'amount' => '30000000', 'payment_date' => '1405/07/11', 'payment_method' => 'Bank Transfer'], 1, $pdo);
     finance_expect((int) ContractPayment::find($first, $pdo)['created_by_user_id'] === 1, 'Creator audit failed.');
     finance_expect(ContractPayment::summaryForContract(1, $pdo)['balance'] === '70000000.00', 'Initial balance failed.');
@@ -114,6 +114,7 @@ try {
     finance_expect((int) $pdo->query("SELECT deleted_by_user_id FROM contract_payments WHERE id=$second")->fetchColumn() === 1, 'Delete actor audit failed.');
     finance_expect(ContractPayment::summaryForContract(1, $pdo)['balance'] === '70000000.00', 'Soft delete did not restore balance.');
     ContractPayment::create(['contract_id' => 3, 'amount' => '80.00', 'payment_date' => '1405/07/11', 'payment_method' => 'Cash'], 1, $pdo);
+    finance_expect(ContractPayment::summaryForContract(3, $pdo)['balance'] === '20.00', 'Direct-sale balance calculation failed.');
     Contract::assertAmountCoversPayments(3, '90.00', $pdo);
     Contract::assertAmountCoversPayments(3, '80.00', $pdo);
     try {

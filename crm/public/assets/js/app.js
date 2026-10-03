@@ -583,3 +583,27 @@ function createDatepicker() {
 if (document.querySelector('.date-input')) {
   createDatepicker();
 }
+
+document.querySelectorAll('[data-contract-type]').forEach(function (typeSelect) {
+  const form = typeSelect.closest('form');
+  if (!form) return;
+  const syncContractType = function () {
+    const formal = typeSelect.value === 'formal';
+    form.querySelectorAll('[data-contract-required]').forEach(function (input) { input.required = formal; });
+    form.querySelectorAll('[data-contract-required-label]').forEach(function (label) { label.classList.toggle('required', formal); });
+    form.querySelectorAll('[data-renewal-field]').forEach(function (field) {
+      field.hidden = !formal;
+      field.querySelectorAll('input, select, textarea').forEach(function (input) { input.disabled = !formal; });
+    });
+    const status = form.querySelector('[name="status"]');
+    if (status instanceof HTMLSelectElement) {
+      Array.from(status.options).forEach(function (option) {
+        option.hidden = !formal && option.dataset.formalStatus === '1';
+        option.disabled = !formal && option.dataset.formalStatus === '1';
+      });
+      if (!formal && !['Active', 'Cancelled'].includes(status.value)) status.value = 'Active';
+    }
+  };
+  typeSelect.addEventListener('change', syncContractType);
+  syncContractType();
+});
