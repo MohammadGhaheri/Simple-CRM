@@ -86,6 +86,11 @@ Proposal|پیشنهاد
 Minutes|صورتجلسه
 Correspondence|مکاتبات
 Other|سایر'),
+('options_payment_methods', 'Bank Transfer|واریز بانکی
+Cheque|چک
+Cash|نقدی
+POS|کارت‌خوان
+Other|سایر'),
 ('options_ticket_statuses', 'Open|باز
 In Progress|در حال بررسی
 Waiting Customer|در انتظار مشتری

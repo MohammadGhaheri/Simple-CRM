@@ -24,6 +24,32 @@
     <?php if ($contract['notes']): ?><p class="muted"><?= nl2br(e($contract['notes'])) ?></p><?php endif; ?>
 </div>
 
+<?php if (can_view_finance()): ?>
+<div class="card" style="margin-top:16px">
+    <h3>وضعیت مالی قرارداد</h3>
+    <div class="stats-grid">
+        <div class="stat-card"><span>مبلغ قرارداد</span><strong><?= e(format_money($financialSummary['contract_amount'])) ?></strong></div>
+        <div class="stat-card"><span>دریافتی</span><strong><?= e(format_money($financialSummary['received'])) ?></strong></div>
+        <div class="stat-card"><span>مانده</span><strong><?= e(format_money($financialSummary['balance'])) ?></strong></div>
+    </div>
+    <?php if (can_manage_finance()): ?>
+        <details style="margin-top:16px" <?= !empty($errors) ? 'open' : '' ?>><summary class="btn btn-primary">ثبت دریافتی</summary>
+            <form method="post" action="<?= e(url('contracts', ['action' => 'payment_create', 'id' => $contract['id']])) ?>" style="margin-top:16px">
+                <?= csrf_field() ?><?php $payment = $_POST; require __DIR__ . '/_payment_form.php'; ?>
+                <div class="form-actions"><button class="btn btn-primary">ثبت دریافتی</button></div>
+            </form>
+        </details>
+    <?php endif; ?>
+    <div class="table-wrap" style="margin-top:16px"><table>
+        <thead><tr><th>تاریخ</th><th>مبلغ</th><th>روش پرداخت</th><th>شماره پیگیری / مرجع</th><th>ثبت‌کننده</th><th>توضیحات</th><?php if (can_manage_finance()): ?><th>عملیات</th><?php endif; ?></tr></thead>
+        <tbody><?php foreach ($payments as $item): ?><tr>
+            <td><?= e(fa_date($item['payment_date'])) ?></td><td><?= e(format_money($item['amount'])) ?></td><td><?= e(payment_method_label($item['payment_method'])) ?></td><td><?= e($item['reference_number'] ?? '') ?></td><td><?= e($item['created_by_name'] ?? 'کاربر حذف‌شده') ?></td><td><?= nl2br(e($item['notes'] ?? '')) ?></td>
+            <?php if (can_manage_finance()): ?><td><span class="actions"><a class="btn btn-small btn-light" href="<?= e(url('contracts', ['action' => 'payment_edit', 'payment_id' => $item['id']])) ?>">ویرایش</a><form method="post" action="<?= e(url('contracts', ['action' => 'payment_delete'])) ?>" data-confirm="این دریافتی از محاسبات مالی حذف شود؟"><?= csrf_field() ?><input type="hidden" name="payment_id" value="<?= e((string) $item['id']) ?>"><button class="btn btn-small btn-danger">حذف</button></form></span></td><?php endif; ?>
+        </tr><?php endforeach; ?></tbody>
+    </table><?php if (!$payments): ?><div class="empty">هنوز دریافتی‌ای برای این قرارداد ثبت نشده است.</div><?php endif; ?></div>
+</div>
+<?php endif; ?>
+
 <div class="card" style="margin-top:16px">
     <h3>اسناد قرارداد</h3>
     <form method="post" enctype="multipart/form-data" action="<?= e(url('contracts', ['action' => 'document_upload', 'id' => $contract['id']])) ?>">

@@ -452,7 +452,91 @@ function format_money($value): string
             $unit = $configured;
         }
     }
-    return number_format((float) $value) . ' ' . $unit;
+    $decimal = normalize_money_decimal((string) $value, true, false);
+    [$integer, $fraction] = explode('.', $decimal);
+    $formatted = preg_replace('/\B(?=(\d{3})+(?!\d))/', ',', $integer) ?: $integer;
+    if ($fraction !== '00') {
+        $formatted .= '.' . rtrim($fraction, '0');
+    }
+    return $formatted . ' ' . $unit;
+}
+
+function normalize_money_decimal(string $value, bool $allowZero = true, bool $enforceDatabaseLimit = true): string
+{
+    $value = trim(normalize_digits($value));
+    $value = str_replace([',', '٬'], '', $value);
+    if (!preg_match('/^\d+(?:\.\d{1,2})?$/', $value)) {
+        throw new InvalidArgumentException('مبلغ واردشده معتبر نیست.');
+    }
+    [$integer, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+    $integer = ltrim($integer, '0');
+    $integer = $integer === '' ? '0' : $integer;
+    if ($enforceDatabaseLimit && strlen($integer) > 16) {
+        throw new InvalidArgumentException('مبلغ از محدوده مجاز بیشتر است.');
+    }
+    $decimal = $integer . '.' . str_pad($fraction, 2, '0');
+    if (!$allowZero && money_compare($decimal, '0.00') <= 0) {
+        throw new InvalidArgumentException('مبلغ دریافتی باید بیشتر از صفر باشد.');
+    }
+    return $decimal;
+}
+
+function money_minor(string $value): string
+{
+    return str_replace('.', '', normalize_money_decimal($value, true, false));
+}
+
+function money_compare(string $left, string $right): int
+{
+    $left = ltrim(money_minor($left), '0') ?: '0';
+    $right = ltrim(money_minor($right), '0') ?: '0';
+    return (strlen($left) <=> strlen($right)) ?: strcmp($left, $right);
+}
+
+function money_add(string $left, string $right): string
+{
+    $a = strrev(money_minor($left));
+    $b = strrev(money_minor($right));
+    $carry = 0;
+    $result = '';
+    for ($i = 0, $max = max(strlen($a), strlen($b)); $i < $max; $i++) {
+        $sum = (int) ($a[$i] ?? 0) + (int) ($b[$i] ?? 0) + $carry;
+        $result .= (string) ($sum % 10);
+        $carry = intdiv($sum, 10);
+    }
+    if ($carry) {
+        $result .= (string) $carry;
+    }
+    return money_from_minor(strrev($result));
+}
+
+function money_subtract(string $left, string $right): string
+{
+    if (money_compare($left, $right) < 0) {
+        throw new InvalidArgumentException('نتیجه محاسبه مالی نمی‌تواند منفی باشد.');
+    }
+    $a = strrev(money_minor($left));
+    $b = strrev(money_minor($right));
+    $borrow = 0;
+    $result = '';
+    for ($i = 0, $max = strlen($a); $i < $max; $i++) {
+        $digit = (int) $a[$i] - (int) ($b[$i] ?? 0) - $borrow;
+        if ($digit < 0) {
+            $digit += 10;
+            $borrow = 1;
+        } else {
+            $borrow = 0;
+        }
+        $result .= (string) $digit;
+    }
+    return money_from_minor(strrev(rtrim($result, '0')) ?: '0');
+}
+
+function money_from_minor(string $minor): string
+{
+    $minor = ltrim($minor, '0') ?: '0';
+    $minor = str_pad($minor, 3, '0', STR_PAD_LEFT);
+    return substr($minor, 0, -2) . '.' . substr($minor, -2);
 }
 
 function selected($actual, $expected): string
@@ -986,6 +1070,16 @@ function option_label(string $key, string $value): string
 {
     $pairs = option_pairs($key);
     return $pairs[$value] ?? fa_label($value);
+}
+
+function payment_method_options(): array
+{
+    return option_pairs('options_payment_methods');
+}
+
+function payment_method_label(string $value): string
+{
+    return option_label('options_payment_methods', $value);
 }
 
 function customer_type_options(): array

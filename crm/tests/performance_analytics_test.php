@@ -17,11 +17,12 @@ function expect(bool $condition, string $message): void
 }
 
 $roles = User::roles();
-expect(array_keys($roles) === ['admin', 'sales', 'support', 'operations'], 'All four internal roles must be available.');
+expect(array_keys($roles) === ['admin', 'sales', 'support', 'operations', 'finance'], 'All five internal roles must be available.');
 expect(User::validRole('admin') === 'admin', 'Admin role must remain valid.');
 expect(User::validRole('sales') === 'sales', 'Sales role must remain valid.');
 expect(User::validRole('support') === 'support', 'Support role must be valid.');
 expect(User::validRole('operations') === 'operations', 'Operations role must be valid.');
+expect(User::validRole('finance') === 'finance', 'Finance role must be valid.');
 expect(User::validRole('invalid-role') === 'sales', 'Invalid roles must safely fall back to sales.');
 
 expect(PerformanceAnalytics::activeSecondsForGap(0) === 0, 'Zero-second gap must not add active time.');

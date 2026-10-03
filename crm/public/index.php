@@ -13,6 +13,7 @@ require __DIR__ . '/../app/models/Customer.php';
 require __DIR__ . '/../app/models/Contact.php';
 require __DIR__ . '/../app/models/Deal.php';
 require __DIR__ . '/../app/models/Contract.php';
+require __DIR__ . '/../app/models/ContractPayment.php';
 require __DIR__ . '/../app/models/ContractDocument.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
@@ -183,6 +184,7 @@ try {
                     'options_activity_statuses' => trim($_POST['options_activity_statuses'] ?? ''),
                     'options_contract_statuses' => trim($_POST['options_contract_statuses'] ?? ''),
                     'options_contract_document_types' => trim($_POST['options_contract_document_types'] ?? ''),
+                    'options_payment_methods' => trim($_POST['options_payment_methods'] ?? ''),
                     'options_ticket_statuses' => trim($_POST['options_ticket_statuses'] ?? ''),
                     'options_ticket_priorities' => trim($_POST['options_ticket_priorities'] ?? ''),
                     'options_ticket_categories' => trim($_POST['options_ticket_categories'] ?? ''),
@@ -1011,6 +1013,58 @@ try {
     }
 
     if ($page === 'contracts') {
+        if ($action === 'payment_create' && is_post()) {
+            require_finance_manage();
+            verify_csrf();
+            try {
+                ContractPayment::create(array_merge($_POST, ['contract_id' => $id]), current_user_id());
+                redirect(url('contracts', ['action' => 'show', 'id' => $id, 'payment_saved' => 1]));
+            } catch (Throwable $e) {
+                $contract = Contract::find($id);
+                if (!$contract) {
+                    redirect(url('contracts'));
+                }
+                $errors[] = $e->getMessage();
+                render('contracts/show', [
+                    'title' => $contract['contract_title'], 'contract' => $contract,
+                    'activities' => Activity::byContract($id), 'documents' => ContractDocument::byContract($id),
+                    'documentTypes' => ContractDocument::documentTypes(), 'payments' => ContractPayment::byContract($id),
+                    'financialSummary' => ContractPayment::summaryForContract($id), 'errors' => $errors,
+                ]);
+                exit;
+            }
+        }
+        if ($action === 'payment_edit') {
+            require_finance_manage();
+            $payment = ContractPayment::find((int) ($_GET['payment_id'] ?? 0));
+            if (!$payment) {
+                http_response_code(404);
+                exit('دریافتی پیدا نشد.');
+            }
+            if (is_post()) {
+                verify_csrf();
+                try {
+                    ContractPayment::update((int) $payment['id'], $_POST, current_user_id());
+                    redirect(url('contracts', ['action' => 'show', 'id' => $payment['contract_id'], 'payment_saved' => 1]));
+                } catch (Throwable $e) {
+                    $errors[] = $e->getMessage();
+                    $payment = array_merge($payment, $_POST);
+                }
+            }
+            render('contracts/payment_edit', ['title' => 'ویرایش دریافتی', 'payment' => $payment, 'contract' => Contract::find((int) $payment['contract_id']), 'errors' => $errors]);
+            exit;
+        }
+        if ($action === 'payment_delete' && is_post()) {
+            require_finance_manage();
+            verify_csrf();
+            $payment = ContractPayment::find((int) ($_POST['payment_id'] ?? 0));
+            if (!$payment) {
+                http_response_code(404);
+                exit('دریافتی پیدا نشد.');
+            }
+            ContractPayment::softDelete((int) $payment['id'], current_user_id());
+            redirect(url('contracts', ['action' => 'show', 'id' => $payment['contract_id'], 'payment_deleted' => 1]));
+        }
         if ($action === 'document_download') {
             $document = ContractDocument::find((int) ($_GET['document_id'] ?? 0));
             $file = $document ? contract_document_path((string) $document['file_path']) : null;
@@ -1101,7 +1155,7 @@ try {
                 'deal_id' => $dealId,
                 'product' => $deal['product'] ?? 'Other',
                 'vehicle_count' => (int) ($deal['vehicle_count'] ?? 0),
-                'contract_amount' => (float) ($deal['estimated_amount'] ?? 0),
+                'contract_amount' => (string) ($deal['estimated_amount'] ?? '0.00'),
                 'owner_user_id' => (int) ($deal['owner_user_id'] ?? current_user_id()),
                 'status' => 'Active',
             ];
@@ -1109,8 +1163,12 @@ try {
                 verify_csrf();
                 $errors = required_fields($_POST, ['contract_number' => 'شماره قرارداد', 'contract_title' => 'عنوان قرارداد', 'customer_id' => 'مشتری', 'end_date' => 'تاریخ پایان']);
                 if (!$errors) {
-                    $newId = Contract::create($_POST);
-                    redirect(url('contracts', ['action' => 'show', 'id' => $newId]));
+                    try {
+                        $newId = Contract::create($_POST);
+                        redirect(url('contracts', ['action' => 'show', 'id' => $newId]));
+                    } catch (Throwable $e) {
+                        $errors[] = $e->getMessage();
+                    }
                 }
                 $contract = $_POST;
             }
@@ -1126,8 +1184,12 @@ try {
                 verify_csrf();
                 $errors = required_fields($_POST, ['contract_number' => 'شماره قرارداد', 'contract_title' => 'عنوان قرارداد', 'customer_id' => 'مشتری', 'end_date' => 'تاریخ پایان']);
                 if (!$errors) {
-                    Contract::update($id, $_POST);
-                    redirect(url('contracts', ['action' => 'show', 'id' => $id]));
+                    try {
+                        Contract::update($id, $_POST);
+                        redirect(url('contracts', ['action' => 'show', 'id' => $id]));
+                    } catch (Throwable $e) {
+                        $errors[] = $e->getMessage();
+                    }
                 }
                 $contract = array_merge($contract, $_POST);
             }
@@ -1148,11 +1210,26 @@ try {
                 'activities' => Activity::byContract($id),
                 'documents' => ContractDocument::byContract($id),
                 'documentTypes' => ContractDocument::documentTypes(),
-                'notice' => isset($_GET['document_uploaded']) ? 'سند قرارداد با موفقیت ثبت شد.' : (isset($_GET['document_deleted']) ? 'سند قرارداد از نمایش حذف شد.' : ''),
+                'payments' => can_view_finance() ? ContractPayment::byContract($id) : [],
+                'financialSummary' => can_view_finance() ? ContractPayment::summaryForContract($id) : null,
+                'notice' => isset($_GET['payment_saved']) ? 'دریافتی قرارداد با موفقیت ذخیره شد.'
+                    : (isset($_GET['payment_deleted']) ? 'دریافتی از محاسبات مالی حذف شد.'
+                    : (isset($_GET['document_uploaded']) ? 'سند قرارداد با موفقیت ثبت شد.'
+                    : (isset($_GET['document_deleted']) ? 'سند قرارداد از نمایش حذف شد.' : ''))),
             ]);
             exit;
         }
         render('contracts/index', ['title' => 'قراردادها', 'contracts' => Contract::search($_GET), 'users' => $users, 'filters' => $_GET]);
+        exit;
+    }
+
+    if ($page === 'finance') {
+        require_finance_view();
+        $rows = ContractPayment::financialRows($_GET);
+        render('finance/index', [
+            'title' => 'مالی', 'rows' => $rows, 'totals' => ContractPayment::totals(ContractPayment::financialRows()),
+            'users' => $users, 'filters' => $_GET,
+        ]);
         exit;
     }
 

@@ -759,6 +759,9 @@ class BackupService
         if (self::sqlDefinesTable($sqlPath, 'contract_documents')) {
             db()->query('SELECT 1 FROM `contract_documents` LIMIT 1');
         }
+        if (self::sqlDefinesTable($sqlPath, 'contract_payments')) {
+            db()->query('SELECT 1 FROM `contract_payments` LIMIT 1');
+        }
     }
 
     private static function sqlDefinesTable(string $path, string $table): bool

@@ -85,10 +85,27 @@ class Contract
 
     public static function update(int $id, array $data): void
     {
+        $newAmount = normalize_money_decimal((string) ($data['contract_amount'] ?? '0'), true);
         $sql = 'UPDATE contracts SET contract_number=:contract_number, contract_title=:contract_title, customer_id=:customer_id, deal_id=:deal_id, product=:product, vehicle_count=:vehicle_count, contract_amount=:contract_amount, start_date=:start_date, end_date=:end_date, renewal_reminder_date=:renewal_reminder_date, owner_user_id=:owner_user_id, status=:status, notes=:notes WHERE id=:id';
         $payload = self::payload($data);
         $payload['id'] = $id;
-        db()->prepare($sql)->execute($payload);
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $lock = $pdo->prepare('SELECT id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+            $lock->execute([$id]);
+            if (!$lock->fetchColumn()) {
+                throw new RuntimeException('قرارداد پیدا نشد.');
+            }
+            self::assertAmountCoversPayments($id, $newAmount, $pdo);
+            $pdo->prepare($sql)->execute($payload);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
         $contract = self::find($id);
         if ($contract) {
             Activity::createOrUpdateContractRenewal($contract);
@@ -121,6 +138,17 @@ class Contract
         return $statuses ?: ['Active', 'Renewal Due', 'Renewed', 'Expired', 'Cancelled'];
     }
 
+    public static function assertAmountCoversPayments(int $id, string $amount, ?PDO $pdo = null): void
+    {
+        if (!class_exists('ContractPayment')) {
+            return;
+        }
+        $received = ContractPayment::receivedForContract($id, $pdo ?: db());
+        if (money_compare(normalize_money_decimal($amount, true), $received) < 0) {
+            throw new DomainException('مبلغ قرارداد نمی‌تواند از مجموع دریافتی‌های ثبت‌شده کمتر باشد.');
+        }
+    }
+
     private static function payload(array $data): array
     {
         $endDate = db_date($data['end_date'] ?? null);
@@ -137,7 +165,7 @@ class Contract
             'deal_id' => !empty($data['deal_id']) ? (int) $data['deal_id'] : null,
             'product' => $data['product'] ?? 'Other',
             'vehicle_count' => (int) ($data['vehicle_count'] ?? 0),
-            'contract_amount' => (float) ($data['contract_amount'] ?? 0),
+            'contract_amount' => normalize_money_decimal((string) ($data['contract_amount'] ?? '0'), true),
             'start_date' => db_date($data['start_date'] ?? null),
             'end_date' => $endDate,
             'renewal_reminder_date' => $reminderDate,

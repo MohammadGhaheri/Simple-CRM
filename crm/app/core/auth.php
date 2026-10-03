@@ -44,6 +44,32 @@ function require_admin(): void
     }
 }
 
+function can_view_finance(): bool
+{
+    return in_array(current_user_role(), ['admin', 'finance', 'sales'], true);
+}
+
+function can_manage_finance(): bool
+{
+    return in_array(current_user_role(), ['admin', 'finance'], true);
+}
+
+function require_finance_view(): void
+{
+    if (!can_view_finance()) {
+        http_response_code(403);
+        exit('شما اجازه مشاهده بخش مالی را ندارید.');
+    }
+}
+
+function require_finance_manage(): void
+{
+    if (!can_manage_finance()) {
+        http_response_code(403);
+        exit('شما اجازه مدیریت اطلاعات مالی را ندارید.');
+    }
+}
+
 function logout_user(): void
 {
     $_SESSION = [];

@@ -57,6 +57,7 @@
         <div><label>وضعیت فعالیت</label><textarea name="options_activity_statuses"><?= e($settings['options_activity_statuses'] ?? '') ?></textarea></div>
         <div><label>وضعیت قرارداد</label><textarea name="options_contract_statuses"><?= e($settings['options_contract_statuses'] ?? '') ?></textarea></div>
         <div><label>نوع اسناد قرارداد</label><textarea name="options_contract_document_types"><?= e($settings['options_contract_document_types'] ?? '') ?></textarea></div>
+        <div><label>روش‌های دریافت قرارداد</label><textarea name="options_payment_methods"><?= e($settings['options_payment_methods'] ?? '') ?></textarea></div>
         <div><label>وضعیت تیکت</label><textarea name="options_ticket_statuses"><?= e($settings['options_ticket_statuses'] ?? '') ?></textarea></div>
         <div><label>اولویت تیکت</label><textarea name="options_ticket_priorities"><?= e($settings['options_ticket_priorities'] ?? '') ?></textarea></div>
         <div><label>دسته‌بندی تیکت</label><textarea name="options_ticket_categories"><?= e($settings['options_ticket_categories'] ?? '') ?></textarea></div>

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 class PerformanceReport
 {
-    public const ROLES = ['admin', 'sales', 'support', 'operations'];
+    public const ROLES = ['admin', 'sales', 'support', 'operations', 'finance'];
 
     public static function normalizeFilters(array $input, ?DateTimeImmutable $now = null): array
     {
