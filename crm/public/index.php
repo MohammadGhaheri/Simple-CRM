@@ -26,6 +26,7 @@ require __DIR__ . '/../app/models/PerformanceReport.php';
 require __DIR__ . '/../app/services/SmsService.php';
 require __DIR__ . '/../app/services/EmailService.php';
 require __DIR__ . '/../app/services/BackupService.php';
+require __DIR__ . '/../app/services/AutomatedBackupService.php';
 
 BackupService::denyIfRestoreLocked();
 
@@ -159,6 +160,7 @@ try {
                     redirect(url('settings'));
                 }
                 $uploadedIcon = upload_image('app_icon_file', 'settings');
+                $automatedBackupSettings = AutomatedBackupService::validateSettings($_POST);
                 Setting::saveMany([
                     'app_title' => trim($_POST['app_title'] ?? ''),
                     'app_subtitle' => trim($_POST['app_subtitle'] ?? ''),
@@ -172,6 +174,7 @@ try {
                     'customer_code_mode' => ($_POST['customer_code_mode'] ?? 'manual') === 'auto' ? 'auto' : 'manual',
                     'customer_code_format' => trim($_POST['customer_code_format'] ?? 'CUS-{YYYY}-{SEQ4}'),
                     'contract_renewal_reminder_days' => max(0, (int) ($_POST['contract_renewal_reminder_days'] ?? 30)),
+                    ...$automatedBackupSettings,
                     'options_customer_types' => trim($_POST['options_customer_types'] ?? ''),
                     'options_sales_statuses' => trim($_POST['options_sales_statuses'] ?? ''),
                     'options_products' => trim($_POST['options_products'] ?? ''),
@@ -233,7 +236,8 @@ try {
                 $settings = array_merge($settings, $_POST);
             }
         }
-        render('settings/index', ['title' => 'تنظیمات سامانه', 'settings' => $settings, 'users' => $users, 'errors' => $errors, 'notice' => $notice]);
+        $automatedBackupStatus = (new AutomatedBackupService())->status();
+        render('settings/index', ['title' => 'تنظیمات سامانه', 'settings' => $settings, 'users' => $users, 'errors' => $errors, 'notice' => $notice, 'automatedBackupStatus' => $automatedBackupStatus]);
         exit;
     }
 

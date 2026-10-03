@@ -145,6 +145,42 @@
         <p class="muted">Placeholderهای قابل استفاده: <code>{app_title}</code>، <code>{contact_name}</code>، <code>{customer_name}</code>، <code>{email}</code>، <code>{password}</code>، <code>{portal_url}</code></p>
     </div>
 
+    <h2 style="margin-top:22px">پشتیبان‌گیری خودکار</h2>
+    <p><label><input type="checkbox" name="backup_auto_enabled" value="1" <?= checked(($settings['backup_auto_enabled'] ?? '0') === '1') ?> style="width:auto"> فعال‌سازی بکاپ خودکار</label></p>
+    <div class="grid grid-2">
+        <div>
+            <label>نوع بکاپ</label>
+            <select name="backup_auto_type">
+                <option value="full" <?= selected($settings['backup_auto_type'] ?? 'full', 'full') ?>>کامل</option>
+                <option value="sql" <?= selected($settings['backup_auto_type'] ?? 'full', 'sql') ?>>فقط دیتابیس</option>
+            </select>
+        </div>
+        <div>
+            <label>فاصله اجرا</label>
+            <select name="backup_auto_interval_hours">
+                <option value="6" <?= selected($settings['backup_auto_interval_hours'] ?? '24', '6') ?>>هر ۶ ساعت</option>
+                <option value="12" <?= selected($settings['backup_auto_interval_hours'] ?? '24', '12') ?>>هر ۱۲ ساعت</option>
+                <option value="24" <?= selected($settings['backup_auto_interval_hours'] ?? '24', '24') ?>>روزانه</option>
+                <option value="168" <?= selected($settings['backup_auto_interval_hours'] ?? '24', '168') ?>>هفتگی</option>
+            </select>
+        </div>
+        <div><label>تعداد نسخه‌های قابل نگهداری</label><input type="number" min="1" max="100" name="backup_retention_count" value="<?= e($settings['backup_retention_count'] ?? '14') ?>"></div>
+        <div><label>حداکثر عمر نسخه‌ها به روز</label><input type="number" min="1" max="365" name="backup_retention_days" value="<?= e($settings['backup_retention_days'] ?? '30') ?>"></div>
+    </div>
+    <p class="muted">برای اجرای خودکار، Cron سرور باید فایل <code>crm/cron/backup.php</code> را به‌صورت دوره‌ای اجرا کند. پیشنهاد می‌شود Cron هر ساعت اجرا شود؛ خود سامانه موعد بکاپ را مدیریت می‌کند.</p>
+    <div class="system-version-note" style="margin-top:14px">
+        <?php if (empty($automatedBackupStatus['last_success_at'])): ?>
+            <span>وضعیت بکاپ خودکار</span><strong>هنوز بکاپ خودکاری ثبت نشده است.</strong>
+        <?php else: ?>
+            <span>آخرین بکاپ موفق: <?= e(fa_datetime(date('Y-m-d H:i:s', (int) $automatedBackupStatus['last_success_at']))) ?></span>
+            <strong><?= e(($automatedBackupStatus['last_success_type'] ?? '') === 'full' ? 'کامل' : 'فقط دیتابیس') ?> · <?= e($automatedBackupStatus['last_success_file'] ?? '') ?> · <?= e(format_file_size((int) ($automatedBackupStatus['last_success_size'] ?? 0))) ?></strong>
+            <small style="word-break:break-all">SHA-256: <?= e($automatedBackupStatus['last_success_sha256'] ?? '') ?></small>
+        <?php endif; ?>
+    </div>
+    <?php if ((int) ($automatedBackupStatus['last_failure_at'] ?? 0) > (int) ($automatedBackupStatus['last_success_at'] ?? 0)): ?>
+        <div class="alert alert-danger" style="margin-top:10px">آخرین تلاش برای تهیه بکاپ ناموفق بوده است.</div>
+    <?php endif; ?>
+
     <div class="form-actions">
         <button class="btn btn-primary">ذخیره تنظیمات</button>
         <button class="btn btn-light" name="send_test_email" value="1">ذخیره و ارسال ایمیل تست</button>

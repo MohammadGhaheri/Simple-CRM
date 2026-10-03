@@ -21,6 +21,7 @@ crm/public/uploads/settings/*
 crm/storage/activity-attachments/*
 crm/storage/announcement-attachments/*
 crm/storage/rate-limits/*
+crm/storage/automated-backups/*
 
 # Local PHP CLI sessions
 sess_*

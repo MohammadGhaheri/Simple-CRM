@@ -72,6 +72,8 @@ mkdir($base . '/source/sessions', 0700, true);
 file_put_contents($base . '/source/sessions/sess_test', 'live-session-data');
 mkdir($base . '/source/rate-limits', 0700, true);
 file_put_contents($base . '/source/rate-limits/state.json', '{"ephemeral":true}');
+mkdir($base . '/source/automated-backups', 0700, true);
+file_put_contents($base . '/source/automated-backups/auto.zip', 'ephemeral-backup');
 $sql = $base . '/database.sql';
 file_put_contents($sql, "-- Elm Simple CRM Backup\nCREATE TABLE app_settings (id INT);\nCREATE TABLE users (id INT);\nCREATE TABLE customers (id INT);\nCREATE TABLE contracts (id INT);\nCREATE TABLE tickets (id INT);\nCREATE TABLE contract_documents (id INT);\n");
 $archive = $base . '/full.zip';
@@ -85,6 +87,7 @@ backup_expect(!in_array('files/public/uploads/payload.php', array_column($valida
 backup_expect(!in_array('outside-source.txt', array_column($validated['files'], 'path'), true), 'Files outside managed roots must not be included.');
 backup_expect(!array_filter($validated['files'], static fn(array $file): bool => str_contains($file['path'], 'sessions')), 'Session files must not appear in the backup manifest.');
 backup_expect(!array_filter($validated['files'], static fn(array $file): bool => str_contains($file['path'], 'rate-limits')), 'Rate-limit state must not appear in the backup manifest.');
+backup_expect(!array_filter($validated['files'], static fn(array $file): bool => str_contains($file['path'], 'automated-backups')), 'Automated backups must not appear in the backup manifest.');
 foreach (['files/public/uploads/tickets/ticket.png', 'files/public/uploads/avatars/profile.jpg', 'files/public/uploads/settings/icon.png'] as $publicFile) {
     backup_expect(in_array($publicFile, array_column($validated['files'], 'path'), true), 'Public user upload missing: ' . $publicFile);
 }
@@ -97,6 +100,7 @@ backup_expect($zip->locateName('manifest.json') !== false && $zip->locateName('d
 for ($zipIndex = 0; $zipIndex < $zip->numFiles; $zipIndex++) {
     backup_expect(!str_contains((string) $zip->getNameIndex($zipIndex), 'sessions'), 'Session files must not appear in ZIP entries.');
     backup_expect(!str_contains((string) $zip->getNameIndex($zipIndex), 'rate-limits'), 'Rate-limit state must not appear in ZIP entries.');
+    backup_expect(!str_contains((string) $zip->getNameIndex($zipIndex), 'automated-backups'), 'Automated backups must not appear in ZIP entries.');
 }
 $zip->close();
 
@@ -243,6 +247,7 @@ backup_expect(!str_contains(substr($serviceSource, strpos($serviceSource, 'priva
 backup_expect(!str_contains(json_encode(BackupService::managedRoots(), JSON_THROW_ON_ERROR), 'restore-snapshots'), 'Safety snapshots must not be included in managed backup roots.');
 backup_expect(!str_contains(json_encode(BackupService::managedRoots(), JSON_THROW_ON_ERROR), 'sessions'), 'Runtime session files must not be included in managed backup roots.');
 backup_expect(!str_contains(json_encode(BackupService::managedRoots(), JSON_THROW_ON_ERROR), 'rate-limits'), 'Login rate-limit state must not be included in managed backup roots.');
+backup_expect(!str_contains(json_encode(BackupService::managedRoots(), JSON_THROW_ON_ERROR), 'automated-backups'), 'Automated backups must not be included in managed backup roots.');
 backup_expect(str_contains($controllerSource, 'require_admin()') && str_contains($controllerSource, 'verify_csrf()'), 'Backup/restore must remain admin and CSRF protected.');
 backup_expect(str_contains($controllerSource, 'downloadFull') && str_contains($controllerSource, 'downloadSql'), 'Both full and SQL downloads must remain available.');
 backup_expect(str_contains($controllerSource, 'BackupService::denyIfRestoreLocked()') && str_contains($portalSource, 'BackupService::denyIfRestoreLocked()'), 'Internal CRM and Portal must honor restore lock.');

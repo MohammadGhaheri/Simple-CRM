@@ -8,6 +8,11 @@ INSERT INTO users (id, name, email, password_hash, role, is_active) VALUES
 (1, 'مدیر سیستم', 'admin@simple-crm.local', '$2y$10$MA2Q2PucE9mu9SvnsuoY.e96PJM.qzV/LHTxwMuFRJHqHX.xAAE3S', 'admin', 1);
 
 INSERT INTO app_settings (setting_key, setting_value) VALUES
+('backup_auto_enabled', '0'),
+('backup_auto_type', 'full'),
+('backup_auto_interval_hours', '24'),
+('backup_retention_count', '14'),
+('backup_retention_days', '30'),
 ('app_title', 'Elm Simple CRM'),
 ('app_subtitle', 'مدیریت مشتریان، فرصت‌ها و پیگیری‌های فروش'),
 ('primary_color', '#155eef'),

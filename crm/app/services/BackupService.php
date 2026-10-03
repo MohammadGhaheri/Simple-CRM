@@ -52,6 +52,32 @@ class BackupService
         exit;
     }
 
+    public static function createSqlBackup(string $destination): array
+    {
+        try {
+            self::writeDatabaseDump($destination);
+            return self::validateSqlBackup($destination);
+        } catch (Throwable $error) {
+            if (is_file($destination)) {
+                @unlink($destination);
+            }
+            throw $error;
+        }
+    }
+
+    public static function validateSqlBackup(string $path): array
+    {
+        if (!is_file($path) || (int) filesize($path) <= 0) {
+            throw new RuntimeException('فایل بکاپ SQL خالی یا نامعتبر است.');
+        }
+        self::assertLegacySql($path);
+        $hash = hash_file('sha256', $path);
+        if (!is_string($hash) || strlen($hash) !== 64) {
+            throw new RuntimeException('محاسبه SHA-256 بکاپ SQL ناموفق بود.');
+        }
+        return ['size' => (int) filesize($path), 'sha256' => $hash];
+    }
+
     public static function download(): never
     {
         self::downloadSql();

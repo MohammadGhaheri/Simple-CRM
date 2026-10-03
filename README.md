@@ -280,6 +280,22 @@ Password: Contact@12345
 php /path/to/crm/cron/daily_summary.php
 ```
 
+### بکاپ خودکار با Cron
+
+پس از فعال‌سازی «پشتیبان‌گیری خودکار» در تنظیمات مدیر، فایل زیر را از طریق PHP CLI اجرا کنید:
+
+```text
+php /path/to/crm/cron/backup.php
+```
+
+پیشنهاد می‌شود Cron هر ساعت اجرا شود؛ خود سامانه براساس فاصله ۶ ساعته، ۱۲ ساعته، روزانه یا هفتگی تصمیم می‌گیرد که بکاپ جدید موعدش رسیده است یا نه:
+
+```cron
+0 * * * * php /path/to/crm/cron/backup.php
+```
+
+مسیر PHP CLI در Shared Hosting ممکن است متفاوت باشد. می‌توانید این فرمان را در بخش Cron Jobs کنترل‌پنل هاست ثبت کنید. اسکریپت Cron خارج از پوشه `public` قرار دارد و اجرای مستقیم آن از وب مجاز نیست.
+
 ## ساختار پروژه
 
 ```text
@@ -295,6 +311,7 @@ crm/
     services/
     views/
   cron/
+    backup.php
     daily_summary.php
   database/
     schema.sql
