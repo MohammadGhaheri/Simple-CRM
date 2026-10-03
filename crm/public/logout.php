@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-session_start();
+require __DIR__ . '/../app/core/session.php';
+start_public_app_session();
 
 require __DIR__ . '/../app/core/helpers.php';
 require __DIR__ . '/../app/core/auth.php';

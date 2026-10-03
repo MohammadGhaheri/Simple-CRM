@@ -8,7 +8,14 @@ declare(strict_types=1);
  * Email: mohammad.ghaheri@gmail.com
  */
 
-session_start();
+require __DIR__ . '/../app/core/session.php';
+try {
+    start_app_session();
+} catch (RuntimeException $error) {
+    error_log('CRM installer session bootstrap failed: ' . $error->getMessage());
+    http_response_code(500);
+    exit('راه‌اندازی نشست نصب ناموفق بود. لطفاً مجوز نوشتن پوشه storage را بررسی کنید.');
+}
 
 $rootPath = dirname(__DIR__);
 $configPath = $rootPath . '/app/config/database.php';
