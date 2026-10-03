@@ -219,23 +219,29 @@ class Activity
 
     public static function agendaForOwner(int $ownerId, string $bucket): array
     {
+        $bucketConditions = [
+            'overdue' => 'a.next_followup_date < CURDATE()',
+            'today' => 'a.next_followup_date = CURDATE()',
+            'upcoming' => 'a.next_followup_date > CURDATE() AND a.next_followup_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)',
+            'later' => 'a.next_followup_date > DATE_ADD(CURDATE(), INTERVAL 7 DAY)',
+            'nodate' => 'a.next_followup_date IS NULL',
+        ];
+        if (!isset($bucketConditions[$bucket])) {
+            throw new InvalidArgumentException('Invalid activity agenda bucket.');
+        }
+
         $where = [
             'a.owner_user_id = ?',
             "a.status <> 'Done'",
-            'a.next_followup_date IS NOT NULL',
             'a.deleted_at IS NULL',
             'c.deleted_at IS NULL',
+            $bucketConditions[$bucket],
         ];
         $params = [$ownerId];
 
-        if ($bucket === 'overdue') {
-            $where[] = 'a.next_followup_date < CURDATE()';
-        } elseif ($bucket === 'today') {
-            $where[] = 'a.next_followup_date = CURDATE()';
-        } elseif ($bucket === 'upcoming') {
-            $where[] = 'a.next_followup_date > CURDATE()';
-            $where[] = 'a.next_followup_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)';
-        }
+        $orderBy = $bucket === 'nodate'
+            ? 'a.activity_date DESC, a.id DESC'
+            : 'a.next_followup_date ASC, a.id ASC';
 
         $sql = 'SELECT a.*, c.customer_name, d.deal_name, ct.contract_title
                 FROM activities a
@@ -243,7 +249,7 @@ class Activity
                 LEFT JOIN deals d ON d.id = a.deal_id
                 LEFT JOIN contracts ct ON ct.id = a.contract_id
                 WHERE ' . implode(' AND ', $where) . '
-                ORDER BY a.next_followup_date ASC, a.id ASC';
+                ORDER BY ' . $orderBy;
         $stmt = db()->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
@@ -253,13 +259,17 @@ class Activity
     {
         $stmt = db()->prepare("
             SELECT
-                SUM(CASE WHEN next_followup_date < CURDATE() AND status <> 'Done' THEN 1 ELSE 0 END) AS overdue_count,
-                SUM(CASE WHEN next_followup_date = CURDATE() AND status <> 'Done' THEN 1 ELSE 0 END) AS today_count,
-                SUM(CASE WHEN next_followup_date > CURDATE() AND next_followup_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND status <> 'Done' THEN 1 ELSE 0 END) AS upcoming_count,
-                SUM(CASE WHEN status = 'Open' THEN 1 ELSE 0 END) AS open_count
-            FROM activities
-            WHERE owner_user_id = ?
-              AND deleted_at IS NULL
+                SUM(CASE WHEN a.next_followup_date < CURDATE() AND a.status <> 'Done' THEN 1 ELSE 0 END) AS overdue_count,
+                SUM(CASE WHEN a.next_followup_date = CURDATE() AND a.status <> 'Done' THEN 1 ELSE 0 END) AS today_count,
+                SUM(CASE WHEN a.next_followup_date > CURDATE() AND a.next_followup_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND a.status <> 'Done' THEN 1 ELSE 0 END) AS upcoming_count,
+                SUM(CASE WHEN a.next_followup_date > DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND a.status <> 'Done' THEN 1 ELSE 0 END) AS later_count,
+                SUM(CASE WHEN a.next_followup_date IS NULL AND a.status <> 'Done' THEN 1 ELSE 0 END) AS nodate_count,
+                SUM(CASE WHEN a.status = 'Open' THEN 1 ELSE 0 END) AS open_count
+            FROM activities a
+            JOIN customers c ON c.id = a.customer_id
+            WHERE a.owner_user_id = ?
+              AND a.deleted_at IS NULL
+              AND c.deleted_at IS NULL
         ");
         $stmt->execute([$ownerId]);
         $row = $stmt->fetch() ?: [];
@@ -267,6 +277,8 @@ class Activity
             'overdue' => (int) ($row['overdue_count'] ?? 0),
             'today' => (int) ($row['today_count'] ?? 0),
             'upcoming' => (int) ($row['upcoming_count'] ?? 0),
+            'later' => (int) ($row['later_count'] ?? 0),
+            'nodate' => (int) ($row['nodate_count'] ?? 0),
             'open' => (int) ($row['open_count'] ?? 0),
         ];
     }

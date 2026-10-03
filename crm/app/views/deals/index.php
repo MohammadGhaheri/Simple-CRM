@@ -27,7 +27,9 @@
                 <td class="actions">
                     <a class="btn btn-small btn-light" href="<?= e(url('deals', ['action' => 'show', 'id' => $deal['id']])) ?>">نمایش</a>
                     <a class="btn btn-small btn-light" href="<?= e(url('deals', ['action' => 'edit', 'id' => $deal['id']])) ?>">ویرایش</a>
-                    <form method="post" action="<?= e(url('deals', ['action' => 'delete', 'id' => $deal['id']])) ?>" data-confirm="این فرصت حذف شود؟"><?= csrf_field() ?><button class="btn btn-small btn-danger">حذف</button></form>
+                    <?php if (is_admin()): ?>
+                        <form method="post" action="<?= e(url('deals', ['action' => 'delete', 'id' => $deal['id']])) ?>" data-confirm="این فرصت حذف شود؟"><?= csrf_field() ?><button class="btn btn-small btn-danger">حذف</button></form>
+                    <?php endif; ?>
                 </td>
             </tr>
         <?php endforeach; ?>

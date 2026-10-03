@@ -503,6 +503,8 @@ try {
             'overdueActivities' => Activity::agendaForOwner(current_user_id(), 'overdue'),
             'todayActivities' => Activity::agendaForOwner(current_user_id(), 'today'),
             'upcomingActivities' => Activity::agendaForOwner(current_user_id(), 'upcoming'),
+            'laterActivities' => Activity::agendaForOwner(current_user_id(), 'later'),
+            'noDateActivities' => Activity::agendaForOwner(current_user_id(), 'nodate'),
         ]);
         exit;
     }
@@ -954,6 +956,7 @@ try {
 
     if ($page === 'deals') {
         if ($action === 'delete' && is_post()) {
+            require_admin();
             delete_action(fn() => Deal::delete($id), url('deals'));
         }
         if ($action === 'create') {
@@ -1082,6 +1085,7 @@ try {
             exit;
         }
         if ($action === 'delete' && is_post()) {
+            require_admin();
             delete_action(fn() => Contract::delete($id), url('contracts'));
         }
         if ($action === 'create') {

@@ -7,6 +7,8 @@
     <div class="card stat"><span>عقب‌افتاده</span><strong><?= e((string) $counts['overdue']) ?></strong></div>
     <div class="card stat"><span>امروز</span><strong><?= e((string) $counts['today']) ?></strong></div>
     <div class="card stat"><span>۷ روز آینده</span><strong><?= e((string) $counts['upcoming']) ?></strong></div>
+    <div class="card stat"><span>بعداً</span><strong><?= e((string) $counts['later']) ?></strong></div>
+    <div class="card stat"><span>بدون تاریخ پیگیری</span><strong><?= e((string) $counts['nodate']) ?></strong></div>
     <div class="card stat"><span>فعالیت‌های باز</span><strong><?= e((string) $counts['open']) ?></strong></div>
 </div>
 
@@ -30,7 +32,7 @@ function render_agenda_items(array $activities, string $type): void
                         <span> | قرارداد: <a href="<?= e(url('contracts', ['action' => 'show', 'id' => $activity['contract_id']])) ?>"><?= e($activity['contract_title']) ?></a></span>
                     <?php endif; ?>
                     <br>
-                    <span>موعد پیگیری: <?= e(fa_date($activity['next_followup_date'])) ?></span>
+                    <span>موعد پیگیری: <?= !empty($activity['next_followup_date']) ? e(fa_date($activity['next_followup_date'])) : 'بدون تاریخ' ?></span>
                     <?php if (!empty($activity['next_action'])): ?>
                         <br><span>اقدام بعدی: <?= e($activity['next_action']) ?></span>
                     <?php endif; ?>
@@ -75,5 +77,27 @@ function render_agenda_items(array $activities, string $type): void
     <div class="task-list">
         <?php render_agenda_items($upcomingActivities, 'upcoming'); ?>
         <?php if (!$upcomingActivities): ?><div class="card empty">پیگیری برنامه‌ریزی‌شده‌ای برای ۷ روز آینده وجود ندارد.</div><?php endif; ?>
+    </div>
+</section>
+
+<section class="agenda-section">
+    <div class="agenda-header">
+        <div><h2>بعداً</h2><p class="muted">پیگیری‌های برنامه‌ریزی‌شده بعد از ۷ روز آینده</p></div>
+        <span class="badge badge-muted"><?= e((string) count($laterActivities)) ?></span>
+    </div>
+    <div class="task-list">
+        <?php render_agenda_items($laterActivities, 'later'); ?>
+        <?php if (!$laterActivities): ?><div class="card empty">پیگیری دورتری برای شما برنامه‌ریزی نشده است.</div><?php endif; ?>
+    </div>
+</section>
+
+<section class="agenda-section">
+    <div class="agenda-header">
+        <div><h2>بدون تاریخ پیگیری</h2><p class="muted">فعالیت‌های باز که هنوز تاریخ پیگیری بعدی ندارند</p></div>
+        <span class="badge badge-muted"><?= e((string) count($noDateActivities)) ?></span>
+    </div>
+    <div class="task-list">
+        <?php render_agenda_items($noDateActivities, 'nodate'); ?>
+        <?php if (!$noDateActivities): ?><div class="card empty">فعالیت بازی بدون تاریخ پیگیری وجود ندارد.</div><?php endif; ?>
     </div>
 </section>

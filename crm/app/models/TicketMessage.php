@@ -98,7 +98,8 @@ class TicketMessage
     {
         $sql = 'INSERT INTO ticket_messages (ticket_id, sender_type, sender_contact_id, sender_user_id, message, attachment_path, attachment_name, attachment_mime, attachment_size)
                 VALUES (:ticket_id, :sender_type, :sender_contact_id, :sender_user_id, :message, :attachment_path, :attachment_name, :attachment_mime, :attachment_size)';
-        db()->prepare($sql)->execute([
+        $pdo = db();
+        $pdo->prepare($sql)->execute([
             'ticket_id' => (int) $data['ticket_id'],
             'sender_type' => $data['sender_type'],
             'sender_contact_id' => !empty($data['sender_contact_id']) ? (int) $data['sender_contact_id'] : null,
@@ -109,8 +110,9 @@ class TicketMessage
             'attachment_mime' => $data['attachment_mime'] ?: null,
             'attachment_size' => !empty($data['attachment_size']) ? (int) $data['attachment_size'] : null,
         ]);
+        $messageId = (int) $pdo->lastInsertId();
 
-        db()->prepare('UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([(int) $data['ticket_id']]);
-        return (int) db()->lastInsertId();
+        $pdo->prepare('UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([(int) $data['ticket_id']]);
+        return $messageId;
     }
 }
