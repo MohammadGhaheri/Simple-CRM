@@ -41,6 +41,8 @@ function item_sql_expect_rejection(callable $action, string $error): void
 function apply_item_migration(PDO $pdo, string $path): void
 {
     $source = (string) file_get_contents($path);
+    // Remove full-line comments before splitting statements; comments may contain semicolons.
+    $source = preg_replace('/^\\s*--[^\\r\\n]*$/m', '', $source);
     foreach (array_filter(array_map('trim', explode(';', $source))) as $statement) {
         // MariaDB accepts SQL comments preceding the CREATE TABLE statement.
         $pdo->exec($statement);
