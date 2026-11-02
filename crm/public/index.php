@@ -15,6 +15,9 @@ require __DIR__ . '/../app/models/Deal.php';
 require __DIR__ . '/../app/models/Contract.php';
 require __DIR__ . '/../app/models/ContractPayment.php';
 require __DIR__ . '/../app/models/ContractDocument.php';
+require __DIR__ . '/../app/models/ContractItem.php';
+require __DIR__ . '/../app/models/ContractInvoiceRef.php';
+require __DIR__ . '/../app/models/ContractSaleService.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/TicketMessage.php';
@@ -1013,6 +1016,72 @@ try {
     }
 
     if ($page === 'contracts') {
+        $itemActions = [
+            'item_add' => 'item_saved',
+            'item_amend' => 'item_amended',
+            'invoice_add' => 'invoice_saved',
+            'invoice_allocate' => 'invoice_allocated',
+            'invoice_reverse' => 'invoice_reversed',
+        ];
+        if (isset($itemActions[$action])) {
+            if (!is_post()) {
+                http_response_code(405);
+                exit('Method not allowed.');
+            }
+            verify_csrf();
+            // Authorization precedes looking up or mutating any item/invoice ID.
+            $role = current_user_role();
+            if (!in_array($role, ['admin', 'sales'], true)) {
+                http_response_code(403);
+                exit('شما اجازه مدیریت اقلام فروش را ندارید.');
+            }
+            $parentContract = Contract::find($id);
+            if (!$parentContract || ($role === 'sales' && (int) $parentContract['owner_user_id'] !== current_user_id())) {
+                http_response_code(404);
+                exit('قرارداد مجاز پیدا نشد.');
+            }
+            try {
+                if ($action === 'item_add') {
+                    ContractItem::add(array_merge($_POST, ['contract_id' => $id]));
+                } elseif ($action === 'item_amend') {
+                    ContractItem::amendQuantity(
+                        $id,
+                        (int) ($_POST['item_id'] ?? 0),
+                        (int) ($_POST['new_quantity'] ?? 0),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
+                } elseif ($action === 'invoice_add') {
+                    ContractInvoiceRef::create(
+                        $id,
+                        (string) ($_POST['invoice_number'] ?? ''),
+                        trim((string) ($_POST['invoice_date'] ?? ''))
+                    );
+                } elseif ($action === 'invoice_allocate') {
+                    ContractInvoiceRef::allocate(
+                        $id,
+                        (int) ($_POST['invoice_ref_id'] ?? 0),
+                        (int) ($_POST['contract_item_id'] ?? 0),
+                        (int) ($_POST['invoiced_quantity'] ?? 0)
+                    );
+                } else {
+                    ContractInvoiceRef::reverseAllocation(
+                        $id,
+                        (int) ($_POST['allocation_id'] ?? 0),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
+                }
+                redirect(url('contracts', [
+                    'action' => 'show', 'id' => $id, $itemActions[$action] => 1,
+                ]));
+            } catch (PDOException $error) {
+                $_SESSION['contract_items_error'] = 'ثبت اطلاعات به دلیل خطا یا تکراری‌بودن اطلاعات انجام نشد.';
+            } catch (DomainException | InvalidArgumentException | RuntimeException $error) {
+                $_SESSION['contract_items_error'] = $error->getMessage();
+            }
+            redirect(url('contracts', ['action' => 'show', 'id' => $id]));
+        }
         if ($action === 'payment_create' && is_post()) {
             require_finance_manage();
             verify_csrf();
@@ -1148,6 +1217,10 @@ try {
             delete_action(fn() => Contract::delete($id), url('contracts'));
         }
         if ($action === 'create') {
+            if (!in_array(current_user_role(), ['admin', 'sales'], true)) {
+                http_response_code(403);
+                exit('شما اجازه ثبت قرارداد یا فروش را ندارید.');
+            }
             $dealId = (int) ($_GET['deal_id'] ?? 0);
             $deal = $dealId > 0 ? Deal::find($dealId) : null;
             $contract = [
@@ -1163,9 +1236,30 @@ try {
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['contract_title' => 'عنوان ثبت', 'customer_id' => 'مشتری']);
+                $customerId = (int) ($_POST['customer_id'] ?? 0);
+                $selectedCustomer = $customerId > 0 ? Customer::find($customerId) : null;
+                if (!$selectedCustomer || (current_user_role() === 'sales'
+                    && (int) ($selectedCustomer['owner_user_id'] ?? 0) !== current_user_id())) {
+                    $errors[] = 'مشتری انتخاب‌شده مجاز یا معتبر نیست.';
+                }
+                $relatedDealId = (int) ($_POST['deal_id'] ?? 0);
+                if ($relatedDealId > 0) {
+                    $relatedDeal = Deal::find($relatedDealId);
+                    if (!$relatedDeal || (int) $relatedDeal['customer_id'] !== $customerId
+                        || (current_user_role() === 'sales'
+                            && (int) $relatedDeal['owner_user_id'] !== current_user_id())) {
+                        $errors[] = 'فرصت فروش به این مشتری یا کاربر تعلق ندارد.';
+                    }
+                }
+                if (current_user_role() === 'sales') {
+                    $_POST['owner_user_id'] = current_user_id();
+                }
                 if (!$errors) {
                     try {
-                        $newId = Contract::create($_POST);
+                        if (isset($_POST['items']) && !is_array($_POST['items'])) {
+                            throw new InvalidArgumentException('قالب اقلام قرارداد معتبر نیست.');
+                        }
+                        $newId = ContractSaleService::create($_POST, $_POST['items'] ?? []);
                         redirect(url('contracts', ['action' => 'show', 'id' => $newId]));
                     } catch (Throwable $e) {
                         $errors[] = $e->getMessage();
