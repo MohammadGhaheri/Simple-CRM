@@ -138,6 +138,31 @@ try {
         'Contract can be reduced below line-item total.'
     );
     item_sql_expect((int) $pdo->query('SELECT COUNT(*) FROM contract_items')->fetchColumn() === 2, 'Unexpected item records.');
+    // Race two independent workers allocating 2 units each from one 3-unit item.
+    // Only one may succeed, even with simultaneous requests.
+    $raceItem = ContractItem::add([
+        'contract_id' => 2, 'item_type' => 'device',
+        'item_title' => 'Parallel allocation test device',
+        'quantity' => 3, 'unit_amount' => '10.00',
+    ]);
+    $raceInvoice2 = ContractInvoiceRef::create(2, 'INV-RACE-2', '2026-11-02');
+    $workerFile = __DIR__ . '/contract_invoice_allocation_worker.php';
+    $descriptors = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $processA = proc_open([PHP_BINARY, $workerFile, '2', (string) $invoiceOther, (string) $raceItem, '2'], $descriptors, $pipesA);
+    $processB = proc_open([PHP_BINARY, $workerFile, '2', (string) $raceInvoice2, (string) $raceItem, '2'], $descriptors, $pipesB);
+    item_sql_expect(is_resource($processA) && is_resource($processB), 'Concurrency workers did not start.');
+    foreach ([$pipesA, $pipesB] as $pipes) {
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+    }
+    $workerOutcomes = [proc_close($processA), proc_close($processB)];
+    sort($workerOutcomes);
+    item_sql_expect($workerOutcomes === [0, 2], 'Concurrent allocation must allow only one successful writer.');
+    $allocatedQuantity = $pdo->prepare('SELECT COALESCE(SUM(invoiced_quantity),0)
+        FROM contract_invoice_lines WHERE contract_id = ? AND contract_item_id = ?');
+    $allocatedQuantity->execute([2, $raceItem]);
+    item_sql_expect((int) $allocatedQuantity->fetchColumn() === 2, 'Concurrent requests exceeded commitment.');
+
     echo "Contract items MariaDB integration tests passed.\n";
 } finally {
     if (is_file($configPath)) {
