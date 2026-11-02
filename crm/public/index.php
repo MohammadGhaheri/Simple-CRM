@@ -24,6 +24,7 @@ require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/models/PerformanceAnalytics.php';
 require __DIR__ . '/../app/models/PerformanceReport.php';
+require __DIR__ . '/../app/models/RoleDashboard.php';
 require __DIR__ . '/../app/services/SmsService.php';
 require __DIR__ . '/../app/services/EmailService.php';
 require __DIR__ . '/../app/services/BackupService.php';
@@ -517,6 +518,14 @@ try {
     }
 
     if ($page === 'dashboard') {
+        if (!is_admin()) {
+            $dashboard = RoleDashboard::build(current_user_role(), current_user_id());
+            render('dashboard/role', [
+                'title' => $dashboard['title'],
+                'dashboard' => $dashboard,
+            ]);
+            exit;
+        }
         $stats = [
             'customers' => (int) db()->query('SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL')->fetchColumn(),
             'open_deals' => (int) db()->query("SELECT COUNT(*) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage NOT IN ('Won','Lost') AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
