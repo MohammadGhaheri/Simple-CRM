@@ -79,7 +79,7 @@ class ContractInvoiceRef
                 throw new RuntimeException('قلم فروش به این قرارداد تعلق ندارد.');
             }
             $stmt = $pdo->prepare('SELECT COALESCE(SUM(invoiced_quantity),0) FROM contract_invoice_lines
-                WHERE contract_id = ? AND contract_item_id = ?');
+                WHERE contract_id = ? AND contract_item_id = ? AND reversed_at IS NULL');
             $stmt->execute([$contractId, $itemId]);
             $allocated = (int) $stmt->fetchColumn();
             if ($allocated + $quantity > (int) $committed) {
@@ -92,6 +92,44 @@ class ContractInvoiceRef
             $id = (int) $pdo->lastInsertId();
             $pdo->commit();
             return $id;
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $error;
+        }
+    }
+
+    /**
+     * Reverses an invoice allocation without removing its audit record.
+     * A reversed allocation no longer counts toward invoiced quantity.
+     */
+    public static function reverseAllocation(int $contractId, int $allocationId, string $reason, int $actorId): void
+    {
+        $reason = trim($reason);
+        if ($contractId <= 0 || $allocationId <= 0 || $actorId <= 0
+            || $reason === '' || mb_strlen($reason) > 500) {
+            throw new InvalidArgumentException('شناسه یا دلیل ابطال تخصیص معتبر نیست.');
+        }
+
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            self::lockContract($pdo, $contractId);
+            $stmt = $pdo->prepare('SELECT id FROM contract_invoice_lines
+                WHERE id = ? AND contract_id = ? AND reversed_at IS NULL FOR UPDATE');
+            $stmt->execute([$allocationId, $contractId]);
+            if (!$stmt->fetchColumn()) {
+                throw new RuntimeException('تخصیص فعال متعلق به این قرارداد پیدا نشد.');
+            }
+            $stmt = $pdo->prepare('UPDATE contract_invoice_lines
+                SET reversed_at = CURRENT_TIMESTAMP, reversed_by_user_id = ?, reversal_reason = ?
+                WHERE id = ? AND contract_id = ? AND reversed_at IS NULL');
+            $stmt->execute([$actorId, $reason, $allocationId, $contractId]);
+            if ($stmt->rowCount() !== 1) {
+                throw new RuntimeException('تخصیص پیش‌تر تغییر کرده است.');
+            }
+            $pdo->commit();
         } catch (Throwable $error) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
