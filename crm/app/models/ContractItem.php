@@ -159,7 +159,7 @@ class ContractItem
             if ($oldQuantity === $newQuantity) {
                 throw new InvalidArgumentException('تعداد تغییری نکرده است.');
             }
-            $assigned = $pdo->prepare('SELECT COALESCE(SUM(invoiced_quantity),0) FROM contract_invoice_lines WHERE contract_id = ? AND contract_item_id = ?');
+            $assigned = $pdo->prepare('SELECT COALESCE(SUM(invoiced_quantity),0) FROM contract_invoice_lines WHERE contract_id = ? AND contract_item_id = ? AND reversed_at IS NULL');
             $assigned->execute([$contractId, $itemId]);
             if ($newQuantity < (int) $assigned->fetchColumn()) {
                 throw new DomainException('تعداد جدید کمتر از تعداد تخصیص‌یافته به فاکتورها است.');
