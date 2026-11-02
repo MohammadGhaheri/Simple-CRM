@@ -1,10 +1,11 @@
 # Contract items and invoice references — staged delivery
 
-This feature branch adds **editable quantity amendments and external invoice reference workflows** to existing formal contracts and direct sales.
+This feature branch adds **atomic sale creation with multiple line items, editable quantity amendments, and external invoice reference allocation/reversal workflows** to existing formal contracts and direct sales.
 
 ## Availability and security
 
-- After creating a contract, open its detail page to add multiple item lines, add invoice references, allocate quantities and amend quantities. This avoids mutating the original create/edit contract flow.
+- The contract **create** form supports entering multiple item lines at once. The contract and all entered lines commit together; malformed data, exceeding the amount ceiling, or a DB insertion error rolls back the entire sale.
+- Contract details support adding more items, referencing invoices, allocating invoice quantities, correcting quantity with a recorded reason, and reversing an incorrect invoice allocation with a mandatory reason.
 - Items may be device, product or service. Only device items can require installation.
 - Sales users can mutate lines and invoices **only for their own contracts**. Admin can manage all; Finance can view but not edit. Support/Operations cannot see item prices through this UI. The additional contract visibility and access hardening in PR #6 must be integrated before production release.
 - This branch does **not** provide an operations installation view. That is Mammut-only work, after the core PR is approved.
@@ -21,7 +22,8 @@ This feature branch adds **editable quantity amendments and external invoice ref
 - Invoice headers are references to external invoices, not accounting documents. Multiple invoices may reference the same contract and item.
 - An invoice allocation cannot cross contract boundaries, or cause cumulative invoiced quantity for an item to exceed committed item quantity.
 - Allocations and amendments serialize through a `SELECT ... FOR UPDATE` lock on the parent contract.
-- Invoice allocations are append-only in this stage. Corrections to invoice allocation require a future, explicitly audited cancellation/reversal workflow; avoid manual DB edits.
+- Invoice allocation reversal is **not a physical deletion**: it records the timestamp, responsible user and mandatory reason on the original allocation row, and excludes that row from the active invoiced quantity. A corrected allocation may then be entered, including for the same invoice/item.
+- Historical allocations are never modified automatically by the migration. No past reversal is inferred.
 
 ## Backward compatibility
 
@@ -38,21 +40,24 @@ Existing sales remain valid without any contract_items rows. No product types, i
 
 1. `crm/database/add_contract_items.sql`
 2. `crm/database/add_contract_item_amendments.sql`
-3. Deploy compatible PHP code.
+3. `crm/database/add_contract_invoice_reversals.sql`
+4. Deploy compatible PHP code **after PR #6 authorization rules are integrated**.
 
 Fresh installs use the updated `crm/database/schema.sql`. These migrations are additive and do not rewrite existing sales or payments.
 
 ## Verification and release gates
 
 - `php crm/tests/contract_items_test.php`: precise money multiplication, static FK and input checks.
-- `php crm/tests/contract_items_mysql_test.php`: live MariaDB transaction/rollback tests for multi-item sale, over-budget rejection, cross-contract invoice isolation, over-allocation, amended quantities, amendment history and legacy records. This test uses an isolated ephemeral database, not production.
+- `php crm/tests/contract_items_mysql_test.php`: live MariaDB transaction/rollback tests for line-item creation, ceiling enforcement, invoice isolation, allocation correction/reversal, amendments, and two-process allocation concurrency.
+- `php crm/tests/contract_sale_atomic_mysql_test.php`: verifies creation of a sale with multiple lines in a single transaction and full rollback when a DB trigger rejects the second line.
+- These tests use temporary isolated databases and never target production.
 - PHP lint on all PHP files.
 - Before merge/deploy: regression testing with complete realistic CRM schema, end-to-end authorization after PR #6 integration, concurrency tests for two simultaneous invoice allocations, backup/restore, and financial settlement regression tests.
 
 ## Follow-on work
 
-- Single-form atomic creation of a contract **with** all line items. Current UI uses create-contract-then-add-items.
-- UI for adjusting item title/model, item cancel and invoice allocation reversals, with proper immutable audit.
+- Editing or cancellation of existing item title/model with a complete audit (current UI permits audited quantity corrections only).
+- Invoice-reference header editing, correcting mistaken dates, and an approved cancellation flow.
 - Explicit reconciliation of line totals to contract totals (discounts, taxes, non-itemized portions).
 - Invoice digital document attachment workflow, if needed.
 - Mammut-specific installation fulfillment keyed by `contract_items.id`, device serials and customer delivery receipts.
