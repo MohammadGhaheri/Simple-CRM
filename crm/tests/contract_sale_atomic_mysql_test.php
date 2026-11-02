@@ -46,7 +46,6 @@ class Setting
 {
     public static function get(string $key): string { return ''; }
 }
-function contract_status_options(): array { return ['Active', 'Renewal Due', 'Renewed', 'Expired', 'Cancelled']; }
 
 try {
     $config = [
