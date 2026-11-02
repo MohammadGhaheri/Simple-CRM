@@ -396,12 +396,18 @@ CREATE TABLE contract_invoice_lines (
   contract_item_id BIGINT UNSIGNED NOT NULL,
   invoiced_quantity INT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_contract_invoice_lines (invoice_ref_id, contract_item_id),
+  reversed_at DATETIME NULL,
+  reversed_by_user_id INT UNSIGNED NULL,
+  reversal_reason VARCHAR(500) NULL,
+  INDEX idx_invoice_lines_ref_item (invoice_ref_id, contract_item_id),
   INDEX idx_invoice_line_item (contract_id, contract_item_id),
+  INDEX idx_invoice_lines_reversal (contract_id, reversed_at),
   CONSTRAINT fk_invoice_line_ref FOREIGN KEY (contract_id, invoice_ref_id)
     REFERENCES contract_invoice_refs(contract_id, id) ON DELETE CASCADE,
   CONSTRAINT fk_invoice_line_item FOREIGN KEY (contract_id, contract_item_id)
-    REFERENCES contract_items(contract_id, id) ON DELETE CASCADE
+    REFERENCES contract_items(contract_id, id) ON DELETE CASCADE,
+  CONSTRAINT fk_invoice_line_reversed_by FOREIGN KEY (reversed_by_user_id)
+    REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE contract_payments (
