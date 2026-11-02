@@ -20,6 +20,8 @@ function stage_expect(bool $condition, string $message): void
 stage_expect(substr_count($deal, 'INSERT INTO deal_stage_events') === 2, 'Create and stage-changing update must each write a history event.');
 stage_expect(str_contains($deal, 'VALUES (?, NULL, ?, ?)'), 'New deals must create an initial event with no previous stage.');
 stage_expect(str_contains($deal, 'SELECT deal_stage FROM deals WHERE id = ? AND deleted_at IS NULL FOR UPDATE'), 'Updates must lock the current stage.');
+stage_expect(str_contains($deal, "array_key_exists('expected_stage', \$data)"), 'Updates must accept an optimistic-concurrency stage token.');
+stage_expect(str_contains($deal, '(string) $previousStage !== $expectedStage'), 'Stale forms must not overwrite a newer stage.');
 stage_expect(str_contains($deal, "if ((string) \$previousStage !== (string) \$payload['deal_stage'])"), 'Unchanged stages must not create duplicate events.');
 stage_expect(substr_count($deal, '$pdo->beginTransaction();') >= 2, 'Create and update must be transactional.');
 stage_expect(substr_count($deal, '$pdo->rollBack();') >= 2, 'Errors must roll back both the deal change and stage event.');
@@ -33,5 +35,10 @@ stage_expect(str_contains($migration, 'FOREIGN KEY (deal_id) REFERENCES deals(id
 stage_expect(str_contains($migration, 'changed_by_user_id'), 'History must retain actor attribution.');
 stage_expect(!preg_match('/\\b(DROP|TRUNCATE|DELETE\\s+FROM|UPDATE\\s+deals)\\b/i', $migration), 'Migration must not modify existing deal data.');
 stage_expect(!preg_match('/INSERT\\s+INTO\\s+deal_stage_events/i', $migration), 'Migration must not invent historical stage transitions.');
+
+$form = file_get_contents($root . '/app/views/deals/_form.php');
+$controller = file_get_contents($root . '/public/index.php');
+stage_expect(str_contains($form, 'name="expected_stage"'), 'Edit forms must submit the original stage token.');
+stage_expect(str_contains($controller, 'catch (DomainException $e)'), 'Concurrency conflicts must be shown without losing the form data.');
 
 echo "Deal stage history static checks passed." . PHP_EOL;

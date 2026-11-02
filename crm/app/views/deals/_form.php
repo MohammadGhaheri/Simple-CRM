@@ -1,5 +1,6 @@
 <?php $deal = $deal ?? []; ?>
 <?php if (!empty($errors)): ?><div class="alert alert-danger"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
+<?php if (isset($deal['id'])): ?><input type="hidden" name="expected_stage" value="<?= e($deal['expected_stage'] ?? $deal['deal_stage'] ?? '') ?>"><?php endif; ?>
 <div class="grid grid-3">
     <div><label class="required">نام فرصت</label><input required name="deal_name" value="<?= e($deal['deal_name'] ?? '') ?>"></div>
     <div><label class="required">مشتری</label><select required name="customer_id"><?php foreach ($customers as $customer): ?><option value="<?= e((string) $customer['id']) ?>" <?= selected($deal['customer_id'] ?? '', $customer['id']) ?>><?= e($customer['customer_name']) ?></option><?php endforeach; ?></select></div>

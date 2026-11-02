@@ -75,6 +75,9 @@ class Deal
         $sql = 'UPDATE deals SET deal_name=:deal_name, customer_id=:customer_id, product=:product, vehicle_count=:vehicle_count, estimated_amount=:estimated_amount, probability=:probability, weighted_amount=:weighted_amount, deal_stage=:deal_stage, expected_close_date=:expected_close_date, owner_user_id=:owner_user_id, win_loss_reason=:win_loss_reason, notes=:notes WHERE id=:id';
         $payload = self::payload($data);
         $payload['id'] = $id;
+        $expectedStage = array_key_exists('expected_stage', $data)
+            ? trim((string) $data['expected_stage'])
+            : null;
         $pdo = db();
         $pdo->beginTransaction();
         try {
@@ -84,6 +87,9 @@ class Deal
             $previousStage = $current->fetchColumn();
             if ($previousStage === false) {
                 throw new RuntimeException('فرصت فروش پیدا نشد.');
+            }
+            if ($expectedStage !== null && (string) $previousStage !== $expectedStage) {
+                throw new DomainException('مرحله فرصت پس از باز شدن فرم تغییر کرده است. صفحه را تازه‌سازی و دوباره تلاش کنید.');
             }
             $pdo->prepare($sql)->execute($payload);
             if ((string) $previousStage !== (string) $payload['deal_stage']) {
