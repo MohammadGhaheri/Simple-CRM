@@ -17,6 +17,7 @@ require __DIR__ . '/../app/models/ContractPayment.php';
 require __DIR__ . '/../app/models/ContractDocument.php';
 require __DIR__ . '/../app/models/ContractItem.php';
 require __DIR__ . '/../app/models/ContractInvoiceRef.php';
+require __DIR__ . '/../app/models/ContractSaleService.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/TicketMessage.php';
@@ -1208,6 +1209,10 @@ try {
             delete_action(fn() => Contract::delete($id), url('contracts'));
         }
         if ($action === 'create') {
+            if (!in_array(current_user_role(), ['admin', 'sales'], true)) {
+                http_response_code(403);
+                exit('شما اجازه ثبت قرارداد یا فروش را ندارید.');
+            }
             $dealId = (int) ($_GET['deal_id'] ?? 0);
             $deal = $dealId > 0 ? Deal::find($dealId) : null;
             $contract = [
@@ -1223,9 +1228,30 @@ try {
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['contract_title' => 'عنوان ثبت', 'customer_id' => 'مشتری']);
+                $customerId = (int) ($_POST['customer_id'] ?? 0);
+                $selectedCustomer = $customerId > 0 ? Customer::find($customerId) : null;
+                if (!$selectedCustomer || (current_user_role() === 'sales'
+                    && (int) ($selectedCustomer['owner_user_id'] ?? 0) !== current_user_id())) {
+                    $errors[] = 'مشتری انتخاب‌شده مجاز یا معتبر نیست.';
+                }
+                $relatedDealId = (int) ($_POST['deal_id'] ?? 0);
+                if ($relatedDealId > 0) {
+                    $relatedDeal = Deal::find($relatedDealId);
+                    if (!$relatedDeal || (int) $relatedDeal['customer_id'] !== $customerId
+                        || (current_user_role() === 'sales'
+                            && (int) $relatedDeal['owner_user_id'] !== current_user_id())) {
+                        $errors[] = 'فرصت فروش به این مشتری یا کاربر تعلق ندارد.';
+                    }
+                }
+                if (current_user_role() === 'sales') {
+                    $_POST['owner_user_id'] = current_user_id();
+                }
                 if (!$errors) {
                     try {
-                        $newId = Contract::create($_POST);
+                        if (isset($_POST['items']) && !is_array($_POST['items'])) {
+                            throw new InvalidArgumentException('قالب اقلام قرارداد معتبر نیست.');
+                        }
+                        $newId = ContractSaleService::create($_POST, $_POST['items'] ?? []);
                         redirect(url('contracts', ['action' => 'show', 'id' => $newId]));
                     } catch (Throwable $e) {
                         $errors[] = $e->getMessage();
