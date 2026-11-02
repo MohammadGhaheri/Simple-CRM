@@ -435,6 +435,22 @@ if ($action === 'create_ticket') {
     exit;
 }
 
+if ($action === 'ticket_attachment') {
+    $message = TicketMessage::attachment((int) ($_GET['message_id'] ?? 0));
+    $ticket = $message ? Ticket::findForContact((int) $message['ticket_id'], (int) $contact['id']) : null;
+    $file = $message ? ticket_attachment_path((string) $message['attachment_path']) : null;
+    if (!$message || !$ticket || !$file) {
+        http_response_code(404);
+        exit('File not found.');
+    }
+    header('Content-Type: ' . ($message['attachment_mime'] ?: 'application/octet-stream'));
+    header('Content-Length: ' . filesize($file));
+    header("Content-Disposition: inline; filename*=UTF-8''" . rawurlencode((string) ($message['attachment_name'] ?: basename($file))));
+    header('X-Content-Type-Options: nosniff');
+    readfile($file);
+    exit;
+}
+
 if ($action === 'ticket') {
     $ticket = Ticket::findForContact((int) ($_GET['id'] ?? 0), (int) $contact['id']);
     if (!$ticket) {
@@ -507,8 +523,9 @@ if ($action === 'ticket') {
                         </div>
                         <?php if (trim((string) $message['message']) !== ''): ?><p><?= nl2br(e($message['message'])) ?></p><?php endif; ?>
                         <?php if (!empty($message['attachment_path'])): ?>
-                            <a class="ticket-attachment" href="<?= e($message['attachment_path']) ?>" target="_blank" rel="noopener">
-                                <img src="<?= e($message['attachment_path']) ?>" alt="">
+                            <?php $ticketAttachmentUrl = 'portal.php?action=ticket_attachment&message_id=' . (int) $message['id']; ?>
+                            <a class="ticket-attachment" href="<?= e($ticketAttachmentUrl) ?>" target="_blank" rel="noopener">
+                                <img src="<?= e($ticketAttachmentUrl) ?>" alt="">
                                 <span><?= e($message['attachment_name'] ?: 'تصویر پیوست') ?></span>
                             </a>
                         <?php endif; ?>

@@ -24,6 +24,7 @@ require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/models/PerformanceAnalytics.php';
 require __DIR__ . '/../app/models/PerformanceReport.php';
+require __DIR__ . '/../app/models/RoleDashboard.php';
 require __DIR__ . '/../app/services/SmsService.php';
 require __DIR__ . '/../app/services/EmailService.php';
 require __DIR__ . '/../app/services/BackupService.php';
@@ -517,6 +518,14 @@ try {
     }
 
     if ($page === 'dashboard') {
+        if (!is_admin()) {
+            $dashboard = RoleDashboard::build(current_user_role(), current_user_id());
+            render('dashboard/role', [
+                'title' => $dashboard['title'],
+                'dashboard' => $dashboard,
+            ]);
+            exit;
+        }
         $stats = [
             'customers' => (int) db()->query('SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL')->fetchColumn(),
             'open_deals' => (int) db()->query("SELECT COUNT(*) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage NOT IN ('Won','Lost') AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
@@ -540,11 +549,13 @@ try {
     }
 
     if ($page === 'customers') {
+        require_roles(['admin', 'sales', 'support', 'operations', 'finance']);
         if ($action === 'delete' && is_post()) {
             require_admin();
             delete_action(fn() => Customer::delete($id), url('customers'));
         }
         if ($action === 'create') {
+            require_customer_manage();
             $customer = [];
             if (is_post()) {
                 verify_csrf();
@@ -563,6 +574,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_customer_manage();
             $customer = Customer::find($id);
             if (!$customer) {
                 redirect(url('customers'));
@@ -599,6 +611,7 @@ try {
             exit;
         }
         if ($action === 'invite_contacts') {
+            require_customer_manage();
             $customer = Customer::find($id);
             if (!$customer) {
                 redirect(url('customers'));
@@ -638,16 +651,21 @@ try {
     }
 
     if ($page === 'contacts') {
+        require_roles(['admin', 'sales', 'support']);
         if ($action === 'delete' && is_post()) {
             require_admin();
             $contact = Contact::find($id);
             delete_action(fn() => Contact::delete($id), url('customers', ['action' => 'show', 'id' => (int) ($contact['customer_id'] ?? 0)]));
         }
         if ($action === 'create') {
+            require_customer_manage();
             $contact = ['customer_id' => (int) ($_GET['customer_id'] ?? 0)];
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'contact_name' => 'نام مخاطب']);
+                if (!Customer::find((int) ($_POST['customer_id'] ?? 0))) {
+                    $errors[] = 'مشتری انتخاب‌شده مجاز یا معتبر نیست.';
+                }
                 if (!empty($_POST['portal_enabled']) && trim((string) ($_POST['portal_password'] ?? '')) === '') {
                     $errors[] = 'برای فعال کردن پرتال، رمز عبور مخاطب الزامی است.';
                 }
@@ -698,6 +716,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_customer_manage();
             $contact = Contact::find($id);
             if (!$contact) {
                 redirect(url('customers'));
@@ -705,6 +724,9 @@ try {
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'contact_name' => 'نام مخاطب']);
+                if (!Customer::find((int) ($_POST['customer_id'] ?? 0))) {
+                    $errors[] = 'مشتری انتخاب‌شده مجاز یا معتبر نیست.';
+                }
                 if (!empty($_POST['portal_enabled']) && empty($contact['password_hash']) && trim((string) ($_POST['portal_password'] ?? '')) === '') {
                     $errors[] = 'برای فعال کردن پرتال، رمز عبور مخاطب الزامی است.';
                 }
@@ -784,6 +806,22 @@ try {
     }
 
     if ($page === 'tickets') {
+        require_ticket_access();
+        if ($action === 'attachment') {
+            $message = TicketMessage::attachment((int) ($_GET['message_id'] ?? 0));
+            $ticket = $message ? Ticket::find((int) $message['ticket_id']) : null;
+            $file = $message ? ticket_attachment_path((string) $message['attachment_path']) : null;
+            if (!$message || !$ticket || !$file) {
+                http_response_code(404);
+                exit('File not found.');
+            }
+            header('Content-Type: ' . ($message['attachment_mime'] ?: 'application/octet-stream'));
+            header('Content-Length: ' . filesize($file));
+            header("Content-Disposition: inline; filename*=UTF-8''" . rawurlencode((string) ($message['attachment_name'] ?: basename($file))));
+            header('X-Content-Type-Options: nosniff');
+            readfile($file);
+            exit;
+        }
         if ($action === 'contacts_by_customer') {
             $customerId = (int) ($_GET['customer_id'] ?? 0);
             header('Content-Type: application/json; charset=UTF-8');
@@ -962,11 +1000,13 @@ try {
     }
 
     if ($page === 'deals') {
+        require_roles(['admin', 'sales']);
         if ($action === 'delete' && is_post()) {
             require_admin();
             delete_action(fn() => Deal::delete($id), url('deals'));
         }
         if ($action === 'create') {
+            require_sales_manage();
             $deal = ['customer_id' => (int) ($_GET['customer_id'] ?? 0), 'probability' => 20];
             if (is_post()) {
                 verify_csrf();
@@ -981,6 +1021,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_sales_manage();
             $deal = Deal::find($id);
             if (!$deal) {
                 redirect(url('deals'));
@@ -1013,6 +1054,7 @@ try {
     }
 
     if ($page === 'contracts') {
+        require_roles(['admin', 'sales', 'finance']);
         if ($action === 'payment_create' && is_post()) {
             require_finance_manage();
             verify_csrf();
@@ -1067,8 +1109,9 @@ try {
         }
         if ($action === 'document_download') {
             $document = ContractDocument::find((int) ($_GET['document_id'] ?? 0));
+            $authorizedContract = $document ? Contract::find((int) $document['contract_id']) : null;
             $file = $document ? contract_document_path((string) $document['file_path']) : null;
-            if (!$document || $file === null) {
+            if (!$document || !$authorizedContract || $file === null) {
                 http_response_code(404);
                 exit('File not found.');
             }
@@ -1092,6 +1135,7 @@ try {
             redirect(url('contracts', ['action' => 'show', 'id' => (int) $document['contract_id'], 'document_deleted' => 1]));
         }
         if ($action === 'document_upload' && is_post()) {
+            require_sales_manage();
             verify_csrf();
             $contract = Contract::find($id);
             if (!$contract) {
@@ -1148,6 +1192,7 @@ try {
             delete_action(fn() => Contract::delete($id), url('contracts'));
         }
         if ($action === 'create') {
+            require_sales_manage();
             $dealId = (int) ($_GET['deal_id'] ?? 0);
             $deal = $dealId > 0 ? Deal::find($dealId) : null;
             $contract = [
@@ -1177,6 +1222,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_sales_manage();
             $contract = Contract::find($id);
             if (!$contract) {
                 redirect(url('contracts'));
@@ -1235,6 +1281,7 @@ try {
     }
 
     if ($page === 'activities') {
+        require_activity_access();
         if ($action === 'customer_lookup') {
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(Customer::autocomplete((string) ($_GET['q'] ?? '')), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -1269,6 +1316,10 @@ try {
             exit;
         }
         if ($action === 'delete' && is_post()) {
+            if (!Activity::find($id)) {
+                http_response_code(404);
+                exit('Activity not found.');
+            }
             delete_action(fn() => Activity::delete($id), url('activities'));
         }
         if ($action === 'create') {

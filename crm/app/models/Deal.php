@@ -8,6 +8,7 @@ class Deal
     {
         $sql = 'SELECT d.*, c.customer_name, u.name AS owner_name FROM deals d JOIN customers c ON c.id = d.customer_id LEFT JOIN users u ON u.id = d.owner_user_id WHERE d.deleted_at IS NULL AND c.deleted_at IS NULL';
         $params = [];
+        self::applyVisibility($sql, $params, 'd');
         if (!empty($filters['q'])) {
             $sql .= ' AND (d.deal_name LIKE ? OR c.customer_name LIKE ?)';
             $q = '%' . $filters['q'] . '%';
@@ -27,8 +28,11 @@ class Deal
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT * FROM deals WHERE customer_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC');
-        $stmt->execute([$customerId]);
+        $sql = 'SELECT * FROM deals d WHERE customer_id = ? AND deleted_at IS NULL';
+        $params = [$customerId];
+        self::applyVisibility($sql, $params, 'd');
+        $stmt = db()->prepare($sql . ' ORDER BY updated_at DESC');
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
@@ -37,15 +41,21 @@ class Deal
         if ($id <= 0) {
             return true;
         }
-        $stmt = db()->prepare('SELECT COUNT(*) FROM deals WHERE id = ? AND customer_id = ? AND deleted_at IS NULL');
-        $stmt->execute([$id, $customerId]);
+        $sql = 'SELECT COUNT(*) FROM deals d WHERE id = ? AND customer_id = ? AND deleted_at IS NULL';
+        $params = [$id, $customerId];
+        self::applyVisibility($sql, $params, 'd');
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
         return (int) $stmt->fetchColumn() > 0;
     }
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT d.*, c.customer_name, u.name AS owner_name FROM deals d JOIN customers c ON c.id = d.customer_id LEFT JOIN users u ON u.id = d.owner_user_id WHERE d.id = ? AND d.deleted_at IS NULL AND c.deleted_at IS NULL');
-        $stmt->execute([$id]);
+        $sql = 'SELECT d.*, c.customer_name, u.name AS owner_name FROM deals d JOIN customers c ON c.id = d.customer_id LEFT JOIN users u ON u.id = d.owner_user_id WHERE d.id = ? AND d.deleted_at IS NULL AND c.deleted_at IS NULL';
+        $params = [$id];
+        self::applyVisibility($sql, $params, 'd');
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetch() ?: null;
     }
 
@@ -83,10 +93,30 @@ class Deal
             'weighted_amount' => $estimated * $probability / 100,
             'deal_stage' => $data['deal_stage'] ?? 'Lead',
             'expected_close_date' => db_date($data['expected_close_date'] ?? null),
-            'owner_user_id' => (int) ($data['owner_user_id'] ?? current_user_id()),
+            'owner_user_id' => self::currentRole() === 'sales'
+                ? current_user_id()
+                : (int) ($data['owner_user_id'] ?? current_user_id()),
             'win_loss_reason' => trim($data['win_loss_reason'] ?? ''),
             'notes' => trim($data['notes'] ?? ''),
         ];
+    }
+
+    private static function applyVisibility(string &$sql, array &$params, string $alias): void
+    {
+        if (self::currentRole() === 'admin') {
+            return;
+        }
+        if (self::currentRole() === 'sales') {
+            $sql .= " AND {$alias}.owner_user_id = ?";
+            $params[] = current_user_id();
+            return;
+        }
+        $sql .= ' AND 1 = 0';
+    }
+
+    private static function currentRole(): string
+    {
+        return function_exists('current_user_role') ? current_user_role() : 'admin';
     }
 
     public static function statsByStage(): array
