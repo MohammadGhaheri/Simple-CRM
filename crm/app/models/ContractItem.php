@@ -85,7 +85,12 @@ class ContractItem
         }
 
         $pdo = db();
-        $pdo->beginTransaction();
+        // Support atomic contract+items creation without a nested PDO transaction.
+        // Other item writers retain their standalone transaction behavior.
+        $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) {
+            $pdo->beginTransaction();
+        }
         try {
             // This lock serializes line numbering and all contract allocations.
             $lock = $pdo->prepare('SELECT id, contract_amount FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
@@ -109,10 +114,12 @@ class ContractItem
                 trim((string) ($data['notes'] ?? '')) ?: null,
             ]);
             $id = (int) $pdo->lastInsertId();
-            $pdo->commit();
+            if ($ownsTransaction) {
+                $pdo->commit();
+            }
             return $id;
         } catch (Throwable $error) {
-            if ($pdo->inTransaction()) {
+            if ($ownsTransaction && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
             throw $error;
