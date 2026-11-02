@@ -549,11 +549,13 @@ try {
     }
 
     if ($page === 'customers') {
+        require_roles(['admin', 'sales', 'support', 'operations', 'finance']);
         if ($action === 'delete' && is_post()) {
             require_admin();
             delete_action(fn() => Customer::delete($id), url('customers'));
         }
         if ($action === 'create') {
+            require_customer_manage();
             $customer = [];
             if (is_post()) {
                 verify_csrf();
@@ -572,6 +574,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_customer_manage();
             $customer = Customer::find($id);
             if (!$customer) {
                 redirect(url('customers'));
@@ -608,6 +611,7 @@ try {
             exit;
         }
         if ($action === 'invite_contacts') {
+            require_customer_manage();
             $customer = Customer::find($id);
             if (!$customer) {
                 redirect(url('customers'));
@@ -647,16 +651,21 @@ try {
     }
 
     if ($page === 'contacts') {
+        require_roles(['admin', 'sales', 'support']);
         if ($action === 'delete' && is_post()) {
             require_admin();
             $contact = Contact::find($id);
             delete_action(fn() => Contact::delete($id), url('customers', ['action' => 'show', 'id' => (int) ($contact['customer_id'] ?? 0)]));
         }
         if ($action === 'create') {
+            require_customer_manage();
             $contact = ['customer_id' => (int) ($_GET['customer_id'] ?? 0)];
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'contact_name' => 'نام مخاطب']);
+                if (!Customer::find((int) ($_POST['customer_id'] ?? 0))) {
+                    $errors[] = 'مشتری انتخاب‌شده مجاز یا معتبر نیست.';
+                }
                 if (!empty($_POST['portal_enabled']) && trim((string) ($_POST['portal_password'] ?? '')) === '') {
                     $errors[] = 'برای فعال کردن پرتال، رمز عبور مخاطب الزامی است.';
                 }
@@ -707,6 +716,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_customer_manage();
             $contact = Contact::find($id);
             if (!$contact) {
                 redirect(url('customers'));
@@ -714,6 +724,9 @@ try {
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'contact_name' => 'نام مخاطب']);
+                if (!Customer::find((int) ($_POST['customer_id'] ?? 0))) {
+                    $errors[] = 'مشتری انتخاب‌شده مجاز یا معتبر نیست.';
+                }
                 if (!empty($_POST['portal_enabled']) && empty($contact['password_hash']) && trim((string) ($_POST['portal_password'] ?? '')) === '') {
                     $errors[] = 'برای فعال کردن پرتال، رمز عبور مخاطب الزامی است.';
                 }
@@ -793,6 +806,22 @@ try {
     }
 
     if ($page === 'tickets') {
+        require_ticket_access();
+        if ($action === 'attachment') {
+            $message = TicketMessage::attachment((int) ($_GET['message_id'] ?? 0));
+            $ticket = $message ? Ticket::find((int) $message['ticket_id']) : null;
+            $file = $message ? ticket_attachment_path((string) $message['attachment_path']) : null;
+            if (!$message || !$ticket || !$file) {
+                http_response_code(404);
+                exit('File not found.');
+            }
+            header('Content-Type: ' . ($message['attachment_mime'] ?: 'application/octet-stream'));
+            header('Content-Length: ' . filesize($file));
+            header("Content-Disposition: inline; filename*=UTF-8''" . rawurlencode((string) ($message['attachment_name'] ?: basename($file))));
+            header('X-Content-Type-Options: nosniff');
+            readfile($file);
+            exit;
+        }
         if ($action === 'contacts_by_customer') {
             $customerId = (int) ($_GET['customer_id'] ?? 0);
             header('Content-Type: application/json; charset=UTF-8');
@@ -1252,6 +1281,7 @@ try {
     }
 
     if ($page === 'activities') {
+        require_activity_access();
         if ($action === 'customer_lookup') {
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(Customer::autocomplete((string) ($_GET['q'] ?? '')), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -1286,6 +1316,10 @@ try {
             exit;
         }
         if ($action === 'delete' && is_post()) {
+            if (!Activity::find($id)) {
+                http_response_code(404);
+                exit('Activity not found.');
+            }
             delete_action(fn() => Activity::delete($id), url('activities'));
         }
         if ($action === 'create') {

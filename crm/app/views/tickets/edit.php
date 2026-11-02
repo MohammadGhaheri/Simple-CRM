@@ -117,8 +117,9 @@ $backUrl = $hasListContext ? ticket_list_url($ticketContext, (int) $ticket['id']
                 </div>
                 <?php if (trim((string) $message['message']) !== ''): ?><p><?= linkify_text($message['message']) ?></p><?php endif; ?>
                 <?php if (!empty($message['attachment_path'])): ?>
-                    <a class="ticket-attachment" href="<?= e($message['attachment_path']) ?>" target="_blank" rel="noopener">
-                        <img src="<?= e($message['attachment_path']) ?>" alt="">
+                    <?php $ticketAttachmentUrl = url('tickets', ['action' => 'attachment', 'message_id' => $message['id']]); ?>
+                    <a class="ticket-attachment" href="<?= e($ticketAttachmentUrl) ?>" target="_blank" rel="noopener">
+                        <img src="<?= e($ticketAttachmentUrl) ?>" alt="">
                         <span><?= e($message['attachment_name'] ?: 'تصویر پیوست') ?></span>
                     </a>
                 <?php endif; ?>

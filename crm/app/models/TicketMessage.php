@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 class TicketMessage
 {
+    public static function attachment(int $messageId): ?array
+    {
+        $stmt = db()->prepare('SELECT tm.id, tm.ticket_id, tm.attachment_path, tm.attachment_name, tm.attachment_mime, tm.attachment_size
+            FROM ticket_messages tm
+            WHERE tm.id = ? AND tm.attachment_path IS NOT NULL');
+        $stmt->execute([$messageId]);
+        return $stmt->fetch() ?: null;
+    }
+
     public static function byTicket(int $ticketId): array
     {
         $stmt = db()->prepare("
@@ -64,7 +73,7 @@ class TicketMessage
 
     public static function createFromContact(int $ticketId, int $contactId, string $message, ?array $attachment = null): int
     {
-        return self::create([
+        return self::createAuthorized([
             'ticket_id' => $ticketId,
             'sender_type' => 'contact',
             'sender_contact_id' => $contactId,
@@ -74,12 +83,12 @@ class TicketMessage
             'attachment_name' => $attachment['name'] ?? null,
             'attachment_mime' => $attachment['mime'] ?? null,
             'attachment_size' => $attachment['size'] ?? null,
-        ]);
+        ], 'contact', $contactId);
     }
 
     public static function createFromUser(int $ticketId, int $userId, string $message, ?array $attachment = null): int
     {
-        $messageId = self::create([
+        $messageId = self::createAuthorized([
             'ticket_id' => $ticketId,
             'sender_type' => 'user',
             'sender_contact_id' => null,
@@ -89,7 +98,7 @@ class TicketMessage
             'attachment_name' => $attachment['name'] ?? null,
             'attachment_mime' => $attachment['mime'] ?? null,
             'attachment_size' => $attachment['size'] ?? null,
-        ]);
+        ], 'user', $userId);
         self::markHandledByInternalReply($ticketId);
         return $messageId;
     }
@@ -114,5 +123,43 @@ class TicketMessage
 
         $pdo->prepare('UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([(int) $data['ticket_id']]);
         return $messageId;
+    }
+
+    private static function createAuthorized(array $data, string $actorType, int $actorId): int
+    {
+        $pdo = db();
+        if (!$pdo instanceof PDO) {
+            return self::create($data);
+        }
+        $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) {
+            $pdo->beginTransaction();
+        }
+        try {
+            $sql = 'SELECT id FROM tickets WHERE id = ? AND deleted_at IS NULL';
+            $params = [(int) $data['ticket_id']];
+            if ($actorType === 'contact') {
+                $sql .= ' AND contact_id = ?';
+                $params[] = $actorId;
+            } elseif (function_exists('current_user_role') && current_user_role() === 'support') {
+                $sql .= ' AND (assigned_user_id = ? OR assigned_user_id IS NULL)';
+                $params[] = $actorId;
+            }
+            $lock = $pdo->prepare($sql . ' FOR UPDATE');
+            $lock->execute($params);
+            if (!$lock->fetchColumn()) {
+                throw new RuntimeException('تیکت برای این عملیات مجاز نیست.');
+            }
+            $messageId = self::create($data);
+            if ($ownsTransaction) {
+                $pdo->commit();
+            }
+            return $messageId;
+        } catch (Throwable $error) {
+            if ($ownsTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $error;
+        }
     }
 }
