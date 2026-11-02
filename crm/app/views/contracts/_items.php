@@ -111,9 +111,38 @@ if (in_array($itemsRole, ['admin', 'sales', 'finance'], true)):
     <?php endif; ?>
     <h4>اقلام تخصیص‌یافته به فاکتورها</h4>
     <div class="table-wrap"><table>
-        <thead><tr><th>فاکتور</th><th>قلم قرارداد</th><th>تعداد تخصیص</th></tr></thead>
+        <thead><tr><th>فاکتور</th><th>قلم قرارداد</th><th>تعداد تخصیص</th><th>وضعیت</th><?php if ($canEditItems): ?><th>اقدام</th><?php endif; ?></tr></thead>
         <tbody><?php foreach ($invoiceLines as $line): ?>
-            <tr><td><?= e($line['invoice_number']) ?></td><td><?= e($line['item_title']) ?></td><td><?= e((string) $line['invoiced_quantity']) ?></td></tr>
+            <tr>
+                <td><?= e($line['invoice_number']) ?></td>
+                <td><?= e($line['item_title']) ?></td>
+                <td><?= e((string) $line['invoiced_quantity']) ?></td>
+                <td>
+                    <?php if (!empty($line['reversed_at'])): ?>
+                        <span class="badge badge-muted">باطل‌شده</span>
+                        <div class="muted"><?= e((string) $line['reversal_reason']) ?></div>
+                        <small class="muted"><?= e(fa_datetime($line['reversed_at'])) ?> — <?= e((string) ($line['reversed_by_name'] ?? 'کاربر نامشخص')) ?></small>
+                    <?php else: ?>
+                        <span class="badge">فعال</span>
+                    <?php endif; ?>
+                </td>
+                <?php if ($canEditItems): ?>
+                <td>
+                    <?php if (empty($line['reversed_at'])): ?>
+                        <details>
+                            <summary>ابطال تخصیص</summary>
+                            <form method="post" action="<?= e(url('contracts', ['action' => 'invoice_reverse', 'id' => $contract['id']])) ?>">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="allocation_id" value="<?= e((string) $line['id']) ?>">
+                                <label>دلیل ابطال (الزامی)</label>
+                                <input name="reason" maxlength="500" required>
+                                <button type="submit" class="btn btn-light">ثبت ابطال</button>
+                            </form>
+                        </details>
+                    <?php endif; ?>
+                </td>
+                <?php endif; ?>
+            </tr>
         <?php endforeach; ?></tbody>
     </table></div>
     <?php if (!$invoiceLines): ?><div class="empty">هیچ قلمی به مرجع فاکتور تخصیص داده نشده است.</div><?php endif; ?>
