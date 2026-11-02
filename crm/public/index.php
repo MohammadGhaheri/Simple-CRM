@@ -989,8 +989,12 @@ try {
                 verify_csrf();
                 $errors = required_fields($_POST, ['deal_name' => 'نام فرصت', 'customer_id' => 'مشتری']);
                 if (!$errors) {
-                    Deal::update($id, $_POST);
-                    redirect(url('deals', ['action' => 'show', 'id' => $id]));
+                    try {
+                        Deal::update($id, $_POST);
+                        redirect(url('deals', ['action' => 'show', 'id' => $id]));
+                    } catch (DomainException $e) {
+                        $errors[] = $e->getMessage();
+                    }
                 }
                 $deal = array_merge($deal, $_POST);
             }

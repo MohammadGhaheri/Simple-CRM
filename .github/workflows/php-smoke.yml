@@ -1,0 +1,44 @@
+name: PHP lint and focused regression checks
+
+on:
+  pull_request:
+    paths:
+      - 'crm/**'
+      - '.github/workflows/php-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  php-smoke:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - name: Checkout pull-request code
+        uses: actions/checkout@v4
+      - name: Report PHP version
+        run: php -v
+      - name: Lint PHP source
+        run: find crm -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Run feature smoke tests when available
+        run: |
+          if [ -f crm/tests/deal_stage_history_test.php ]; then php crm/tests/deal_stage_history_test.php; fi
+          if [ -f crm/tests/role_dashboard_test.php ]; then php crm/tests/role_dashboard_test.php; fi
+      - name: Run deal-stage MySQL integration tests
+        if: hashFiles('crm/tests/deal_stage_history_mysql_test.php') != ''
+        env:
+          CRM_TEST_DB_HOST: 127.0.0.1
+          CRM_TEST_DB_USER: root
+          CRM_TEST_DB_PASSWORD: root
+        run: php crm/tests/deal_stage_history_mysql_test.php
