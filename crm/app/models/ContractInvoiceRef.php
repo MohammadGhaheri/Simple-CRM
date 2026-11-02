@@ -19,10 +19,11 @@ class ContractInvoiceRef
 
     public static function allocationsByContract(int $contractId): array
     {
-        $stmt = db()->prepare('SELECT il.*, ir.invoice_number, i.item_title
+        $stmt = db()->prepare('SELECT il.*, ir.invoice_number, i.item_title, u.name AS reversed_by_name
             FROM contract_invoice_lines il
             JOIN contract_invoice_refs ir ON ir.id = il.invoice_ref_id AND ir.contract_id = il.contract_id
             JOIN contract_items i ON i.id = il.contract_item_id AND i.contract_id = il.contract_id
+            LEFT JOIN users u ON u.id = il.reversed_by_user_id
             WHERE il.contract_id = ? AND ir.deleted_at IS NULL AND i.deleted_at IS NULL
             ORDER BY ir.invoice_number, il.id');
         $stmt->execute([$contractId]);
