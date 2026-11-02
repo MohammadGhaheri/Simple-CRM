@@ -15,6 +15,8 @@ require __DIR__ . '/../app/models/Deal.php';
 require __DIR__ . '/../app/models/Contract.php';
 require __DIR__ . '/../app/models/ContractPayment.php';
 require __DIR__ . '/../app/models/ContractDocument.php';
+require __DIR__ . '/../app/models/ContractItem.php';
+require __DIR__ . '/../app/models/ContractInvoiceRef.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/TicketMessage.php';
@@ -1013,6 +1015,64 @@ try {
     }
 
     if ($page === 'contracts') {
+        $itemActions = [
+            'item_add' => 'item_saved',
+            'item_amend' => 'item_amended',
+            'invoice_add' => 'invoice_saved',
+            'invoice_allocate' => 'invoice_allocated',
+        ];
+        if (isset($itemActions[$action])) {
+            if (!is_post()) {
+                http_response_code(405);
+                exit('Method not allowed.');
+            }
+            verify_csrf();
+            // Authorization precedes looking up or mutating any item/invoice ID.
+            $role = current_user_role();
+            if (!in_array($role, ['admin', 'sales'], true)) {
+                http_response_code(403);
+                exit('شما اجازه مدیریت اقلام فروش را ندارید.');
+            }
+            $parentContract = Contract::find($id);
+            if (!$parentContract || ($role === 'sales' && (int) $parentContract['owner_user_id'] !== current_user_id())) {
+                http_response_code(404);
+                exit('قرارداد مجاز پیدا نشد.');
+            }
+            try {
+                if ($action === 'item_add') {
+                    ContractItem::add(array_merge($_POST, ['contract_id' => $id]));
+                } elseif ($action === 'item_amend') {
+                    ContractItem::amendQuantity(
+                        $id,
+                        (int) ($_POST['item_id'] ?? 0),
+                        (int) ($_POST['new_quantity'] ?? 0),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
+                } elseif ($action === 'invoice_add') {
+                    ContractInvoiceRef::create(
+                        $id,
+                        (string) ($_POST['invoice_number'] ?? ''),
+                        trim((string) ($_POST['invoice_date'] ?? ''))
+                    );
+                } else {
+                    ContractInvoiceRef::allocate(
+                        $id,
+                        (int) ($_POST['invoice_ref_id'] ?? 0),
+                        (int) ($_POST['contract_item_id'] ?? 0),
+                        (int) ($_POST['invoiced_quantity'] ?? 0)
+                    );
+                }
+                redirect(url('contracts', [
+                    'action' => 'show', 'id' => $id, $itemActions[$action] => 1,
+                ]));
+            } catch (PDOException $error) {
+                $_SESSION['contract_items_error'] = 'ثبت اطلاعات به دلیل خطا یا تکراری‌بودن اطلاعات انجام نشد.';
+            } catch (DomainException | InvalidArgumentException | RuntimeException $error) {
+                $_SESSION['contract_items_error'] = $error->getMessage();
+            }
+            redirect(url('contracts', ['action' => 'show', 'id' => $id]));
+        }
         if ($action === 'payment_create' && is_post()) {
             require_finance_manage();
             verify_csrf();
