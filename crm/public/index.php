@@ -1021,6 +1021,7 @@ try {
             'item_amend' => 'item_amended',
             'invoice_add' => 'invoice_saved',
             'invoice_allocate' => 'invoice_allocated',
+            'invoice_reverse' => 'invoice_reversed',
         ];
         if (isset($itemActions[$action])) {
             if (!is_post()) {
@@ -1056,12 +1057,19 @@ try {
                         (string) ($_POST['invoice_number'] ?? ''),
                         trim((string) ($_POST['invoice_date'] ?? ''))
                     );
-                } else {
+                } elseif ($action === 'invoice_allocate') {
                     ContractInvoiceRef::allocate(
                         $id,
                         (int) ($_POST['invoice_ref_id'] ?? 0),
                         (int) ($_POST['contract_item_id'] ?? 0),
                         (int) ($_POST['invoiced_quantity'] ?? 0)
+                    );
+                } else {
+                    ContractInvoiceRef::reverseAllocation(
+                        $id,
+                        (int) ($_POST['allocation_id'] ?? 0),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
                     );
                 }
                 redirect(url('contracts', [
