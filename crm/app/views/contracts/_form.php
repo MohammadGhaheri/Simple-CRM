@@ -22,6 +22,7 @@
 </div>
 <p class="muted" data-renewal-field>برای قرارداد رسمی، تاریخ یادآوری خالی به‌صورت خودکار از تاریخ پایان محاسبه می‌شود. فروش بدون قرارداد رسمی فعالیت تمدید ندارد.</p>
 <div style="margin-top:14px"><label>یادداشت</label><textarea name="notes"><?= e($contract['notes'] ?? '') ?></textarea></div>
+<p class="muted">پس از ذخیره قرارداد یا فروش، از صفحه جزئیات می‌توانید اقلام دستگاه، کالا و خدمت را به‌صورت ردیف‌های مستقل ثبت کنید. اطلاعات قراردادی قدیمی تا زمان ثبت اقلام همچنان معتبر می‌مانند.</p>
 <div class="form-actions">
     <button class="btn btn-primary" type="submit">ذخیره</button>
     <a class="btn btn-light" href="<?= e(url('contracts')) ?>">انصراف</a>
