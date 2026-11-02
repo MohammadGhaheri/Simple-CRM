@@ -72,6 +72,7 @@ try {
 
     apply_item_migration($pdo, __DIR__ . '/../database/add_contract_items.sql');
     apply_item_migration($pdo, __DIR__ . '/../database/add_contract_item_amendments.sql');
+    apply_item_migration($pdo, __DIR__ . '/../database/add_contract_invoice_reversals.sql');
 
     $device = ContractItem::add([
         'contract_id' => 1, 'item_type' => 'device', 'product' => 'IoTruck',
@@ -120,7 +121,7 @@ try {
     ContractItem::amendQuantity(1, $device, 3, 'Approved sales adjustment', 1);
     item_sql_expect((int) ContractItem::byContract(1)[0]['quantity'] === 3, 'Amended line quantity was not persisted.');
     item_sql_expect(count(ContractItem::amendmentsForContract(1)) === 1, 'Amendment audit event not recorded.');
-    ContractInvoiceRef::allocate(1, $invoice2, $device, 1);
+    $secondAllocation = ContractInvoiceRef::allocate(1, $invoice2, $device, 1);
     item_sql_expect_rejection(
         static fn() => ContractItem::amendQuantity(1, $device, 2, 'Reduce below invoice', 1),
         'Quantity reduced below already invoiced amount.'
@@ -131,6 +132,23 @@ try {
     );
     item_sql_expect(count(ContractItem::amendmentsForContract(1)) === 1, 'Rejected amendment created a ghost audit event.');
     item_sql_expect((int) ContractItem::byContract(1)[0]['quantity'] === 3, 'Rejected amendment mutated actual quantity.');
+
+    ContractInvoiceRef::reverseAllocation(1, $secondAllocation, 'Incorrect invoice allocation', 1);
+    $allocationHistory = ContractInvoiceRef::allocationsByContract(1);
+    item_sql_expect(count($allocationHistory) === 2, 'Reversal deleted the allocation audit record.');
+    $reversedRows = array_values(array_filter($allocationHistory, static fn(array $line): bool => !empty($line['reversed_at'])));
+    item_sql_expect(count($reversedRows) === 1
+        && $reversedRows[0]['reversal_reason'] === 'Incorrect invoice allocation'
+        && (int) $reversedRows[0]['reversed_by_user_id'] === 1,
+        'Reversal attribution or reason is missing.');
+    item_sql_expect_rejection(
+        static fn() => ContractInvoiceRef::reverseAllocation(1, $secondAllocation, 'Double reverse', 1),
+        'The same allocation was reversed twice.'
+    );
+    // After reversal, allocation capacity is released; a corrected row may be inserted.
+    ContractInvoiceRef::allocate(1, $invoice2, $device, 1);
+    item_sql_expect(count(ContractInvoiceRef::allocationsByContract(1)) === 3, 'Corrected allocation not persisted.');
+
 
     ContractItem::assertAmountCoversItems(1, '600.00', $pdo);
     item_sql_expect_rejection(
