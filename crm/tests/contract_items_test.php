@@ -32,6 +32,11 @@ contract_item_expect(str_contains($source, "SELECT id, contract_amount FROM cont
 contract_item_expect(str_contains($source, '$pdo->rollBack();'), 'ContractItem must roll back on error.');
 contract_item_expect(str_contains($source, 'FILTER_VALIDATE_INT'), 'Quantity must be validated before insert.');
 
+$reverseMigration = file_get_contents($root . '/database/add_contract_invoice_reversals.sql');
+contract_item_expect(str_contains($reverseMigration, 'DROP INDEX uq_contract_invoice_lines'), 'Reversal migration must release old invoice/item uniqueness constraint.');
+contract_item_expect(str_contains($reverseMigration, 'reversed_at') && str_contains($reverseMigration, 'reversed_by_user_id') && str_contains($reverseMigration, 'reversal_reason'), 'Allocation reversal audit is missing.');
+contract_item_expect(!preg_match('/\\b(DROP\\s+TABLE|TRUNCATE|DELETE\\s+FROM|UPDATE\\s+contract_invoice_lines)\\b/i', $reverseMigration), 'Reversal migration must not delete existing allocations.');
+contract_item_expect(str_contains(file_get_contents($root . '/app/models/ContractInvoiceRef.php'), 'reverseAllocation('), 'Invoice reversal model method missing.');
 $amendMigration = file_get_contents($root . '/database/add_contract_item_amendments.sql');
 contract_item_expect(str_contains($schema, 'CREATE TABLE contract_item_amendments'), 'Fresh installs must include amendment history.');
 contract_item_expect(str_contains($amendMigration, 'CREATE TABLE IF NOT EXISTS contract_item_amendments'), 'Additive audit migration missing.');
