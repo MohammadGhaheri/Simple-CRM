@@ -43,7 +43,7 @@ Existing sales remain valid without any contract_items rows. No product types, i
 3. `crm/database/add_contract_invoice_reversals.sql`
 4. Deploy compatible PHP code **after PR #6 authorization rules are integrated**.
 
-Fresh installs use the updated `crm/database/schema.sql`. These migrations are additive and do not rewrite existing sales or payments.
+Fresh installs use the updated `crm/database/schema.sql`. These migrations are additive and do not rewrite existing sales or payments. The reversal migration changes the invoice-line index and must be run **exactly once** after the first schema migration. Do not apply it on an already-updated fresh schema.
 
 ## Verification and release gates
 
@@ -52,7 +52,7 @@ Fresh installs use the updated `crm/database/schema.sql`. These migrations are a
 - `php crm/tests/contract_sale_atomic_mysql_test.php`: verifies creation of a sale with multiple lines in a single transaction and full rollback when a DB trigger rejects the second line.
 - These tests use temporary isolated databases and never target production.
 - PHP lint on all PHP files.
-- Before merge/deploy: regression testing with complete realistic CRM schema, end-to-end authorization after PR #6 integration, concurrency tests for two simultaneous invoice allocations, backup/restore, and financial settlement regression tests.
+- Before merge/deploy: regression testing with the complete realistic CRM schema, end-to-end authorization after PR #6 integration, backup/restore, and financial settlement regression tests. The isolated two-writer invoice allocation concurrency test is already part of the MariaDB CI suite.
 
 ## Follow-on work
 
@@ -63,3 +63,14 @@ Fresh installs use the updated `crm/database/schema.sql`. These migrations are a
 - Mammut-specific installation fulfillment keyed by `contract_items.id`, device serials and customer delivery receipts.
 
 Tracking: Issue #3 and PR #7; Mammut roadmap in `mammut-connect/docs/ROADMAP-MAMMUT-CONNECT.md`.
+
+## Integration order with the security PR
+
+PR #6 and PR #7 both modify these three files:
+- `.github/workflows/php-smoke.yml`
+- `crm/app/models/Contract.php`
+- `crm/public/index.php`
+
+Do not simply overwrite the later branch with an older version of these files. Integrate both feature sets and retest all HTTP routes: new sale creation; invoice line add, amend, allocate and reverse; sale-owner restrictions; Finance read-only access; non-sales access denial; contract document downloads; existing payment operations. Add the isolated MariaDB tests from both PRs to the final CI job before deployment.
+
+The integration is **not** complete merely because each PR passes CI independently.
