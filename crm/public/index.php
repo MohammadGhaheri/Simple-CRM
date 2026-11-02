@@ -971,11 +971,13 @@ try {
     }
 
     if ($page === 'deals') {
+        require_roles(['admin', 'sales']);
         if ($action === 'delete' && is_post()) {
             require_admin();
             delete_action(fn() => Deal::delete($id), url('deals'));
         }
         if ($action === 'create') {
+            require_sales_manage();
             $deal = ['customer_id' => (int) ($_GET['customer_id'] ?? 0), 'probability' => 20];
             if (is_post()) {
                 verify_csrf();
@@ -990,6 +992,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_sales_manage();
             $deal = Deal::find($id);
             if (!$deal) {
                 redirect(url('deals'));
@@ -1022,6 +1025,7 @@ try {
     }
 
     if ($page === 'contracts') {
+        require_roles(['admin', 'sales', 'finance']);
         if ($action === 'payment_create' && is_post()) {
             require_finance_manage();
             verify_csrf();
@@ -1076,8 +1080,9 @@ try {
         }
         if ($action === 'document_download') {
             $document = ContractDocument::find((int) ($_GET['document_id'] ?? 0));
+            $authorizedContract = $document ? Contract::find((int) $document['contract_id']) : null;
             $file = $document ? contract_document_path((string) $document['file_path']) : null;
-            if (!$document || $file === null) {
+            if (!$document || !$authorizedContract || $file === null) {
                 http_response_code(404);
                 exit('File not found.');
             }
@@ -1101,6 +1106,7 @@ try {
             redirect(url('contracts', ['action' => 'show', 'id' => (int) $document['contract_id'], 'document_deleted' => 1]));
         }
         if ($action === 'document_upload' && is_post()) {
+            require_sales_manage();
             verify_csrf();
             $contract = Contract::find($id);
             if (!$contract) {
@@ -1157,6 +1163,7 @@ try {
             delete_action(fn() => Contract::delete($id), url('contracts'));
         }
         if ($action === 'create') {
+            require_sales_manage();
             $dealId = (int) ($_GET['deal_id'] ?? 0);
             $deal = $dealId > 0 ? Deal::find($dealId) : null;
             $contract = [
@@ -1186,6 +1193,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_sales_manage();
             $contract = Contract::find($id);
             if (!$contract) {
                 redirect(url('contracts'));
