@@ -8,6 +8,7 @@ class Customer
     {
         $sql = 'SELECT c.*, u.name AS owner_name FROM customers c LEFT JOIN users u ON u.id = c.owner_user_id WHERE c.deleted_at IS NULL';
         $params = [];
+        self::applyVisibility($sql, $params, 'c');
 
         if (!empty($filters['q'])) {
             $sql .= ' AND (c.customer_name LIKE ? OR c.customer_code LIKE ? OR c.city LIKE ? OR c.industry LIKE ?)';
@@ -24,14 +25,18 @@ class Customer
         $sql .= ' ORDER BY c.updated_at DESC, c.id DESC';
         $stmt = db()->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll();
+        return self::redactFinancialFields($stmt->fetchAll());
     }
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT c.*, u.name AS owner_name FROM customers c LEFT JOIN users u ON u.id = c.owner_user_id WHERE c.id = ? AND c.deleted_at IS NULL');
-        $stmt->execute([$id]);
-        return $stmt->fetch() ?: null;
+        $sql = 'SELECT c.*, u.name AS owner_name FROM customers c LEFT JOIN users u ON u.id = c.owner_user_id WHERE c.id = ? AND c.deleted_at IS NULL';
+        $params = [$id];
+        self::applyVisibility($sql, $params, 'c');
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
+        $row = $stmt->fetch() ?: null;
+        return $row ? self::redactFinancialFields([$row])[0] : null;
     }
 
     public static function autocomplete(string $query, int $limit = 15): array
@@ -40,19 +45,19 @@ class Customer
         if (preg_match_all('/./u', $query) < 2) {
             return [];
         }
-        $stmt = db()->prepare('
+        $sql = '
             SELECT id, customer_code, customer_name, city
-            FROM customers
+            FROM customers c
             WHERE deleted_at IS NULL
-              AND (customer_name LIKE ? OR customer_code LIKE ? OR city LIKE ?)
-            ORDER BY customer_name
-            LIMIT ?
-        ');
+              AND (customer_name LIKE ? OR customer_code LIKE ? OR city LIKE ?)';
         $like = '%' . $query . '%';
-        $stmt->bindValue(1, $like);
-        $stmt->bindValue(2, $like);
-        $stmt->bindValue(3, $like);
-        $stmt->bindValue(4, max(1, min($limit, 30)), PDO::PARAM_INT);
+        $params = [$like, $like, $like];
+        self::applyVisibility($sql, $params, 'c');
+        $stmt = db()->prepare($sql . ' ORDER BY customer_name LIMIT ?');
+        foreach ($params as $index => $value) {
+            $stmt->bindValue($index + 1, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(count($params) + 1, max(1, min($limit, 30)), PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
     }
@@ -143,7 +148,9 @@ class Customer
             'vehicle_count' => (int) ($data['vehicle_count'] ?? 0),
             'estimated_contract_value' => (float) ($data['estimated_contract_value'] ?? 0),
             'sales_status' => $data['sales_status'] ?? 'New',
-            'owner_user_id' => (int) ($data['owner_user_id'] ?? current_user_id()),
+            'owner_user_id' => self::currentRole() === 'sales'
+                ? current_user_id()
+                : (int) ($data['owner_user_id'] ?? current_user_id()),
             'last_followup_date' => db_date($data['last_followup_date'] ?? null),
             'next_followup_date' => db_date($data['next_followup_date'] ?? null),
             'is_vip' => isset($data['is_vip']) ? 1 : 0,
@@ -184,5 +191,44 @@ class Customer
     public static function statsByType(): array
     {
         return db()->query('SELECT customer_type, COUNT(*) AS total FROM customers WHERE deleted_at IS NULL GROUP BY customer_type ORDER BY total DESC')->fetchAll();
+    }
+
+    private static function applyVisibility(string &$sql, array &$params, string $alias): void
+    {
+        $role = self::currentRole();
+        if (in_array($role, ['admin', 'support'], true)) {
+            return;
+        }
+        if ($role === 'sales') {
+            $sql .= " AND {$alias}.owner_user_id = ?";
+            $params[] = current_user_id();
+            return;
+        }
+        if ($role === 'operations') {
+            $sql .= " AND EXISTS (SELECT 1 FROM activities av WHERE av.customer_id = {$alias}.id AND av.owner_user_id = ? AND av.deleted_at IS NULL)";
+            $params[] = current_user_id();
+            return;
+        }
+        if ($role === 'finance') {
+            $sql .= " AND EXISTS (SELECT 1 FROM contracts cv WHERE cv.customer_id = {$alias}.id AND cv.deleted_at IS NULL)";
+            return;
+        }
+        $sql .= ' AND 1 = 0';
+    }
+
+    private static function redactFinancialFields(array $rows): array
+    {
+        if (in_array(self::currentRole(), ['support', 'operations'], true)) {
+            foreach ($rows as &$row) {
+                $row['estimated_contract_value'] = null;
+            }
+            unset($row);
+        }
+        return $rows;
+    }
+
+    private static function currentRole(): string
+    {
+        return function_exists('current_user_role') ? current_user_role() : 'admin';
     }
 }

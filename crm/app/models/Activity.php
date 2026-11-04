@@ -42,6 +42,7 @@ class Activity
                   AND ((a.activity_date >= ? AND a.activity_date < ?)
                     OR (a.next_followup_date >= ? AND a.next_followup_date < ?))';
         $params = [$from, $to, $from, $to];
+        self::applyVisibility($sql, $params, 'a');
         foreach (['status', 'activity_type', 'owner_user_id'] as $field) {
             if (isset($filters[$field])) {
                 $sql .= " AND a.$field = ?";
@@ -98,6 +99,7 @@ class Activity
     {
         $sql = 'SELECT a.*, c.customer_name, d.deal_name, ct.contract_title, u.name AS owner_name FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id LEFT JOIN users u ON u.id = a.owner_user_id WHERE a.deleted_at IS NULL AND c.deleted_at IS NULL';
         $params = [];
+        self::applyVisibility($sql, $params, 'a');
         if (!empty($filters['q'])) {
             $sql .= ' AND (a.summary LIKE ? OR c.customer_name LIKE ? OR d.deal_name LIKE ? OR ct.contract_title LIKE ?)';
             $q = '%' . $filters['q'] . '%';
@@ -129,37 +131,48 @@ class Activity
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT a.*, d.deal_name, ct.contract_title, u.name AS owner_name FROM activities a LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id LEFT JOIN users u ON u.id = a.owner_user_id WHERE a.customer_id = ? AND a.deleted_at IS NULL ORDER BY a.activity_date DESC, a.id DESC');
-        $stmt->execute([$customerId]);
+        $sql = 'SELECT a.*, d.deal_name, ct.contract_title, u.name AS owner_name FROM activities a LEFT JOIN deals d ON d.id = a.deal_id LEFT JOIN contracts ct ON ct.id = a.contract_id LEFT JOIN users u ON u.id = a.owner_user_id WHERE a.customer_id = ? AND a.deleted_at IS NULL';
+        $params = [$customerId];
+        self::applyVisibility($sql, $params, 'a');
+        $stmt = db()->prepare($sql . ' ORDER BY a.activity_date DESC, a.id DESC');
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
     public static function byDeal(int $dealId): array
     {
-        $stmt = db()->prepare('SELECT a.*, c.customer_name, ct.contract_title FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN contracts ct ON ct.id = a.contract_id WHERE a.deal_id = ? AND a.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY a.activity_date DESC, a.id DESC');
-        $stmt->execute([$dealId]);
+        $sql = 'SELECT a.*, c.customer_name, ct.contract_title FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN contracts ct ON ct.id = a.contract_id WHERE a.deal_id = ? AND a.deleted_at IS NULL AND c.deleted_at IS NULL';
+        $params = [$dealId];
+        self::applyVisibility($sql, $params, 'a');
+        $stmt = db()->prepare($sql . ' ORDER BY a.activity_date DESC, a.id DESC');
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
     public static function byContract(int $contractId): array
     {
-        $stmt = db()->prepare('SELECT a.*, c.customer_name, d.deal_name FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN deals d ON d.id = a.deal_id WHERE a.contract_id = ? AND a.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY a.activity_date DESC, a.id DESC');
-        $stmt->execute([$contractId]);
+        $sql = 'SELECT a.*, c.customer_name, d.deal_name FROM activities a JOIN customers c ON c.id = a.customer_id LEFT JOIN deals d ON d.id = a.deal_id WHERE a.contract_id = ? AND a.deleted_at IS NULL AND c.deleted_at IS NULL';
+        $params = [$contractId];
+        self::applyVisibility($sql, $params, 'a');
+        $stmt = db()->prepare($sql . ' ORDER BY a.activity_date DESC, a.id DESC');
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('
+        $sql = '
             SELECT a.*, c.customer_name, d.deal_name, ct.contract_title, u.name AS owner_name
             FROM activities a
             JOIN customers c ON c.id = a.customer_id
             LEFT JOIN deals d ON d.id = a.deal_id
             LEFT JOIN contracts ct ON ct.id = a.contract_id
             LEFT JOIN users u ON u.id = a.owner_user_id
-            WHERE a.id = ? AND a.deleted_at IS NULL AND c.deleted_at IS NULL
-        ');
-        $stmt->execute([$id]);
+            WHERE a.id = ? AND a.deleted_at IS NULL AND c.deleted_at IS NULL';
+        $params = [$id];
+        self::applyVisibility($sql, $params, 'a');
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetch() ?: null;
     }
 
@@ -187,13 +200,26 @@ class Activity
         $sql = 'UPDATE activities SET customer_id=:customer_id, deal_id=:deal_id, contract_id=:contract_id, activity_date=:activity_date, activity_type=:activity_type, summary=:summary, next_action=:next_action, next_followup_date=:next_followup_date, owner_user_id=:owner_user_id, status=:status, is_internal_task=:is_internal_task, attachment_path=:attachment_path, attachment_name=:attachment_name, attachment_mime=:attachment_mime, attachment_size=:attachment_size, notes=:notes WHERE id=:id';
         $payload = self::payload($data);
         $payload['id'] = $id;
-        db()->prepare($sql)->execute($payload);
-        self::syncCustomerFollowup($data);
+        if (self::currentRole() !== 'admin') {
+            $sql .= ' AND owner_user_id=:authorized_owner_user_id';
+            $payload['authorized_owner_user_id'] = current_user_id();
+        }
+        $stmt = db()->prepare($sql);
+        $stmt->execute($payload);
+        if ($stmt->rowCount() > 0) {
+            self::syncCustomerFollowup($data);
+        }
     }
 
     public static function delete(int $id): void
     {
-        db()->prepare('UPDATE activities SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE id = ?')->execute([$id]);
+        $sql = 'UPDATE activities SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE id = ?';
+        $params = [$id];
+        if (self::currentRole() !== 'admin') {
+            $sql .= ' AND owner_user_id = ?';
+            $params[] = current_user_id();
+        }
+        db()->prepare($sql)->execute($params);
     }
 
     public static function recent(int $limit = 6): array
@@ -349,7 +375,9 @@ class Activity
             'summary' => trim($data['summary'] ?? ''),
             'next_action' => trim($data['next_action'] ?? ''),
             'next_followup_date' => db_date($data['next_followup_date'] ?? null),
-            'owner_user_id' => (int) ($data['owner_user_id'] ?? current_user_id()),
+            'owner_user_id' => self::currentRole() === 'admin'
+                ? (int) ($data['owner_user_id'] ?? current_user_id())
+                : current_user_id(),
             'status' => $data['status'] ?? 'Open',
             'is_internal_task' => isset($data['is_internal_task']) ? 1 : 0,
             'attachment_path' => !empty($data['attachment_path']) ? (string) $data['attachment_path'] : null,
@@ -367,5 +395,23 @@ class Activity
         }
         $stmt = db()->prepare('UPDATE customers SET last_followup_date = ?, next_followup_date = COALESCE(?, next_followup_date) WHERE id = ? AND deleted_at IS NULL');
         $stmt->execute([db_date($data['activity_date'] ?? null) ?: date('Y-m-d'), db_date($data['next_followup_date'] ?? null), (int) $data['customer_id']]);
+    }
+
+    private static function applyVisibility(string &$sql, array &$params, string $alias): void
+    {
+        if (self::currentRole() === 'admin') {
+            return;
+        }
+        if (in_array(self::currentRole(), ['sales', 'support', 'operations'], true)) {
+            $sql .= " AND {$alias}.owner_user_id = ?";
+            $params[] = current_user_id();
+            return;
+        }
+        $sql .= ' AND 1 = 0';
+    }
+
+    private static function currentRole(): string
+    {
+        return function_exists('current_user_role') ? current_user_role() : 'admin';
     }
 }
