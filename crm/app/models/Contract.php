@@ -111,6 +111,10 @@ class Contract
                 throw new RuntimeException('قرارداد پیدا نشد.');
             }
             self::assertAmountCoversPayments($id, $newAmount, $pdo);
+            // A contract with itemized lines cannot be reduced below their total.
+            if (class_exists('ContractItem')) {
+                ContractItem::assertAmountCoversItems($id, $newAmount, $pdo);
+            }
             $pdo->prepare($sql)->execute($payload);
             $pdo->commit();
         } catch (Throwable $e) {

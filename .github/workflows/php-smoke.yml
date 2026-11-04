@@ -1,4 +1,4 @@
-name: PHP lint and focused regression checks
+name: PHP lint and integrated regression checks
 
 on:
   pull_request:
@@ -16,23 +16,29 @@ jobs:
       mysql:
         image: mariadb:10.11
         env:
-          MARIADB_ROOT_PASSWORD: root
+          MARIADB_ROOT_PASSWORD: test_only_password
         ports:
           - 3306:3306
         options: >-
           --health-cmd="healthcheck.sh --connect --innodb_initialized"
           --health-interval=5s
           --health-timeout=5s
-          --health-retries=12
+          --health-retries=20
     steps:
       - name: Checkout pull-request code
         uses: actions/checkout@v4
+      - name: Set up PHP and MySQL driver
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring
       - name: Report PHP version
         run: php -v
       - name: Lint PHP source
         run: find crm -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-      - name: Run feature smoke tests when available
+      - name: Run focused regression tests
         run: |
+          if [ -f crm/tests/contract_items_test.php ]; then php crm/tests/contract_items_test.php; fi
           if [ -f crm/tests/deal_stage_history_test.php ]; then php crm/tests/deal_stage_history_test.php; fi
           if [ -f crm/tests/role_dashboard_test.php ]; then php crm/tests/role_dashboard_test.php; fi
           if [ -f crm/tests/sales_record_authorization_test.php ]; then php crm/tests/sales_record_authorization_test.php; fi
@@ -43,11 +49,25 @@ jobs:
         env:
           CRM_TEST_DB_HOST: 127.0.0.1
           CRM_TEST_DB_USER: root
-          CRM_TEST_DB_PASSWORD: root
+          CRM_TEST_DB_PASSWORD: test_only_password
         run: php crm/tests/deal_stage_history_mysql_test.php
       - name: Run record-authorization MySQL integration tests
         env:
           CRM_TEST_DB_HOST: 127.0.0.1
           CRM_TEST_DB_USER: root
-          CRM_TEST_DB_PASSWORD: root
+          CRM_TEST_DB_PASSWORD: test_only_password
         run: php crm/tests/record_authorization_mysql_test.php
+      - name: Test itemization, invoices and amendments on MariaDB
+        env:
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: '3306'
+          MYSQL_TEST_USER: root
+          MYSQL_TEST_PASSWORD: test_only_password
+        run: php crm/tests/contract_items_mysql_test.php
+      - name: Test atomic contract-and-items creation and rollback
+        env:
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: '3306'
+          MYSQL_TEST_USER: root
+          MYSQL_TEST_PASSWORD: test_only_password
+        run: php crm/tests/contract_sale_atomic_mysql_test.php
