@@ -1065,7 +1065,10 @@ try {
         $itemActions = [
             'item_add' => 'item_saved',
             'item_amend' => 'item_amended',
+            'item_identity_amend' => 'item_amended',
+            'item_cancel' => 'item_cancelled',
             'invoice_add' => 'invoice_saved',
+            'invoice_edit' => 'invoice_saved',
             'invoice_allocate' => 'invoice_allocated',
             'invoice_reverse' => 'invoice_reversed',
         ];
@@ -1097,11 +1100,36 @@ try {
                         (string) ($_POST['reason'] ?? ''),
                         current_user_id()
                     );
+                } elseif ($action === 'item_identity_amend') {
+                    ContractItem::amendIdentity(
+                        $id,
+                        (int) ($_POST['item_id'] ?? 0),
+                        $_POST,
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
+                } elseif ($action === 'item_cancel') {
+                    ContractItem::cancel(
+                        $id,
+                        (int) ($_POST['item_id'] ?? 0),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
                 } elseif ($action === 'invoice_add') {
                     ContractInvoiceRef::create(
                         $id,
                         (string) ($_POST['invoice_number'] ?? ''),
                         trim((string) ($_POST['invoice_date'] ?? ''))
+                    );
+                } elseif ($action === 'invoice_edit') {
+                    ContractInvoiceRef::update(
+                        $id,
+                        (int) ($_POST['invoice_ref_id'] ?? 0),
+                        (string) ($_POST['invoice_number'] ?? ''),
+                        trim((string) ($_POST['invoice_date'] ?? '')),
+                        (string) ($_POST['note'] ?? ''),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
                     );
                 } elseif ($action === 'invoice_allocate') {
                     ContractInvoiceRef::allocate(

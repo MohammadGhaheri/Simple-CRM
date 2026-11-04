@@ -81,6 +81,7 @@ try {
     require __DIR__ . '/../app/core/auth.php';
     require __DIR__ . '/../app/models/Customer.php';
     require __DIR__ . '/../app/models/Contact.php';
+    require __DIR__ . '/../app/models/Contract.php';
     require __DIR__ . '/../app/models/Activity.php';
     require __DIR__ . '/../app/models/Ticket.php';
     require __DIR__ . '/../app/models/TicketMessage.php';
@@ -97,6 +98,20 @@ try {
 
     $_SESSION['user'] = ['id' => 4, 'role' => 'finance'];
     authorization_mysql_expect(Customer::find(1) !== null && Contact::find(1) === null && Ticket::find(1) === null, 'Finance scope failed.');
+    try {
+        Contract::delete(1);
+        throw new RuntimeException('Finance mutated a contract through a direct model call.');
+    } catch (RuntimeException $expected) {
+        authorization_mysql_expect($expected->getMessage() !== 'Finance mutated a contract through a direct model call.', $expected->getMessage());
+    }
+
+    $_SESSION['user'] = ['id' => 1, 'role' => 'sales'];
+    try {
+        Contract::delete(2);
+        throw new RuntimeException('Sales deleted another owner contract by changing its ID.');
+    } catch (RuntimeException $expected) {
+        authorization_mysql_expect($expected->getMessage() !== 'Sales deleted another owner contract by changing its ID.', $expected->getMessage());
+    }
 
     $_SESSION['user'] = ['id' => 5, 'role' => 'operations'];
     $operationsCustomer = Customer::find(2);

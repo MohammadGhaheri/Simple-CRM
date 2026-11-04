@@ -42,7 +42,7 @@ function apply_item_migration(PDO $pdo, string $path): void
 {
     $source = (string) file_get_contents($path);
     // Remove full-line comments before splitting statements; comments may contain semicolons.
-    $source = preg_replace('/^\\s*--[^\\r\\n]*$/m', '', $source);
+    $source = preg_replace('/^\\h*--[^\\r\\n]*(?:\\r?\\n|\\z)/m', '', $source);
     foreach (array_filter(array_map('trim', explode(';', $source))) as $statement) {
         // MariaDB accepts SQL comments preceding the CREATE TABLE statement.
         $pdo->exec($statement);
@@ -56,6 +56,7 @@ try {
     ];
     file_put_contents($configPath, '<?php return ' . var_export($config, true) . ';');
     require __DIR__ . '/../app/core/helpers.php';
+    require __DIR__ . '/../app/core/auth.php';
     require __DIR__ . '/../app/models/ContractItem.php';
     require __DIR__ . '/../app/models/ContractInvoiceRef.php';
     $_SESSION['user'] = ['id' => 1, 'role' => 'admin'];
@@ -65,14 +66,35 @@ try {
     $pdo->exec("CREATE TABLE contracts (
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         contract_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+        owner_user_id INT UNSIGNED NOT NULL,
         deleted_at DATETIME NULL
     ) ENGINE=InnoDB");
-    $pdo->exec("INSERT INTO users (id, name) VALUES (1, 'Test Admin')");
-    $pdo->exec("INSERT INTO contracts (id, contract_amount) VALUES (1, '1000.00'),(2, '1000.00'),(3, '0.00')");
+    $pdo->exec("INSERT INTO users (id, name) VALUES (1, 'Test Admin'), (2, 'Other owner')");
+    $pdo->exec("INSERT INTO contracts (id, contract_amount, owner_user_id) VALUES
+        (1, '1000.00', 1),(2, '1000.00', 1),(3, '0.00', 1),(4, '1000.00', 2)");
 
     apply_item_migration($pdo, __DIR__ . '/../database/add_contract_items.sql');
     apply_item_migration($pdo, __DIR__ . '/../database/add_contract_item_amendments.sql');
     apply_item_migration($pdo, __DIR__ . '/../database/add_contract_invoice_reversals.sql');
+    apply_item_migration($pdo, __DIR__ . '/../database/add_contract_change_audits.sql');
+
+    $_SESSION['user'] = ['id' => 1, 'role' => 'sales'];
+    item_sql_expect_rejection(static function (): void {
+        ContractItem::add([
+            'contract_id' => 4, 'item_type' => 'device', 'item_title' => 'IDOR attempt',
+            'quantity' => 1, 'unit_amount' => '10.00',
+        ]);
+    }, 'Sales user added an item to another owner contract.');
+    item_sql_expect_rejection(
+        static fn() => ContractInvoiceRef::create(4, 'IDOR-INVOICE', '2026-11-02'),
+        'Sales user added an invoice to another owner contract.'
+    );
+    $_SESSION['user'] = ['id' => 4, 'role' => 'finance'];
+    item_sql_expect_rejection(
+        static fn() => ContractInvoiceRef::create(1, 'FINANCE-WRITE', '2026-11-02'),
+        'Finance user mutated a contract invoice.'
+    );
+    $_SESSION['user'] = ['id' => 1, 'role' => 'admin'];
 
     $device = ContractItem::add([
         'contract_id' => 1, 'item_type' => 'device', 'product' => 'IoTruck',
@@ -86,6 +108,19 @@ try {
     item_sql_expect($device > 0 && $service > 0, 'Failed to create multiple lines.');
     item_sql_expect(count(ContractItem::byContract(1)) === 2, 'Multi-item sale not stored.');
     item_sql_expect(count(ContractItem::byContract(3)) === 0, 'Legacy sale was unexpectedly itemized.');
+    $_SESSION['user'] = ['id' => 2, 'role' => 'sales'];
+    item_sql_expect(ContractItem::byContract(1) === [], 'Sales read another owner contract items.');
+    $_SESSION['user'] = ['id' => 4, 'role' => 'finance'];
+    item_sql_expect(count(ContractItem::byContract(1)) === 2, 'Finance read-only item visibility failed.');
+    $_SESSION['user'] = ['id' => 5, 'role' => 'operations'];
+    item_sql_expect(ContractItem::byContract(1) === [], 'Operations received financial item rows.');
+    $_SESSION['user'] = ['id' => 1, 'role' => 'admin'];
+
+    ContractItem::amendIdentity(1, $device, [
+        'item_title' => 'Renamed test device', 'product' => 'IoTruck', 'sku' => 'TEST-TRUCK-V2',
+    ], 'Correct catalogue identity', 1);
+    item_sql_expect(ContractItem::byContract(1)[0]['item_title'] === 'Renamed test device', 'Item identity amendment not persisted.');
+    item_sql_expect(count(ContractItem::changeEventsForContract(1)) === 1, 'Item identity audit event missing.');
 
     $before = count(ContractItem::byContract(1));
     item_sql_expect_rejection(static function (): void {
@@ -99,8 +134,15 @@ try {
     $invoice1 = ContractInvoiceRef::create(1, 'INV-100', '2026-11-02');
     $invoice2 = ContractInvoiceRef::create(1, 'INV-101', '2026-11-02');
     $invoiceOther = ContractInvoiceRef::create(2, 'INV-200', '2026-11-02');
+    ContractInvoiceRef::update(1, $invoice1, 'INV-100-A', '2026-11-03', 'Corrected reference', 'Finance system correction', 1);
+    $editedInvoice = array_values(array_filter(
+        ContractInvoiceRef::byContract(1),
+        static fn(array $invoice): bool => (int) $invoice['id'] === $invoice1
+    ));
+    item_sql_expect(($editedInvoice[0]['invoice_number'] ?? '') === 'INV-100-A', 'Invoice reference edit not persisted.');
+    item_sql_expect(count(ContractInvoiceRef::changeEventsForContract(1)) === 1, 'Invoice reference history missing.');
     item_sql_expect_rejection(
-        static fn() => ContractInvoiceRef::create(1, 'INV-100', '2026-11-02'),
+        static fn() => ContractInvoiceRef::create(1, 'INV-100-A', '2026-11-02'),
         'Duplicate invoice number allowed.'
     );
     ContractInvoiceRef::allocate(1, $invoice1, $device, 2);
@@ -149,13 +191,18 @@ try {
     ContractInvoiceRef::allocate(1, $invoice2, $device, 1);
     item_sql_expect(count(ContractInvoiceRef::allocationsByContract(1)) === 3, 'Corrected allocation not persisted.');
 
-
     ContractItem::assertAmountCoversItems(1, '600.00', $pdo);
     item_sql_expect_rejection(
         static fn() => ContractItem::assertAmountCoversItems(1, '599.99', db()),
         'Contract can be reduced below line-item total.'
     );
     item_sql_expect((int) $pdo->query('SELECT COUNT(*) FROM contract_items')->fetchColumn() === 2, 'Unexpected item records.');
+    ContractItem::cancel(1, $service, 'Service removed before invoicing', 1);
+    item_sql_expect(count(ContractItem::byContract(1)) === 1, 'Cancelled item remains active.');
+    item_sql_expect_rejection(
+        static fn() => ContractItem::cancel(1, $device, 'Must fail while allocated', 1),
+        'Item with active invoice allocations was cancelled.'
+    );
     // Race two independent workers allocating 2 units each from one 3-unit item.
     // Only one may succeed, even with simultaneous requests.
     $raceItem = ContractItem::add([

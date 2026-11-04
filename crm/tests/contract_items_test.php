@@ -28,7 +28,10 @@ contract_item_expect(str_contains($migration, 'UNIQUE KEY uq_contract_items_pare
 contract_item_expect(str_contains($migration, 'UNIQUE KEY uq_contract_invoice_refs_parent'), 'Invoices must expose composite contract/key identity.');
 contract_item_expect(str_contains($migration, 'FOREIGN KEY (contract_id, invoice_ref_id)'), 'Invoice line must enforce same-contract invoice.');
 contract_item_expect(str_contains($migration, 'FOREIGN KEY (contract_id, contract_item_id)'), 'Invoice line must enforce same-contract item.');
-contract_item_expect(str_contains($source, "SELECT id, contract_amount FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE"), 'ContractItem writes must lock the parent contract.');
+contract_item_expect(
+    str_contains($source, 'SELECT id, contract_amount, owner_user_id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE'),
+    'ContractItem writes must lock the parent contract and re-check its owner.'
+);
 contract_item_expect(str_contains($source, '$pdo->rollBack();'), 'ContractItem must roll back on error.');
 contract_item_expect(str_contains($source, 'FILTER_VALIDATE_INT'), 'Quantity must be validated before insert.');
 
@@ -38,10 +41,14 @@ contract_item_expect(str_contains($reverseMigration, 'reversed_at') && str_conta
 contract_item_expect(!preg_match('/\\b(DROP\\s+TABLE|TRUNCATE|DELETE\\s+FROM|UPDATE\\s+contract_invoice_lines)\\b/i', $reverseMigration), 'Reversal migration must not delete existing allocations.');
 contract_item_expect(str_contains(file_get_contents($root . '/app/models/ContractInvoiceRef.php'), 'reverseAllocation('), 'Invoice reversal model method missing.');
 $amendMigration = file_get_contents($root . '/database/add_contract_item_amendments.sql');
+$changeAuditMigration = file_get_contents($root . '/database/add_contract_change_audits.sql');
 contract_item_expect(str_contains($schema, 'CREATE TABLE contract_item_amendments'), 'Fresh installs must include amendment history.');
 contract_item_expect(str_contains($amendMigration, 'CREATE TABLE IF NOT EXISTS contract_item_amendments'), 'Additive audit migration missing.');
 contract_item_expect(!preg_match('/\\b(DROP|TRUNCATE|DELETE\\s+FROM|UPDATE\\s+contract_items)\\b/i', $amendMigration), 'Audit migration must not rewrite existing items.');
 contract_item_expect(str_contains($source, 'INSERT INTO contract_item_amendments'), 'Quantity changes must create audit events.');
+contract_item_expect(str_contains($changeAuditMigration, 'contract_item_change_events') && str_contains($changeAuditMigration, 'contract_invoice_ref_events'), 'Metadata audit migration missing.');
+contract_item_expect(!preg_match('/\b(DROP|TRUNCATE|DELETE\s+FROM|UPDATE\s+)\b/i', $changeAuditMigration), 'Metadata audit migration must be additive.');
+contract_item_expect(str_contains($source, 'function amendIdentity(') && str_contains($source, 'function cancel('), 'Item identity/cancellation workflow missing.');
 contract_item_expect(str_contains($source, 'WHERE contract_id = ? AND contract_item_id = ?'), 'Amendment must respect invoiced quantity.');
 contract_item_expect(str_contains(file_get_contents($root . '/app/models/ContractInvoiceRef.php'), 'FOR UPDATE'), 'Invoice allocation must lock current contract/item.');
 contract_item_expect(ContractItem::lineAmount('199.99', 3) === '599.97', 'Decimal multiplication is inaccurate.');

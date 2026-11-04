@@ -42,6 +42,11 @@ $pdo->exec('CREATE TABLE deals (
     deal_stage TEXT, expected_close_date TEXT, owner_user_id INTEGER, win_loss_reason TEXT,
     notes TEXT, deleted_at TEXT, updated_at TEXT
 )');
+$pdo->exec('CREATE TABLE deal_stage_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, deal_id INTEGER NOT NULL,
+    from_stage TEXT NULL, to_stage TEXT NOT NULL, changed_by_user_id INTEGER NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+)');
 $pdo->exec('CREATE TABLE contracts (
     id INTEGER PRIMARY KEY, contract_type TEXT, contract_number TEXT, contract_title TEXT,
     customer_id INTEGER, deal_id INTEGER, product TEXT, vehicle_count INTEGER,

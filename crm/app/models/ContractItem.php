@@ -11,20 +11,42 @@ class ContractItem
 {
     public static function byContract(int $contractId): array
     {
-        $stmt = db()->prepare('SELECT * FROM contract_items WHERE contract_id = ? AND deleted_at IS NULL ORDER BY line_number, id');
-        $stmt->execute([$contractId]);
+        $sql = 'SELECT i.* FROM contract_items i JOIN contracts ct ON ct.id = i.contract_id
+            WHERE i.contract_id = ? AND i.deleted_at IS NULL AND ct.deleted_at IS NULL';
+        $params = [$contractId];
+        self::applyReadVisibility($sql, $params, 'ct');
+        $stmt = db()->prepare($sql . ' ORDER BY i.line_number, i.id');
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
     public static function amendmentsForContract(int $contractId): array
     {
-        $stmt = db()->prepare('SELECT am.*, i.item_title, u.name AS actor_name
+        $sql = 'SELECT am.*, i.item_title, u.name AS actor_name
             FROM contract_item_amendments am
             JOIN contract_items i ON i.id = am.contract_item_id
             LEFT JOIN users u ON u.id = am.changed_by_user_id
-            WHERE i.contract_id = ?
-            ORDER BY am.created_at DESC, am.id DESC');
-        $stmt->execute([$contractId]);
+            JOIN contracts ct ON ct.id = i.contract_id AND ct.deleted_at IS NULL
+            WHERE i.contract_id = ?';
+        $params = [$contractId];
+        self::applyReadVisibility($sql, $params, 'ct');
+        $stmt = db()->prepare($sql . ' ORDER BY am.created_at DESC, am.id DESC');
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public static function changeEventsForContract(int $contractId): array
+    {
+        $sql = 'SELECT ev.*, i.item_title AS current_item_title, u.name AS actor_name
+            FROM contract_item_change_events ev
+            JOIN contract_items i ON i.id = ev.contract_item_id
+            JOIN contracts ct ON ct.id = ev.contract_id AND ct.deleted_at IS NULL
+            LEFT JOIN users u ON u.id = ev.changed_by_user_id
+            WHERE ev.contract_id = ?';
+        $params = [$contractId];
+        self::applyReadVisibility($sql, $params, 'ct');
+        $stmt = db()->prepare($sql . ' ORDER BY ev.created_at DESC, ev.id DESC');
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
@@ -93,12 +115,13 @@ class ContractItem
         }
         try {
             // This lock serializes line numbering and all contract allocations.
-            $lock = $pdo->prepare('SELECT id, contract_amount FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+            $lock = $pdo->prepare('SELECT id, contract_amount, owner_user_id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
             $lock->execute([$contractId]);
             $contract = $lock->fetch();
             if (!$contract) {
                 throw new RuntimeException('قرارداد یا فروش پیدا نشد.');
             }
+            self::assertMutationAuthorized((int) $contract['owner_user_id']);
             self::assertTotalFits($contractId, $lineAmount, (string) $contract['contract_amount'], $pdo);
             $next = $pdo->prepare('SELECT COALESCE(MAX(line_number),0) + 1 FROM contract_items WHERE contract_id = ?');
             $next->execute([$contractId]);
@@ -142,12 +165,14 @@ class ContractItem
         $pdo = db();
         $pdo->beginTransaction();
         try {
-            $lock = $pdo->prepare('SELECT contract_amount FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+            $lock = $pdo->prepare('SELECT contract_amount, owner_user_id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
             $lock->execute([$contractId]);
-            $contractAmount = $lock->fetchColumn();
-            if ($contractAmount === false) {
+            $contract = $lock->fetch();
+            if (!$contract) {
                 throw new RuntimeException('قرارداد پیدا نشد.');
             }
+            self::assertMutationAuthorized((int) $contract['owner_user_id']);
+            $contractAmount = (string) $contract['contract_amount'];
             $stmt = $pdo->prepare('SELECT id, quantity, unit_amount, line_amount FROM contract_items
                 WHERE id = ? AND contract_id = ? AND deleted_at IS NULL FOR UPDATE');
             $stmt->execute([$itemId, $contractId]);
@@ -181,6 +206,83 @@ class ContractItem
         }
     }
 
+    public static function amendIdentity(int $contractId, int $itemId, array $data, string $reason, int $actorId): void
+    {
+        $title = trim((string) ($data['item_title'] ?? ''));
+        $product = trim((string) ($data['product'] ?? ''));
+        $sku = trim((string) ($data['sku'] ?? ''));
+        $reason = trim($reason);
+        if ($contractId <= 0 || $itemId <= 0 || $actorId <= 0 || $title === '' || $product === ''
+            || mb_strlen($title) > 190 || mb_strlen($product) > 120 || mb_strlen($sku) > 120
+            || $reason === '' || mb_strlen($reason) > 500) {
+            throw new InvalidArgumentException('عنوان، مدل، محصول یا دلیل اصلاح معتبر نیست.');
+        }
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $contract = self::lockContractForMutation($pdo, $contractId);
+            self::assertMutationAuthorized((int) $contract['owner_user_id']);
+            $stmt = $pdo->prepare('SELECT item_title, product, sku FROM contract_items
+                WHERE id = ? AND contract_id = ? AND deleted_at IS NULL FOR UPDATE');
+            $stmt->execute([$itemId, $contractId]);
+            $old = $stmt->fetch();
+            if (!$old) {
+                throw new RuntimeException('قلم متعلق به این قرارداد نیست.');
+            }
+            $newSku = $sku === '' ? null : $sku;
+            if ($old['item_title'] === $title && $old['product'] === $product && $old['sku'] === $newSku) {
+                throw new InvalidArgumentException('مشخصات قلم تغییری نکرده است.');
+            }
+            $pdo->prepare('UPDATE contract_items SET item_title = ?, product = ?, sku = ? WHERE id = ? AND contract_id = ?')
+                ->execute([$title, $product, $newSku, $itemId, $contractId]);
+            self::recordChangeEvent($pdo, $contractId, $itemId, 'identity_amended', $old, [
+                'item_title' => $title, 'product' => $product, 'sku' => $newSku,
+            ], $reason, $actorId);
+            $pdo->commit();
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $error;
+        }
+    }
+
+    public static function cancel(int $contractId, int $itemId, string $reason, int $actorId): void
+    {
+        $reason = trim($reason);
+        if ($contractId <= 0 || $itemId <= 0 || $actorId <= 0 || $reason === '' || mb_strlen($reason) > 500) {
+            throw new InvalidArgumentException('شناسه یا دلیل ابطال قلم معتبر نیست.');
+        }
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $contract = self::lockContractForMutation($pdo, $contractId);
+            self::assertMutationAuthorized((int) $contract['owner_user_id']);
+            $stmt = $pdo->prepare('SELECT item_title, product, sku FROM contract_items
+                WHERE id = ? AND contract_id = ? AND deleted_at IS NULL FOR UPDATE');
+            $stmt->execute([$itemId, $contractId]);
+            $old = $stmt->fetch();
+            if (!$old) {
+                throw new RuntimeException('قلم فعال متعلق به این قرارداد پیدا نشد.');
+            }
+            $allocated = $pdo->prepare('SELECT COALESCE(SUM(invoiced_quantity),0) FROM contract_invoice_lines
+                WHERE contract_id = ? AND contract_item_id = ? AND reversed_at IS NULL');
+            $allocated->execute([$contractId, $itemId]);
+            if ((int) $allocated->fetchColumn() > 0) {
+                throw new DomainException('قلم دارای تخصیص فعال فاکتور است؛ ابتدا تخصیص‌ها را باطل کنید.');
+            }
+            $pdo->prepare('UPDATE contract_items SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND contract_id = ? AND deleted_at IS NULL')
+                ->execute([$itemId, $contractId]);
+            self::recordChangeEvent($pdo, $contractId, $itemId, 'cancelled', $old, $old, $reason, $actorId);
+            $pdo->commit();
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $error;
+        }
+    }
+
     public static function assertAmountCoversItems(int $contractId, string $amount, ?PDO $pdo = null): void
     {
         self::assertTotalFits($contractId, '0.00', normalize_money_decimal($amount, true), $pdo ?: db());
@@ -205,5 +307,61 @@ class ContractItem
         if (money_compare(money_add($current, $newLineAmount), $contractAmount) > 0) {
             throw new DomainException('مجموع مبالغ اقلام از مبلغ قرارداد یا فروش بیشتر می‌شود.');
         }
+    }
+
+    private static function assertMutationAuthorized(int $ownerUserId): void
+    {
+        $role = function_exists('current_user_role') ? current_user_role() : 'admin';
+        if ($role === 'admin' || ($role === 'sales' && $ownerUserId === current_user_id())) {
+            return;
+        }
+        throw new RuntimeException('اجازه تغییر اقلام این قرارداد را ندارید.');
+    }
+
+    private static function lockContractForMutation(PDO $pdo, int $contractId): array
+    {
+        $stmt = $pdo->prepare('SELECT id, owner_user_id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+        $stmt->execute([$contractId]);
+        $contract = $stmt->fetch();
+        if (!$contract) {
+            throw new RuntimeException('قرارداد پیدا نشد.');
+        }
+        return $contract;
+    }
+
+    private static function recordChangeEvent(
+        PDO $pdo,
+        int $contractId,
+        int $itemId,
+        string $eventType,
+        array $old,
+        array $new,
+        string $reason,
+        int $actorId
+    ): void {
+        $pdo->prepare('INSERT INTO contract_item_change_events
+            (contract_id, contract_item_id, event_type, old_item_title, new_item_title,
+             old_product, new_product, old_sku, new_sku, reason, changed_by_user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute([
+                $contractId, $itemId, $eventType,
+                $old['item_title'] ?? null, $new['item_title'] ?? null,
+                $old['product'] ?? null, $new['product'] ?? null,
+                $old['sku'] ?? null, $new['sku'] ?? null,
+                $reason, $actorId,
+            ]);
+    }
+
+    private static function applyReadVisibility(string &$sql, array &$params, string $contractAlias): void
+    {
+        $role = function_exists('current_user_role') ? current_user_role() : 'admin';
+        if (in_array($role, ['admin', 'finance'], true)) {
+            return;
+        }
+        if ($role === 'sales') {
+            $sql .= " AND {$contractAlias}.owner_user_id = ?";
+            $params[] = current_user_id();
+            return;
+        }
+        $sql .= ' AND 1 = 0';
     }
 }

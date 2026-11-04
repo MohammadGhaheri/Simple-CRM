@@ -31,7 +31,7 @@ function atomic_expect(bool $condition, string $description): void
 function atomic_apply(PDO $pdo, string $filename): void
 {
     $sql = (string) file_get_contents($filename);
-    $sql = preg_replace('/^\\s*--[^\\r\\n]*$/m', '', $sql);
+    $sql = preg_replace('/^\\h*--[^\\r\\n]*(?:\\r?\\n|\\z)/m', '', $sql);
     foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
         $pdo->exec($statement);
     }

@@ -105,11 +105,13 @@ class Contract
         $pdo = db();
         $pdo->beginTransaction();
         try {
-            $lock = $pdo->prepare('SELECT id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+            $lock = $pdo->prepare('SELECT id, owner_user_id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
             $lock->execute([$id]);
-            if (!$lock->fetchColumn()) {
+            $lockedContract = $lock->fetch();
+            if (!$lockedContract) {
                 throw new RuntimeException('قرارداد پیدا نشد.');
             }
+            self::assertMutationAuthorized((int) $lockedContract['owner_user_id']);
             self::assertAmountCoversPayments($id, $newAmount, $pdo);
             // A contract with itemized lines cannot be reduced below their total.
             if (class_exists('ContractItem')) {
@@ -131,7 +133,25 @@ class Contract
 
     public static function delete(int $id): void
     {
-        db()->prepare('UPDATE contracts SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE id = ?')->execute([$id]);
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $lock = $pdo->prepare('SELECT owner_user_id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+            $lock->execute([$id]);
+            $ownerUserId = $lock->fetchColumn();
+            if ($ownerUserId === false) {
+                throw new RuntimeException('قرارداد پیدا نشد.');
+            }
+            self::assertMutationAuthorized((int) $ownerUserId);
+            $pdo->prepare('UPDATE contracts SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL')
+                ->execute([$id]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     public static function transferOwner(int $fromUserId, int $toUserId): int
@@ -245,5 +265,17 @@ class Contract
     private static function currentRole(): string
     {
         return function_exists('current_user_role') ? current_user_role() : 'admin';
+    }
+
+    private static function assertMutationAuthorized(int $ownerUserId): void
+    {
+        $role = self::currentRole();
+        if ($role === 'admin') {
+            return;
+        }
+        if ($role === 'sales' && $ownerUserId === current_user_id()) {
+            return;
+        }
+        throw new RuntimeException('اجازه تغییر این قرارداد را ندارید.');
     }
 }

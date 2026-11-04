@@ -6,17 +6,20 @@ if (in_array($itemsRole, ['admin', 'sales', 'finance'], true)):
     $invoiceRefs = ContractInvoiceRef::byContract((int) $contract['id']);
     $invoiceLines = ContractInvoiceRef::allocationsByContract((int) $contract['id']);
     $itemAmendments = ContractItem::amendmentsForContract((int) $contract['id']);
+    $itemChangeEvents = ContractItem::changeEventsForContract((int) $contract['id']);
+    $invoiceChangeEvents = ContractInvoiceRef::changeEventsForContract((int) $contract['id']);
     $canEditItems = in_array($itemsRole, ['admin', 'sales'], true)
         && ($itemsRole === 'admin' || (int) $contract['owner_user_id'] === current_user_id());
     $lineTotal = '0.00';
     foreach ($itemRows as $itemRow) {
         $lineTotal = money_add($lineTotal, (string) $itemRow['line_amount']);
     }
+    $unreconciledAmount = money_subtract((string) $contract['contract_amount'], $lineTotal);
 ?>
 <div class="card" style="margin-top:16px">
     <h3>اقلام قرارداد / فروش</h3>
     <p class="muted">اقلام در ردیف‌های مستقل نگهداری می‌شوند. مبلغ قرارداد منبع رسمی مالی باقی می‌ماند و مجموع اقلام نباید از آن بیشتر شود. قراردادهای قدیمی تا زمانی که به‌صورت دستی قلم‌بندی نشوند، بدون تغییر باقی می‌مانند.</p>
-    <?php if (isset($_GET['item_saved']) || isset($_GET['item_amended']) || isset($_GET['invoice_saved']) || isset($_GET['invoice_allocated'])): ?>
+    <?php if (isset($_GET['item_saved']) || isset($_GET['item_amended']) || isset($_GET['item_cancelled']) || isset($_GET['invoice_saved']) || isset($_GET['invoice_allocated']) || isset($_GET['invoice_reversed'])): ?>
         <div class="alert alert-success">تغییرات اقلام یا مرجع فاکتور با موفقیت ثبت شد.</div>
     <?php endif; ?>
     <?php if (!empty($_SESSION['contract_items_error'])): ?>
@@ -50,6 +53,26 @@ if (in_array($itemsRole, ['admin', 'sales', 'finance'], true)):
                                 <button class="btn btn-small btn-primary" type="submit">ثبت اصلاحیه</button>
                             </form>
                         </details>
+                        <details>
+                            <summary>اصلاح عنوان / مدل</summary>
+                            <form method="post" action="<?= e(url('contracts', ['action' => 'item_identity_amend', 'id' => $contract['id']])) ?>">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="item_id" value="<?= e((string) $item['id']) ?>">
+                                <label>عنوان</label><input name="item_title" maxlength="190" required value="<?= e($item['item_title']) ?>">
+                                <label>دسته محصول</label><select name="product"><?php foreach (product_options() as $option): ?><option value="<?= e($option) ?>" <?= selected($item['product'], $option) ?>><?= e(product_label($option)) ?></option><?php endforeach; ?></select>
+                                <label>مدل / SKU</label><input name="sku" maxlength="120" value="<?= e((string) $item['sku']) ?>">
+                                <label>دلیل اصلاح</label><input name="reason" maxlength="500" required>
+                                <button class="btn btn-small btn-primary" type="submit">ثبت اصلاح مشخصات</button>
+                            </form>
+                        </details>
+                        <details>
+                            <summary>ابطال قلم</summary>
+                            <form method="post" action="<?= e(url('contracts', ['action' => 'item_cancel', 'id' => $contract['id']])) ?>">
+                                <?= csrf_field() ?><input type="hidden" name="item_id" value="<?= e((string) $item['id']) ?>">
+                                <label>دلیل ابطال</label><input name="reason" maxlength="500" required>
+                                <button class="btn btn-small btn-light" type="submit">ثبت ابطال</button>
+                            </form>
+                        </details>
                     </td>
                 <?php endif; ?>
             </tr>
@@ -58,6 +81,11 @@ if (in_array($itemsRole, ['admin', 'sales', 'finance'], true)):
     </table></div>
     <?php if (!$itemRows): ?><div class="empty">برای این فروش هنوز هیچ ردیف کالا یا خدمتی ثبت نشده است.</div><?php endif; ?>
     <p class="muted">جمع اقلام: <strong><?= e(format_money($lineTotal)) ?></strong> — مبلغ قرارداد: <strong><?= e(format_money($contract['contract_amount'])) ?></strong></p>
+    <?php if ($itemRows && money_compare($unreconciledAmount, '0.00') > 0): ?>
+        <div class="alert alert-warning">اختلاف تطبیق مالی: <strong><?= e(format_money($unreconciledAmount)) ?></strong>. این مبلغ ممکن است ناشی از تخفیف، مالیات، خدمت قلم‌بندی‌نشده یا تعدیل دیگری باشد؛ سیستم بدون سند آن را به هیچ عنوانی نسبت نمی‌دهد. پیش از نهایی‌سازی مالی، علت اختلاف را در اقلام یا یادداشت قرارداد مستند کنید.</div>
+    <?php elseif ($itemRows): ?>
+        <div class="alert alert-success">جمع اقلام با مبلغ قرارداد تطبیق کامل دارد.</div>
+    <?php endif; ?>
     <?php if ($canEditItems): ?>
         <details style="margin-top:12px">
             <summary class="btn btn-primary">افزودن قلم کالا / خدمت</summary>
@@ -90,9 +118,18 @@ if (in_array($itemsRole, ['admin', 'sales', 'finance'], true)):
     <h3>مراجع فاکتور فروش</h3>
     <p class="muted">این بخش فقط شماره فاکتور صادرشده در سیستم مالی را به اقلام متصل می‌کند و فاکتور حسابداری صادر نمی‌کند.</p>
     <div class="table-wrap"><table>
-        <thead><tr><th>شماره فاکتور</th><th>تاریخ</th></tr></thead>
+        <thead><tr><th>شماره فاکتور</th><th>تاریخ</th><th>یادداشت</th><?php if ($canEditItems): ?><th>عملیات</th><?php endif; ?></tr></thead>
         <tbody><?php foreach ($invoiceRefs as $invoice): ?>
-            <tr><td><?= e($invoice['invoice_number']) ?></td><td><?= e(fa_date($invoice['invoice_date'])) ?></td></tr>
+            <tr><td><?= e($invoice['invoice_number']) ?></td><td><?= e(fa_date($invoice['invoice_date'])) ?></td><td><?= e((string) $invoice['note']) ?></td>
+            <?php if ($canEditItems): ?><td><details><summary>اصلاح مرجع</summary>
+                <form method="post" action="<?= e(url('contracts', ['action' => 'invoice_edit', 'id' => $contract['id']])) ?>">
+                    <?= csrf_field() ?><input type="hidden" name="invoice_ref_id" value="<?= e((string) $invoice['id']) ?>">
+                    <label>شماره</label><input name="invoice_number" maxlength="120" required value="<?= e($invoice['invoice_number']) ?>">
+                    <label>تاریخ</label><input name="invoice_date" class="date-input" value="<?= e(fa_date($invoice['invoice_date'])) ?>">
+                    <label>یادداشت</label><input name="note" maxlength="2000" value="<?= e((string) $invoice['note']) ?>">
+                    <label>دلیل اصلاح</label><input name="reason" maxlength="500" required>
+                    <button class="btn btn-small btn-primary" type="submit">ثبت اصلاح</button>
+                </form></details></td><?php endif; ?></tr>
         <?php endforeach; ?></tbody>
     </table></div>
     <?php if (!$invoiceRefs): ?><div class="empty">هنوز فاکتوری مرتبط نشده است.</div><?php endif; ?>
@@ -181,6 +218,25 @@ if (in_array($itemsRole, ['admin', 'sales', 'finance'], true)):
                 <td><?= e($am['actor_name'] ?: 'کاربر حذف‌شده') ?></td><td><?= e(fa_datetime($am['created_at'])) ?></td></tr>
         <?php endforeach; ?></tbody>
     </table></div>
+</div>
+<?php endif; ?>
+<?php if ($itemChangeEvents || $invoiceChangeEvents): ?>
+<div class="card" style="margin-top:16px">
+    <h3>تاریخچه تغییر مشخصات و ابطال</h3>
+    <div class="table-wrap"><table><thead><tr><th>نوع</th><th>مرجع</th><th>قبل</th><th>بعد</th><th>دلیل</th><th>ثبت‌کننده</th><th>تاریخ</th></tr></thead><tbody>
+    <?php foreach ($itemChangeEvents as $event): ?><tr>
+        <td><?= $event['event_type'] === 'cancelled' ? 'ابطال قلم' : 'اصلاح مشخصات قلم' ?></td>
+        <td><?= e($event['current_item_title']) ?></td>
+        <td><?= e(trim((string) $event['old_item_title'] . ' / ' . (string) $event['old_product'] . ' / ' . (string) $event['old_sku'], ' /')) ?></td>
+        <td><?= e(trim((string) $event['new_item_title'] . ' / ' . (string) $event['new_product'] . ' / ' . (string) $event['new_sku'], ' /')) ?></td>
+        <td><?= e($event['reason']) ?></td><td><?= e($event['actor_name'] ?: 'کاربر حذف‌شده') ?></td><td><?= e(fa_datetime($event['created_at'])) ?></td>
+    </tr><?php endforeach; ?>
+    <?php foreach ($invoiceChangeEvents as $event): ?><tr>
+        <td>اصلاح مرجع فاکتور</td><td><?= e($event['new_invoice_number']) ?></td>
+        <td><?= e((string) $event['old_invoice_number']) ?></td><td><?= e((string) $event['new_invoice_number']) ?></td>
+        <td><?= e($event['reason']) ?></td><td><?= e($event['actor_name'] ?: 'کاربر حذف‌شده') ?></td><td><?= e(fa_datetime($event['created_at'])) ?></td>
+    </tr><?php endforeach; ?>
+    </tbody></table></div>
 </div>
 <?php endif; ?>
 <?php endif; ?>

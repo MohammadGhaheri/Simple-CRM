@@ -9,7 +9,9 @@ if (PHP_SAPI !== 'cli' || count($argv) !== 5) {
     exit(3);
 }
 require __DIR__ . '/../app/core/helpers.php';
+require __DIR__ . '/../app/core/auth.php';
 require __DIR__ . '/../app/models/ContractInvoiceRef.php';
+$_SESSION['user'] = ['id' => 1, 'role' => 'admin'];
 try {
     ContractInvoiceRef::allocate((int) $argv[1], (int) $argv[2], (int) $argv[3], (int) $argv[4]);
     exit(0);

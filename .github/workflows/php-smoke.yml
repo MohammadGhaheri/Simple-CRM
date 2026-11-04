@@ -71,3 +71,10 @@ jobs:
           MYSQL_TEST_USER: root
           MYSQL_TEST_PASSWORD: test_only_password
         run: php crm/tests/contract_sale_atomic_mysql_test.php
+      - name: Test complete CRM schema and legacy contract compatibility
+        env:
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: '3306'
+          MYSQL_TEST_USER: root
+          MYSQL_TEST_PASSWORD: test_only_password
+        run: php crm/tests/full_schema_contract_mysql_test.php
