@@ -571,8 +571,8 @@ function upload_ticket_image(string $field): ?array
         throw new RuntimeException('فرمت تصویر تیکت مجاز نیست. فقط jpg، png یا webp قابل قبول است.');
     }
 
-    $publicRoot = public_upload_root();
-    $dir = $publicRoot . '/uploads/tickets/' . date('Y/m');
+    $relativeDir = date('Y/m');
+    $dir = ticket_attachment_root() . '/' . $relativeDir;
     if (!is_dir($dir)) {
         if (!mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new RuntimeException('Ticket upload directory could not be created.');
@@ -591,11 +591,36 @@ function upload_ticket_image(string $field): ?array
     }
 
     return [
-        'path' => 'uploads/tickets/' . date('Y/m') . '/' . $filename,
+        'path' => $relativeDir . '/' . $filename,
         'name' => $originalName,
         'mime' => $mime,
         'size' => (int) ($_FILES[$field]['size'] ?? 0),
     ];
+}
+
+function ticket_attachment_root(): string
+{
+    return private_storage_root() . '/ticket-attachments';
+}
+
+function ticket_attachment_path(?string $relativePath): ?string
+{
+    $relativePath = ltrim((string) $relativePath, '/\\');
+    if ($relativePath === '') {
+        return null;
+    }
+    $candidates = [
+        ticket_attachment_root() . '/' . $relativePath,
+        public_upload_root() . '/' . $relativePath,
+    ];
+    foreach ($candidates as $candidate) {
+        $root = realpath(str_starts_with($candidate, ticket_attachment_root()) ? ticket_attachment_root() : public_upload_root());
+        $file = realpath($candidate);
+        if ($root && $file && str_starts_with($file, $root . DIRECTORY_SEPARATOR) && is_file($file)) {
+            return $file;
+        }
+    }
+    return null;
 }
 
 function activity_attachment_root(): string
