@@ -20,6 +20,7 @@ DROP TABLE IF EXISTS login_events;
 DROP TABLE IF EXISTS record_view_events;
 DROP TABLE IF EXISTS user_sessions;
 DROP TABLE IF EXISTS tickets;
+DROP TABLE IF EXISTS deal_stage_events;
 DROP TABLE IF EXISTS deals;
 DROP TABLE IF EXISTS contacts;
 DROP TABLE IF EXISTS customers;
@@ -309,6 +310,23 @@ CREATE TABLE deals (
   deleted_at DATETIME NULL,
   CONSTRAINT fk_deals_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
   CONSTRAINT fk_deals_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+
+CREATE TABLE deal_stage_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  deal_id INT UNSIGNED NOT NULL,
+  from_stage VARCHAR(80) NULL,
+  to_stage VARCHAR(80) NOT NULL,
+  changed_by_user_id INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_deal_stage_events_deal_time (deal_id, created_at, id),
+  INDEX idx_deal_stage_events_time (created_at, to_stage),
+  INDEX idx_deal_stage_events_actor (changed_by_user_id, created_at),
+  CONSTRAINT fk_deal_stage_events_deal
+    FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE CASCADE,
+  CONSTRAINT fk_deal_stage_events_actor
+    FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE contracts (
