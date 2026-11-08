@@ -137,6 +137,32 @@ try {
     mammut_expect((int) $pdo->query("SELECT COUNT(*) FROM fulfillment_events WHERE contract_item_id={$itemA} AND event_type='obligation_completed'")->fetchColumn() === 1, 'Completion event/finance follow-up was not created once.');
     DeliveryReceipt::cancel($receipt2, 'Customer rejected second handover', 3);
     mammut_expect((int) InstallationObligation::find($itemA)['remaining_quantity'] === 1, 'Receipt cancellation did not reopen remaining quantity.');
+    mammut_expect((int) $pdo->query("SELECT COUNT(*) FROM fulfillment_events
+        WHERE contract_item_id={$itemA} AND event_type='obligation_reopened'")->fetchColumn() === 1,
+        'Reopened obligation audit event missing.');
+    mammut_expect((int) $pdo->query("SELECT COUNT(*) FROM fulfillment_events
+        WHERE contract_item_id={$itemA} AND event_type='obligation_completed'
+          AND finance_followup_status='pending'")->fetchColumn() === 0,
+        'Cancelled handover left an invalid pending finance task.');
+    $receipt3 = DeliveryReceipt::createApproved(
+        [$r2],
+        ['receipt_number' => 'R-3', 'receiver_name' => 'Customer', 'delivered_at' => '2026-11-08 12:00'],
+        3
+    );
+    mammut_expect((int) InstallationObligation::find($itemA)['remaining_quantity'] === 0,
+        'Re-accepted customer handover did not re-complete obligation.');
+    mammut_expect((int) $pdo->query("SELECT COUNT(*) FROM fulfillment_events
+        WHERE contract_item_id={$itemA} AND event_type='obligation_completed'")->fetchColumn() === 2,
+        'Re-completion should record a new financial follow-up cycle.');
+    mammut_expect((int) $pdo->query("SELECT COUNT(*) FROM fulfillment_events
+        WHERE contract_item_id={$itemA} AND event_type='obligation_completed'
+          AND finance_followup_status='pending'")->fetchColumn() === 1,
+        'Re-completion must create exactly one active finance follow-up.');
+    // The HTTP controller must ignore attacker-supplied receipt file paths.
+    $routerSource = (string) file_get_contents(__DIR__ . '/../public/index.php');
+    mammut_expect(str_contains($routerSource, "unset(\$_POST['evidence_path'], \$_POST['evidence_name']);"),
+        'Client-provided private receipt paths are not discarded by the router.');
+
     $_SESSION['user'] = ['id' => 1, 'role' => 'admin'];
     mammut_reject(static fn() => ContractItem::amendQuantity(1, $itemA, 1, 'invalid reduction', 1), 'Commitment was reduced below active installations.');
     mammut_reject(static fn() => ContractItem::cancel(1, $itemA, 'invalid cancellation with installs', 1),
