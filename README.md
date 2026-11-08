@@ -10,6 +10,15 @@
 SOURCE /path/to/crm/database/add_deal_stage_events.sql;
 ```
 
+این migration باید **پیش از استقرار هر نسخه‌ای که شامل `Deal::create/update` جدید است** اجرا شود. در انتشار یکپارچهٔ تاریخچه فروش و اقلام قرارداد، ترتیب الزامی migrationها چنین است:
+
+1. `add_deal_stage_events.sql`
+2. `add_contract_items.sql`
+3. `add_contract_item_amendments.sql`
+4. `add_contract_invoice_reversals.sql` (فقط یک بار)
+5. `add_contract_change_audits.sql`
+6. استقرار کد جدید، فقط بعد از موفقیت همه مراحل بالا
+
 نصب جدید این جدول را مستقیماً از `crm/database/schema.sql` می‌سازد. تاریخچه ماه‌های پیش از فعال‌شدن قابلیت عمداً بازسازی نمی‌شود چون زمان واقعی تغییر مراحل در داده‌های قدیمی موجود نیست. آزمون ایستا با `php crm/tests/deal_stage_history_test.php` اجرا می‌شود؛ قبل از انتشار، آزمون عملکردی با MySQL واقعی نیز ضروری است.
 
 

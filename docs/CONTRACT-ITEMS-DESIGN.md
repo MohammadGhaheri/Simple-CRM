@@ -40,11 +40,12 @@ Existing sales remain valid without any contract_items rows. No product types, i
 
 **Do not run on production until approved.** Take a verified backup and test on a copy.
 
-1. `crm/database/add_contract_items.sql`
-2. `crm/database/add_contract_item_amendments.sql`
-3. `crm/database/add_contract_invoice_reversals.sql`
-4. `crm/database/add_contract_change_audits.sql`
-5. Deploy compatible PHP code **after PR #6 authorization rules are integrated**.
+1. `crm/database/add_deal_stage_events.sql` — must exist before deploying `Deal::create/update` history writes.
+2. `crm/database/add_contract_items.sql`
+3. `crm/database/add_contract_item_amendments.sql`
+4. `crm/database/add_contract_invoice_reversals.sql`
+5. `crm/database/add_contract_change_audits.sql`
+6. Deploy compatible PHP code **only after all migrations above succeed** and PR #6 authorization rules are integrated.
 
 Fresh installs use the updated `crm/database/schema.sql`. These migrations are additive and do not rewrite existing sales or payments. The reversal migration changes the invoice-line index and must be run **exactly once** after the first schema migration. Do not apply it on an already-updated fresh schema.
 
@@ -53,6 +54,7 @@ Fresh installs use the updated `crm/database/schema.sql`. These migrations are a
 - `php crm/tests/contract_items_test.php`: precise money multiplication, static FK and input checks.
 - `php crm/tests/contract_items_mysql_test.php`: live MariaDB transaction/rollback tests for line-item creation, ceiling enforcement, invoice isolation, allocation correction/reversal, amendments, and two-process allocation concurrency.
 - `php crm/tests/contract_sale_atomic_mysql_test.php`: verifies creation of a sale with multiple lines in a single transaction and full rollback when a DB trigger rejects the second line.
+- `php crm/tests/deal_stage_history_mysql_test.php`: applies the deal-stage migration to a legacy schema with an existing deal, proves the legacy row is preserved without invented history, then verifies new writes and concurrency.
 - These tests use temporary isolated databases and never target production.
 - PHP lint on all PHP files.
 - Before merge/deploy: regression testing with the complete realistic CRM schema, end-to-end authorization after PR #6 integration, backup/restore, and financial settlement regression tests. The isolated two-writer invoice allocation concurrency test is already part of the MariaDB CI suite.

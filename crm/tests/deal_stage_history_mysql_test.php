@@ -10,13 +10,14 @@ if (($argv[1] ?? '') === '--worker') {
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, PDO::ATTR_EMULATE_PREPARES => false]
     );
     $GLOBALS['deal_test_pdo'] = $pdo;
-    $GLOBALS['deal_test_user_id'] = (int) $argv[7];
+    $dealId = (int) $argv[7];
+    $GLOBALS['deal_test_user_id'] = (int) $argv[8];
     require __DIR__ . '/../app/models/Deal.php';
-    $row = $pdo->query('SELECT * FROM deals WHERE id=1')->fetch();
-    $row['deal_stage'] = $argv[8];
-    $row['expected_stage'] = $argv[9];
+    $row = $pdo->query("SELECT * FROM deals WHERE id={$dealId}")->fetch();
+    $row['deal_stage'] = $argv[9];
+    $row['expected_stage'] = $argv[10];
     try {
-        Deal::update(1, $row);
+        Deal::update($dealId, $row);
         exit(0);
     } catch (DomainException) {
         exit(2);
@@ -83,12 +84,20 @@ try {
         CONSTRAINT fk_test_deal_customer FOREIGN KEY (customer_id) REFERENCES customers(id),
         CONSTRAINT fk_test_deal_owner FOREIGN KEY (owner_user_id) REFERENCES users(id)
     ) ENGINE=InnoDB");
+    $pdo->exec("INSERT INTO users (id,name) VALUES (1,'User One'),(2,'User Two')");
+    $pdo->exec("INSERT INTO customers (id,customer_name) VALUES (1,'Test Customer')");
+    $pdo->exec("INSERT INTO deals
+        (id,deal_name,customer_id,product,vehicle_count,estimated_amount,probability,weighted_amount,deal_stage,owner_user_id)
+        VALUES (1,'Legacy deal',1,'Other',1,500,10,50,'Lead',1)");
+
     $migration = file_get_contents(__DIR__ . '/../database/add_deal_stage_events.sql');
     foreach (array_filter(array_map('trim', explode(';', $migration))) as $statement) {
         $pdo->exec($statement);
     }
-    $pdo->exec("INSERT INTO users (id,name) VALUES (1,'User One'),(2,'User Two')");
-    $pdo->exec("INSERT INTO customers (id,customer_name) VALUES (1,'Test Customer')");
+    deal_mysql_expect((int) $pdo->query('SELECT COUNT(*) FROM deals WHERE id=1')->fetchColumn() === 1,
+        'Upgrade migration changed an existing deal.');
+    deal_mysql_expect((int) $pdo->query('SELECT COUNT(*) FROM deal_stage_events')->fetchColumn() === 0,
+        'Upgrade migration invented history for a legacy deal.');
 
     require __DIR__ . '/../app/models/Deal.php';
     $base = [
@@ -99,9 +108,9 @@ try {
     ];
 
     $id = Deal::create($base);
-    deal_mysql_expect($id === 1, 'Deal creation failed.');
+    deal_mysql_expect($id === 2, 'Deal creation failed after legacy-schema migration.');
     deal_mysql_expect((int) $pdo->query('SELECT COUNT(*) FROM deal_stage_events')->fetchColumn() === 1, 'Initial event was not recorded.');
-    $initial = $pdo->query('SELECT from_stage,to_stage,changed_by_user_id FROM deal_stage_events WHERE deal_id=1')->fetch();
+    $initial = $pdo->query("SELECT from_stage,to_stage,changed_by_user_id FROM deal_stage_events WHERE deal_id={$id}")->fetch();
     deal_mysql_expect($initial['from_stage'] === null && $initial['to_stage'] === 'Lead' && (int) $initial['changed_by_user_id'] === 1, 'Initial event data is incorrect.');
 
     Deal::update($id, $base + ['expected_stage' => 'Lead', 'notes' => 'No stage change']);
@@ -118,11 +127,11 @@ try {
         throw new RuntimeException('Event foreign-key failure did not abort the update.');
     } catch (PDOException) {
     }
-    deal_mysql_expect($pdo->query('SELECT deal_stage FROM deals WHERE id=1')->fetchColumn() === 'Qualified', 'Failed event did not roll back the deal stage.');
+    deal_mysql_expect($pdo->query("SELECT deal_stage FROM deals WHERE id={$id}")->fetchColumn() === 'Qualified', 'Failed event did not roll back the deal stage.');
 
-    $pdo->exec("UPDATE deals SET deal_stage='Lead' WHERE id=1");
+    $pdo->exec("UPDATE deals SET deal_stage='Lead' WHERE id={$id}");
     $pdo->exec('DELETE FROM deal_stage_events WHERE id > 1');
-    $commandBase = [PHP_BINARY, __FILE__, '--worker', $host, (string) $port, $database, $username, base64_encode($password)];
+    $commandBase = [PHP_BINARY, __FILE__, '--worker', $host, (string) $port, $database, $username, base64_encode($password), (string) $id];
     $p1 = proc_open([...$commandBase, '1', 'Qualified', 'Lead'], [], $pipes1, null, null, ['bypass_shell' => true]);
     $p2 = proc_open([...$commandBase, '2', 'Proposal', 'Lead'], [], $pipes2, null, null, ['bypass_shell' => true]);
     $exitCodes = [proc_close($p1), proc_close($p2)];

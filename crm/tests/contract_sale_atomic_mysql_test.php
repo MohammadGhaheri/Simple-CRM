@@ -37,10 +37,15 @@ function atomic_apply(PDO $pdo, string $filename): void
     }
 }
 
-// Contract model compatibility mocks: no external messaging or reminders.
+// Contract model compatibility mock: records renewal side effects in the same
+// isolated database so rejected updates can prove they caused none.
 class Activity
 {
-    public static function createOrUpdateContractRenewal(array $contract): void {}
+    public static function createOrUpdateContractRenewal(array $contract): void
+    {
+        db()->prepare('INSERT INTO activity_side_effects (contract_id, customer_id) VALUES (?, ?)')
+            ->execute([(int) $contract['id'], (int) $contract['customer_id']]);
+    }
 }
 class Setting
 {
@@ -54,6 +59,7 @@ try {
     ];
     file_put_contents($configPath, '<?php return ' . var_export($config, true) . ';');
     require __DIR__ . '/../app/core/helpers.php';
+    require __DIR__ . '/../app/core/auth.php';
     require __DIR__ . '/../app/models/Contract.php';
     require __DIR__ . '/../app/models/ContractItem.php';
     require __DIR__ . '/../app/models/ContractSaleService.php';
@@ -61,8 +67,9 @@ try {
     $_SESSION['user'] = ['id' => 1, 'role' => 'sales'];
     $pdo = db();
     $pdo->exec('CREATE TABLE users (id INT UNSIGNED PRIMARY KEY, name VARCHAR(120)) ENGINE=InnoDB');
-    $pdo->exec('CREATE TABLE customers (id INT UNSIGNED PRIMARY KEY, customer_name VARCHAR(190), deleted_at DATETIME NULL) ENGINE=InnoDB');
-    $pdo->exec('CREATE TABLE deals (id INT UNSIGNED PRIMARY KEY, deal_name VARCHAR(190)) ENGINE=InnoDB');
+    $pdo->exec('CREATE TABLE customers (id INT UNSIGNED PRIMARY KEY, customer_name VARCHAR(190), owner_user_id INT UNSIGNED, deleted_at DATETIME NULL) ENGINE=InnoDB');
+    $pdo->exec('CREATE TABLE deals (id INT UNSIGNED PRIMARY KEY, deal_name VARCHAR(190), customer_id INT UNSIGNED, owner_user_id INT UNSIGNED, deleted_at DATETIME NULL) ENGINE=InnoDB');
+    $pdo->exec('CREATE TABLE activity_side_effects (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, contract_id INT UNSIGNED, customer_id INT UNSIGNED) ENGINE=InnoDB');
     $pdo->exec("CREATE TABLE contracts (
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         contract_type VARCHAR(40) NOT NULL DEFAULT 'formal',
@@ -81,8 +88,11 @@ try {
         notes TEXT NULL,
         deleted_at DATETIME NULL
     ) ENGINE=InnoDB");
-    $pdo->exec("INSERT INTO users (id,name) VALUES (1,'Sales')");
-    $pdo->exec("INSERT INTO customers (id,customer_name) VALUES (1,'Test customer')");
+    $pdo->exec("INSERT INTO users (id,name) VALUES (1,'Sales One'),(2,'Sales Two'),(9,'Admin')");
+    $pdo->exec("INSERT INTO customers (id,customer_name,owner_user_id) VALUES
+        (1,'Own customer',1),(2,'Foreign customer',2)");
+    $pdo->exec("INSERT INTO deals (id,deal_name,customer_id,owner_user_id) VALUES
+        (1,'Own deal',1,1),(2,'Foreign deal',2,2),(3,'Mismatched deal',2,1)");
     atomic_apply($pdo, __DIR__ . '/../database/add_contract_items.sql');
 
     $base = [
@@ -98,6 +108,38 @@ try {
     atomic_expect(count(ContractItem::byContract($sale)) === 2, 'Initial item lines not committed with contract.');
     atomic_expect((string) Contract::find($sale)['contract_amount'] === '500.00', 'Contract amount changed unexpectedly.');
     atomic_expect(!$pdo->inTransaction(), 'Transaction not closed after success.');
+
+    $sideEffectsBeforeTamper = (int) $pdo->query('SELECT COUNT(*) FROM activity_side_effects')->fetchColumn();
+    try {
+        Contract::update($sale, array_merge($base, ['customer_id' => 2, 'deal_id' => 2]));
+        throw new RuntimeException('Sales relinked a contract to another owner customer/deal.');
+    } catch (RuntimeException $expected) {
+        atomic_expect(
+            $expected->getMessage() !== 'Sales relinked a contract to another owner customer/deal.',
+            $expected->getMessage()
+        );
+    }
+    $afterForeignRelink = $pdo->query("SELECT customer_id, deal_id, contract_title FROM contracts WHERE id = {$sale}")->fetch();
+    atomic_expect((int) $afterForeignRelink['customer_id'] === 1 && $afterForeignRelink['deal_id'] === null,
+        'Rejected foreign relink changed contract parent references.');
+    atomic_expect($afterForeignRelink['contract_title'] === 'Atomic sale', 'Rejected relink partially changed contract fields.');
+    atomic_expect((int) $pdo->query('SELECT COUNT(*) FROM activity_side_effects')->fetchColumn() === $sideEffectsBeforeTamper,
+        'Rejected relink created a renewal activity side effect.');
+    atomic_expect(!$pdo->inTransaction(), 'Rejected relink leaked an open transaction.');
+
+    $_SESSION['user'] = ['id' => 9, 'role' => 'admin'];
+    try {
+        Contract::update($sale, array_merge($base, ['customer_id' => 1, 'deal_id' => 2]));
+        throw new RuntimeException('Admin linked a deal to an inconsistent customer.');
+    } catch (RuntimeException $expected) {
+        atomic_expect(
+            $expected->getMessage() !== 'Admin linked a deal to an inconsistent customer.',
+            $expected->getMessage()
+        );
+    }
+    atomic_expect((int) $pdo->query('SELECT COUNT(*) FROM activity_side_effects')->fetchColumn() === $sideEffectsBeforeTamper,
+        'Rejected inconsistent deal created a renewal activity side effect.');
+    $_SESSION['user'] = ['id' => 1, 'role' => 'sales'];
 
     $legacy = ContractSaleService::create($base + [], []);
     atomic_expect(count(ContractItem::byContract($legacy)) === 0, 'Legacy no-item sale must not be auto-itemized.');

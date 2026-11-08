@@ -112,6 +112,11 @@ class Contract
                 throw new RuntimeException('قرارداد پیدا نشد.');
             }
             self::assertMutationAuthorized((int) $lockedContract['owner_user_id']);
+            self::assertParentReferencesAuthorized(
+                $pdo,
+                (int) $payload['customer_id'],
+                $payload['deal_id'] === null ? null : (int) $payload['deal_id']
+            );
             self::assertAmountCoversPayments($id, $newAmount, $pdo);
             // A contract with itemized lines cannot be reduced below their total.
             if (class_exists('ContractItem')) {
@@ -277,5 +282,45 @@ class Contract
             return;
         }
         throw new RuntimeException('اجازه تغییر این قرارداد را ندارید.');
+    }
+
+    /**
+     * Lock and validate proposed parent references in the same transaction as
+     * the contract update. This closes the edit-time IDOR/TOCTOU window and
+     * guarantees that a deal cannot be linked to a different customer.
+     */
+    private static function assertParentReferencesAuthorized(PDO $pdo, int $customerId, ?int $dealId): void
+    {
+        if ($customerId <= 0) {
+            throw new InvalidArgumentException('مشتری انتخاب‌شده معتبر نیست.');
+        }
+
+        $customerStmt = $pdo->prepare('SELECT id, owner_user_id FROM customers
+            WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+        $customerStmt->execute([$customerId]);
+        $customer = $customerStmt->fetch();
+        if (!$customer) {
+            throw new RuntimeException('مشتری مقصد پیدا نشد یا حذف شده است.');
+        }
+
+        $role = self::currentRole();
+        if ($role === 'sales' && (int) $customer['owner_user_id'] !== current_user_id()) {
+            throw new RuntimeException('اجازه اتصال قرارداد به این مشتری را ندارید.');
+        }
+
+        if ($dealId === null) {
+            return;
+        }
+
+        $dealStmt = $pdo->prepare('SELECT id, customer_id, owner_user_id FROM deals
+            WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+        $dealStmt->execute([$dealId]);
+        $deal = $dealStmt->fetch();
+        if (!$deal || (int) $deal['customer_id'] !== $customerId) {
+            throw new RuntimeException('فرصت فروش مقصد به مشتری انتخاب‌شده تعلق ندارد.');
+        }
+        if ($role === 'sales' && (int) $deal['owner_user_id'] !== current_user_id()) {
+            throw new RuntimeException('اجازه اتصال قرارداد به این فرصت فروش را ندارید.');
+        }
     }
 }

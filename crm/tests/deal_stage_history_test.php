@@ -8,6 +8,7 @@ $root = dirname(__DIR__);
 $deal = file_get_contents($root . '/app/models/Deal.php');
 $schema = file_get_contents($root . '/database/schema.sql');
 $migration = file_get_contents($root . '/database/add_deal_stage_events.sql');
+$releaseGuide = file_get_contents(dirname($root) . '/docs/CONTRACT-ITEMS-DESIGN.md');
 
 function stage_expect(bool $condition, string $message): void
 {
@@ -35,6 +36,11 @@ stage_expect(str_contains($migration, 'FOREIGN KEY (deal_id) REFERENCES deals(id
 stage_expect(str_contains($migration, 'changed_by_user_id'), 'History must retain actor attribution.');
 stage_expect(!preg_match('/\\b(DROP|TRUNCATE|DELETE\\s+FROM|UPDATE\\s+deals)\\b/i', $migration), 'Migration must not modify existing deal data.');
 stage_expect(!preg_match('/INSERT\\s+INTO\\s+deal_stage_events/i', $migration), 'Migration must not invent historical stage transitions.');
+stage_expect(str_contains($releaseGuide, 'add_deal_stage_events.sql'), 'Release checklist omits the deal-stage migration.');
+stage_expect(
+    strpos($releaseGuide, 'add_deal_stage_events.sql') < strpos($releaseGuide, 'add_contract_items.sql'),
+    'Deal-stage migration must precede contract item migrations in the release checklist.'
+);
 
 $form = file_get_contents($root . '/app/views/deals/_form.php');
 $controller = file_get_contents($root . '/public/index.php');
