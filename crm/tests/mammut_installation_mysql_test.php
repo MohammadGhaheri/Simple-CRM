@@ -71,7 +71,7 @@ try {
     $pdo->exec("CREATE TABLE users (id INT UNSIGNED PRIMARY KEY, name VARCHAR(120), role VARCHAR(30), is_active TINYINT DEFAULT 1) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE customers (id INT UNSIGNED PRIMARY KEY, customer_name VARCHAR(190), deleted_at DATETIME NULL) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE contracts (id INT UNSIGNED PRIMARY KEY, contract_number VARCHAR(80), contract_title VARCHAR(190), customer_id INT UNSIGNED, owner_user_id INT UNSIGNED, contract_amount DECIMAL(18,2), deleted_at DATETIME NULL) ENGINE=InnoDB");
-    $pdo->exec("INSERT INTO users VALUES (1,'Admin','admin',1),(2,'Sales','sales',1),(3,'Operations','operations',1),(4,'Finance','finance',1),(5,'Support','support',1)");
+    $pdo->exec("INSERT INTO users VALUES (1,'Admin','admin',1),(2,'Sales','sales',1),(3,'Operations','operations',1),(4,'Finance','finance',1),(5,'Support','support',1),(6,'Other Sales','sales',1)");
     $pdo->exec("INSERT INTO customers VALUES (1,'Customer A',NULL),(2,'Customer B',NULL),(3,'Legacy Customer',NULL)");
     $pdo->exec("INSERT INTO contracts VALUES (1,'C-1','Device sale',1,2,10000,NULL),(2,'C-2','Other sale',2,2,10000,NULL),(3,'OLD','Legacy sale',3,2,5000,NULL)");
     mammut_apply($pdo, __DIR__ . '/../database/add_contract_items.sql');
@@ -128,14 +128,42 @@ try {
     InstallationRecord::transition($over, 'in_progress', 'attempt over capacity', 3);
     mammut_reject(static fn() => InstallationRecord::transition($over, 'installed', 'must exceed capacity', 3), 'Installation exceeded committed quantity.');
 
-    $receipt1 = DeliveryReceipt::createApproved([$r1], ['receipt_number' => 'R-1', 'receiver_name' => 'Customer', 'delivered_at' => '2026-11-08 10:00'], 3);
+    $receipt1 = DeliveryReceipt::createApproved([$r1], [
+        'receipt_number' => 'R-1', 'receiver_name' => 'Customer', 'delivered_at' => '2026-11-08 10:00',
+        'evidence_path' => '2026/11/receipt-one.pdf', 'evidence_name' => 'receipt-one.pdf',
+    ], 3);
+    // Read access must be enforced inside the receipt model, not only in the HTTP controller.
+    $_SESSION['user'] = ['id' => 6, 'role' => 'sales'];
+    mammut_expect(DeliveryReceipt::byContractItem($itemA) === [], 'Foreign Sales user can read another owner receipt list.');
+    mammut_expect(DeliveryReceipt::evidenceForViewer($receipt1) === null, 'Foreign Sales user can resolve receipt evidence.');
+    $_SESSION['user'] = ['id' => 2, 'role' => 'sales'];
+    mammut_expect(count(DeliveryReceipt::byContractItem($itemA)) === 1, 'Owning Sales user cannot read their receipt.');
+    mammut_expect(DeliveryReceipt::evidenceForViewer($receipt1) !== null, 'Owning Sales user cannot read authorized evidence.');
+    $_SESSION['user'] = ['id' => 5, 'role' => 'support'];
+    mammut_expect(count(DeliveryReceipt::byContractItem($itemA)) === 1, 'Support must see approved delivered device receipts.');
+    mammut_expect(DeliveryReceipt::evidenceForViewer($receipt1) !== null, 'Support cannot access authorized active receipt evidence.');
+    $_SESSION['user'] = ['id' => 3, 'role' => 'operations'];
     mammut_expect((int) InstallationObligation::find($itemA)['remaining_quantity'] === 1, 'Partial delivery remaining quantity is wrong.');
     mammut_reject(static fn() => DeliveryReceipt::createApproved([$r1], ['receipt_number' => 'R-DUP', 'receiver_name' => 'Customer', 'delivered_at' => '2026-11-08 10:00'], 3), 'Installation was delivered twice.');
     mammut_reject(static fn() => DeliveryReceipt::createApproved([$r1, InstallationRecord::create($itemB, ['serial_number' => 'CROSS-1'], 3)], ['receipt_number' => 'R-CROSS', 'receiver_name' => 'Customer', 'delivered_at' => '2026-11-08 10:00'], 3), 'Cross-contract receipt was accepted.');
-    $receipt2 = DeliveryReceipt::createApproved([$r2], ['receipt_number' => 'R-2', 'receiver_name' => 'Customer', 'delivered_at' => '2026-11-08 11:00'], 3);
+    $receipt2 = DeliveryReceipt::createApproved([$r2], [
+        'receipt_number' => 'R-2', 'receiver_name' => 'Customer', 'delivered_at' => '2026-11-08 11:00',
+        'evidence_path' => '2026/11/receipt-two.pdf', 'evidence_name' => 'receipt-two.pdf',
+    ], 3);
     mammut_expect((int) InstallationObligation::find($itemA)['remaining_quantity'] === 0, 'Completed obligation did not reach zero.');
     mammut_expect((int) $pdo->query("SELECT COUNT(*) FROM fulfillment_events WHERE contract_item_id={$itemA} AND event_type='obligation_completed'")->fetchColumn() === 1, 'Completion event/finance follow-up was not created once.');
     DeliveryReceipt::cancel($receipt2, 'Customer rejected second handover', 3);
+    $_SESSION['user'] = ['id' => 5, 'role' => 'support'];
+    mammut_expect(count(DeliveryReceipt::byContractItem($itemA)) === 1,
+        'Support can see cancelled receipts that are no longer an active handover.');
+    mammut_expect(DeliveryReceipt::evidenceForViewer($receipt2) === null,
+        'Support can download evidence for a cancelled receipt.');
+    mammut_expect(DeliveryReceipt::evidenceForViewer($receipt1) !== null,
+        'Support lost access to still-valid handover evidence.');
+    $_SESSION['user'] = ['id' => 1, 'role' => 'admin'];
+    mammut_expect(DeliveryReceipt::evidenceForViewer($receipt2) !== null,
+        'Admin lost the audit reference to a cancelled receipt.');
+    $_SESSION['user'] = ['id' => 3, 'role' => 'operations'];
     mammut_expect((int) InstallationObligation::find($itemA)['remaining_quantity'] === 1, 'Receipt cancellation did not reopen remaining quantity.');
     mammut_expect((int) $pdo->query("SELECT COUNT(*) FROM fulfillment_events
         WHERE contract_item_id={$itemA} AND event_type='obligation_reopened'")->fetchColumn() === 1,
@@ -162,6 +190,10 @@ try {
     $routerSource = (string) file_get_contents(__DIR__ . '/../public/index.php');
     mammut_expect(str_contains($routerSource, "unset(\$_POST['evidence_path'], \$_POST['evidence_name']);"),
         'Client-provided private receipt paths are not discarded by the router.');
+    mammut_expect(str_contains($routerSource, 'DeliveryReceipt::evidenceForViewer('),
+        'Receipt evidence route does not use model-level authorization.');
+    mammut_expect(str_contains($routerSource, 'if (!$canMutateInstallations)'),
+        'Mutation route fails to reject unauthorized users before processing uploads.');
 
     $_SESSION['user'] = ['id' => 1, 'role' => 'admin'];
     mammut_reject(static fn() => ContractItem::amendQuantity(1, $itemA, 1, 'invalid reduction', 1), 'Commitment was reduced below active installations.');
