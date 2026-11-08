@@ -66,6 +66,24 @@ async function main() {
         assert.equal(detailDimensions.direction, 'rtl', label + ': detail is not RTL');
         assert(detailDimensions.width <= detailDimensions.viewport + 24,
           label + ': detail horizontal overflow: ' + detailDimensions.width + ' / ' + detailDimensions.viewport);
+        const kpis = await page.evaluate(() => {
+          const grid = document.querySelector('.installation-stats');
+          if (!grid) return null;
+          const cards = Array.from(grid.querySelectorAll('.installation-stat'));
+          return {
+            layout: getComputedStyle(grid).display,
+            columns: getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length,
+            count: cards.length,
+            values: cards.map(card => card.querySelector('strong')?.textContent.trim()),
+            labels: cards.map(card => card.querySelector('span')?.textContent.trim()),
+          };
+        });
+        assert(kpis && kpis.layout === 'grid' && kpis.count === 4,
+          label + ': 4 individual KPI cards are missing');
+        assert.equal(kpis.columns, width <= 720 ? 2 : 4,
+          label + ': KPI grid does not have the expected responsive column count');
+        assert(kpis.values.every(value => /^\d+$/.test(value)),
+          label + ': one or more commitment metrics are not readable numeric values');
         await page.screenshot({ path: path.join(destination, label + '-detail.png'), fullPage: true });
         screenshots++;
       } else if (label.includes('finance')) {
