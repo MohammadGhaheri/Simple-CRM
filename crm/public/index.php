@@ -140,6 +140,10 @@ try {
                 exit('Method not allowed.');
             }
             verify_csrf();
+            if (!$canMutateInstallations) {
+                http_response_code(403);
+                exit('شما اجازه تغییر اطلاعات نصب و تحویل را ندارید.');
+            }
             try {
                 if ($action === 'record_create') {
                     InstallationRecord::create((int) ($_POST['contract_item_id'] ?? 0), $_POST, current_user_id());
@@ -184,22 +188,16 @@ try {
             }
         }
         if ($action === 'evidence_download') {
-            $stmt = db()->prepare('SELECT dr.evidence_path, dr.evidence_name, ir.contract_item_id
-                FROM delivery_receipts dr
-                JOIN delivery_receipt_items dri ON dri.delivery_receipt_id = dr.id
-                JOIN installation_records ir ON ir.id = dri.installation_record_id
-                WHERE dr.id = ? LIMIT 1');
-            $stmt->execute([(int) ($_GET['receipt_id'] ?? 0)]);
-            $receipt = $stmt->fetch();
-            $authorized = $receipt ? InstallationObligation::find((int) $receipt['contract_item_id']) : null;
+            $receipt = DeliveryReceipt::evidenceForViewer((int) ($_GET['receipt_id'] ?? 0));
             $file = $receipt ? contract_document_path((string) $receipt['evidence_path']) : null;
-            if (!$receipt || !$authorized || $file === null) {
+            if (!$receipt || $file === null) {
                 http_response_code(404);
                 exit('File not found.');
             }
             header('Content-Type: application/octet-stream');
             header('Content-Length: ' . filesize($file));
-            header("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode((string) $receipt['evidence_name']));
+            header("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode(sanitize_uploaded_filename((string) ($receipt['evidence_name'] ?: 'delivery-receipt'))));
+            header('Cache-Control: private, no-store');
             header('X-Content-Type-Options: nosniff');
             readfile($file);
             exit;
