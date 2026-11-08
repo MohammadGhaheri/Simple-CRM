@@ -58,6 +58,27 @@ Only after successful verification and an agreed retention/rollback plan should 
 - Maintain `Content-Type` safeguards and review `inline` attachment serving headers before production acceptance.
 - Test account-specific access with Admin, Support, other staff roles and unrelated customer portal contacts.
 
-## 4. Release status
+## 4. Private ticket evidence in full backups
+
+The original CRM private ticket-storage helper referenced a nonexistent
+`private_storage_root()` function, and the full ZIP backup omitted
+`crm/storage/ticket-attachments`. Both defects are fixed in this PR.
+
+New full ZIP backups use **manifest format v2**, which includes the private
+ticket directory and checksum metadata. The restore validator continues to
+accept pre-change **v1** backups containing the four original storage roots.
+Version 2 archives missing the ticket root are rejected.
+
+`php crm/tests/private_ticket_backup_test.php` verifies a real synthetic ZIP
+containing private ticket evidence, its checksum, v1 backward compatibility
+and rejection of a truncated v2 manifest. It requires the PHP `zip` extension.
+
+**Critical:** old v1 ZIP archives do **not** contain the new private ticket
+attachments. Do not treat an old v1 archive as a complete backup of a site
+that already has private tickets. Before production rollout, separately back
+up those files, verify a fresh v2 full backup, and test an actual restore on
+a disconnected staging copy. Do not restore to production as a test.
+
+## 5. Release status
 
 These are **pre-deployment requirements**, not actions performed by GitHub CI. This PR is not merged or deployed just because unit and integration tests pass.
