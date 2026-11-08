@@ -600,7 +600,10 @@ function upload_ticket_image(string $field): ?array
 
 function ticket_attachment_root(): string
 {
-    return private_storage_root() . '/ticket-attachments';
+    // Keep private ticket files outside the public web root.
+    // The previous private_storage_root() call referenced a nonexistent
+    // helper and caused new ticket uploads and full backup creation to fail.
+    return dirname(__DIR__, 2) . '/storage/ticket-attachments';
 }
 
 function ticket_attachment_path(?string $relativePath): ?string
