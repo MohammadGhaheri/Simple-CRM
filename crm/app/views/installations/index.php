@@ -68,10 +68,25 @@ $statusLabels = [
 <td><?= e($record['imei'] ?: $record['serial_number']) ?><div class="muted"><?= e($record['device_model']) ?></div></td>
 <td><?= e((string) ($record['license_plate'] ?: $record['vin'])) ?></td><td><?= e((string) ($record['technician_name'] ?: 'ثبت‌نشده')) ?></td>
 <td><?= e($statusLabels[$record['status']] ?? $record['status']) ?></td><td><?= !empty($record['is_delivered']) ? 'تحویل قطعی' : '—' ?></td>
-<?php if ($canMutateInstallations): ?><td><form method="post" action="<?= e(url('installations', ['action' => 'transition', 'id' => $obligation['contract_item_id']])) ?>">
-<?= csrf_field() ?><input type="hidden" name="contract_item_id" value="<?= e((string) $obligation['contract_item_id']) ?>"><input type="hidden" name="installation_id" value="<?= e((string) $record['id']) ?>">
-<select name="to_status"><option value="in_progress">در حال اجرا</option><option value="installed">نصب انجام‌شده</option><option value="pending_approval">در انتظار تأیید</option><option value="approved">تأییدشده</option><option value="failed">ناموفق</option><option value="cancelled">لغوشده</option></select>
-<input name="reason" maxlength="500" required placeholder="دلیل تغییر"><button class="btn btn-small btn-light">ثبت</button></form></td><?php endif; ?>
+<?php if ($canMutateInstallations): ?>
+<td>
+<?php $nextStatuses = InstallationRecord::allowedNextStatuses((string) $record['status']); ?>
+<?php if ($nextStatuses): ?>
+<form method="post" action="<?= e(url('installations', ['action' => 'transition', 'id' => $obligation['contract_item_id']])) ?>">
+<?= csrf_field() ?>
+<input type="hidden" name="contract_item_id" value="<?= e((string) $obligation['contract_item_id']) ?>">
+<input type="hidden" name="installation_id" value="<?= e((string) $record['id']) ?>">
+<label>وضعیت بعدی</label>
+<select name="to_status" required>
+<?php foreach ($nextStatuses as $nextStatus): ?>
+<option value="<?= e($nextStatus) ?>"><?= e($statusLabels[$nextStatus] ?? $nextStatus) ?></option>
+<?php endforeach; ?>
+</select>
+<input name="reason" maxlength="500" required placeholder="دلیل تغییر"><button class="btn btn-small btn-light">ثبت</button>
+</form>
+<?php else: ?><span class="muted">بدون تغییر مجاز</span><?php endif; ?>
+</td>
+<?php endif; ?>
 </tr><?php endforeach; ?><?php if (!$installationRows): ?><tr><td colspan="6" class="empty">هنوز نصب دستگاهی ثبت نشده است.</td></tr><?php endif; ?></tbody></table></div></div>
 
 <?php if ($canMutateInstallations): $deliverable = array_filter($installationRows, static fn(array $row): bool => $row['status'] === 'approved' && empty($row['is_delivered'])); ?>
