@@ -28,6 +28,7 @@ $serverPdo->exec("CREATE DATABASE {$dbName} CHARACTER SET utf8mb4 COLLATE utf8mb
 $webProcess = null;
 $sessionFiles = [];
 $evidenceFile = null;
+$uploadedEvidenceFile = null;
 $logPath = tempnam(sys_get_temp_dir(), 'crm-http-test-');
 
 function http_expect(bool $condition, string $message): void
@@ -53,6 +54,47 @@ function http_request(int $port, string $sessionId, string $path, string $method
     $statusLine = (string) ($responseHeaders[0] ?? '');
     if (!preg_match('/^HTTP\/\d(?:\.\d)?\s+(\d{3})/', $statusLine, $matches)) {
         throw new RuntimeException('HTTP integration test received no HTTP status: ' . $path);
+    }
+    return [(int) $matches[1], $result === false ? '' : $result];
+}
+
+/**
+ * Send an actual multipart/form-data request through PHP's web server to test
+ * $_FILES / move_uploaded_file(), rather than spoofing a path via ordinary POST.
+ */
+function http_multipart_receipt(int $port, string $sessionId, string $csrf, string $path,
+    int $installationId, string $receiptNumber, string $filename, string $mime, string $bytes): array
+{
+    $boundary = '----mammut-http-' . bin2hex(random_bytes(10));
+    $fields = [
+        'csrf_token' => $csrf,
+        'contract_item_id' => '1',
+        'installation_ids[]' => (string) $installationId,
+        'receipt_number' => $receiptNumber,
+        'receiver_name' => 'Test Receiver',
+        'delivered_at' => '2026-11-08T12:00',
+    ];
+    $body = '';
+    foreach ($fields as $name => $value) {
+        $body .= "--{$boundary}\r\nContent-Disposition: form-data; name=\"{$name}\"\r\n\r\n{$value}\r\n";
+    }
+    $body .= "--{$boundary}\r\nContent-Disposition: form-data; name=\"evidence_file\"; filename=\"{$filename}\"\r\n";
+    $body .= "Content-Type: {$mime}\r\n\r\n" . $bytes . "\r\n";
+    $body .= "--{$boundary}--\r\n";
+    $context = stream_context_create(['http' => [
+        'method' => 'POST',
+        'content' => $body,
+        'ignore_errors' => true,
+        'follow_location' => 0,
+        'timeout' => 10,
+        'header' => "Cookie: PHPSESSID={$sessionId}\r\nConnection: close\r\n"
+            . "Content-Type: multipart/form-data; boundary={$boundary}\r\n"
+            . 'Content-Length: ' . strlen($body) . "\r\n",
+    ]]);
+    $result = @file_get_contents("http://127.0.0.1:{$port}/index.php?{$path}", false, $context);
+    $responseHeaders = $http_response_header ?? [];
+    if (!preg_match('/^HTTP\/\d(?:\.\d)?\s+(\d{3})/', (string) ($responseHeaders[0] ?? ''), $matches)) {
+        throw new RuntimeException('Multipart receipt upload returned no HTTP status.');
     }
     return [(int) $matches[1], $result === false ? '' : $result];
 }
@@ -309,7 +351,45 @@ try {
     http_expect($status === 200 && $body === $evidenceContent,
         'Admin cannot inspect cancelled receipt audit evidence.');
 
-    echo "Mammut full HTTP workflow and role/CSRF/evidence tests passed.\n";
+    // Real multipart upload path: reject a disguised non-PDF first.
+    $countBeforeUpload = (int) $pdo->query('SELECT COUNT(*) FROM delivery_receipts')->fetchColumn();
+    [$status] = http_multipart_receipt(
+        $httpPort, $sessions['operations']['id'], $sessions['operations']['csrf'],
+        $deliveryRoute, $installationId, 'HTTP-BAD-PDF', 'invalid.pdf',
+        'application/pdf', 'this is not a valid PDF'
+    );
+    http_expect($status === 302, 'Invalid uploaded file did not redirect to the form.');
+    http_expect((int) $pdo->query('SELECT COUNT(*) FROM delivery_receipts')->fetchColumn() === $countBeforeUpload,
+        'Invalid PDF spoof generated a delivery receipt.');
+
+    $pdfContents = "%PDF-1.4\n"
+        . "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+        . "2 0 obj\n<< /Type /Pages /Count 0 /Kids [] >>\nendobj\n"
+        . "trailer\n<< /Root 1 0 R >>\n%%EOF\n";
+    [$status] = http_multipart_receipt(
+        $httpPort, $sessions['operations']['id'], $sessions['operations']['csrf'],
+        $deliveryRoute, $installationId, 'HTTP-REAL-PDF', 'handover.pdf',
+        'application/pdf', $pdfContents
+    );
+    http_expect($status === 302, 'Real multipart PDF upload did not redirect.');
+    $uploadedReceipt = $pdo->query("SELECT * FROM delivery_receipts
+        WHERE receipt_number='HTTP-REAL-PDF' ORDER BY id DESC LIMIT 1")->fetch();
+    http_expect($uploadedReceipt && $uploadedReceipt['status'] === 'approved'
+        && $uploadedReceipt['evidence_name'] === 'handover.pdf'
+        && $uploadedReceipt['evidence_path'], 'Multipart evidence metadata was not saved correctly.');
+    $evidenceRelative = (string) $uploadedReceipt['evidence_path'];
+    http_expect(!str_contains($evidenceRelative, '..'), 'Evidence path contains traversal.');
+    $uploadedEvidenceFile = $root . '/storage/contract-documents/' . $evidenceRelative;
+    http_expect(is_file($uploadedEvidenceFile)
+        && file_get_contents($uploadedEvidenceFile) === $pdfContents,
+        'Uploaded private PDF was not stored with correct bytes.');
+    [$status, $downloadBody] = $get('support', 'page=installations&action=evidence_download&receipt_id=' . $uploadedReceipt['id']);
+    http_expect($status === 200 && $downloadBody === $pdfContents,
+        'Support cannot download authorized uploaded PDF via exact receipt route.');
+    [$status] = $get('other', 'page=installations&action=evidence_download&receipt_id=' . $uploadedReceipt['id']);
+    http_expect($status === 404, 'Nonowner Sales can download a real uploaded private PDF.');
+
+    echo "Mammut full HTTP workflow, real multipart PDF evidence, and role/CSRF tests passed.\n";
 } catch (Throwable $error) {
     if (is_file($logPath)) {
         fwrite(STDERR, "Test-only PHP server log (tail):\n" . substr((string) file_get_contents($logPath), -5500) . "\n");
@@ -327,6 +407,9 @@ try {
     }
     if ($evidenceFile && is_file($evidenceFile)) {
         unlink($evidenceFile);
+    }
+    if ($uploadedEvidenceFile && is_file($uploadedEvidenceFile)) {
+        unlink($uploadedEvidenceFile);
     }
     if (is_file($configPath)) {
         unlink($configPath);
