@@ -200,6 +200,10 @@ try {
     http_expect($status === 302, 'Authorized Operations installation create failed: ' . $status);
     $installationId = (int) $pdo->query('SELECT id FROM installation_records')->fetchColumn();
     http_expect($installationId > 0, 'Authorized installation was not stored.');
+    [$status, $html] = $get('operations', 'page=installations&action=show&id=1');
+    http_expect($status === 200 && str_contains($html, '<option value="in_progress">')
+        && !str_contains($html, '<option value="approved">'),
+        'Scheduled installation view offers an illegal direct approval transition.');
 
     foreach (['in_progress', 'installed', 'pending_approval', 'approved'] as $nextStatus) {
         [$status] = $post('operations', 'page=installations&action=transition&id=1', [
@@ -210,6 +214,11 @@ try {
         $actual = (string) $pdo->query("SELECT status FROM installation_records WHERE id={$installationId}")->fetchColumn();
         http_expect($actual === $nextStatus, 'HTTP transition did not persist ' . $nextStatus);
     }
+
+    [$status, $html] = $get('operations', 'page=installations&action=show&id=1');
+    http_expect($status === 200 && str_contains($html, 'بدون تغییر مجاز')
+        && !str_contains($html, '<select name="to_status"'),
+        'Approved installation should not expose an enabled status-change action.');
 
     $deliveryRoute = 'page=installations&action=delivery_create&id=1';
     [$status] = $post('sales', $deliveryRoute, [
