@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require __DIR__ . '/../app/services/ReleaseSchemaPreflight.php';
+
 /**
  * Rehearse six ordered migrations on disposable MariaDB created from the
  * pre-PR#8 Mammut Connect schema in actual Git history.
@@ -60,6 +62,10 @@ try {
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
     upgrade_sql($pdo, $oldSchema);
+    $before = ReleaseSchemaPreflight::inspect($pdo);
+    upgrade_check($before['state'] === 'legacy' && $before['completed_steps'] === 0
+        && $before['next_migration'] === 'add_deal_stage_events.sql',
+        'Old schema preflight did not identify the correct first migration.');
     $pdo->exec("INSERT INTO users (id,name,email,password_hash,role)
         VALUES (1,'Legacy Owner','legacy-mammut@example.test','TEST','sales')");
     $pdo->exec("INSERT INTO customers (id,customer_code,customer_name,owner_user_id)
@@ -80,11 +86,20 @@ try {
         'add_contract_change_audits.sql',
         'add_mammut_installation_fulfillment.sql',
     ];
-    foreach ($migrations as $migration) {
+    foreach ($migrations as $index => $migration) {
         $contents = (string) file_get_contents($root . '/crm/database/' . $migration);
         upgrade_check($contents !== '', 'Required migration is missing: ' . $migration);
         upgrade_sql($pdo, $contents);
+        $progress = ReleaseSchemaPreflight::inspect($pdo);
+        upgrade_check($progress['completed_steps'] === $index + 1
+            && $progress['state'] !== 'manual_review_required',
+            'Preflight did not recognize completed migration ' . $migration);
+        $expectedNext = $migrations[$index + 1] ?? null;
+        upgrade_check($progress['next_migration'] === $expectedNext,
+            'Preflight suggested an incorrect next migration after ' . $migration);
     }
+    upgrade_check($progress['state'] === 'mammut_ready' && !$progress['production_ready'],
+        'Inspector must report all six schema steps but never approve a production release.');
 
     $deal = $pdo->query('SELECT deal_name, deal_stage, owner_user_id FROM deals WHERE id=1')->fetch();
     upgrade_check($deal && $deal['deal_name'] === 'Historical deal'
