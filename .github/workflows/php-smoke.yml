@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   php-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned for Playwright Chromium dependency compatibility
     services:
       mysql:
         image: mariadb:10.11
