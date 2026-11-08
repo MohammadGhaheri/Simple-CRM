@@ -177,6 +177,50 @@ a { color: inherit; text-decoration: none; }
 .stat span { color: var(--muted); }
 .stat strong { font-size: 24px; }
 
+/* Mammut fulfillment metrics: four clear cards on desktop, two on phones. */
+.installation-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.installation-stat {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 14px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  text-align: center;
+}
+.installation-stat span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.installation-stat strong {
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.installation-mobile-hint { display: none; }
+@media (max-width: 720px) {
+  .installation-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .installation-stat { padding: 12px 8px; }
+  .installation-mobile-hint {
+    display: block;
+    margin: 6px 0 10px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+}
+
 .toolbar {
   display: flex;
   align-items: center;
