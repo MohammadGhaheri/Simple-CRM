@@ -100,22 +100,54 @@ final class DeliveryReceipt
             if (!$receipt) {
                 throw new RuntimeException('رسید فعال پیدا نشد.');
             }
+            // Capture the exact completed obligations BEFORE the receipt is
+            // revoked. A cancelled receipt may reopen a previously completed
+            // commitment and must retire its stale pending finance follow-up.
+            $items = $pdo->prepare('SELECT DISTINCT ir.contract_item_id, i.quantity
+                FROM delivery_receipt_items dri
+                JOIN installation_records ir ON ir.id = dri.installation_record_id
+                JOIN contract_items i ON i.id = ir.contract_item_id
+                WHERE dri.delivery_receipt_id = ?');
+            $items->execute([$receiptId]);
+            $affected = $items->fetchAll();
+            $wasComplete = [];
+            foreach ($affected as $item) {
+                $itemId = (int) $item['contract_item_id'];
+                $wasComplete[$itemId] = self::deliveredSaleCount($pdo, $itemId) >= (int) $item['quantity'];
+            }
             $pdo->prepare("UPDATE delivery_receipts SET status = 'cancelled', cancelled_by_user_id = ?,
                 cancelled_at = CURRENT_TIMESTAMP, cancellation_reason = ? WHERE id = ?")
                 ->execute([$actorId, $reason, $receiptId]);
             $pdo->prepare('UPDATE delivery_receipt_items SET revoked_at = CURRENT_TIMESTAMP
                 WHERE delivery_receipt_id = ? AND revoked_at IS NULL')->execute([$receiptId]);
-            $items = $pdo->prepare('SELECT DISTINCT ir.contract_item_id FROM delivery_receipt_items dri
-                JOIN installation_records ir ON ir.id = dri.installation_record_id WHERE dri.delivery_receipt_id = ?');
-            $items->execute([$receiptId]);
-            foreach ($items->fetchAll() as $item) {
+
+            $logCancellation = $pdo->prepare('INSERT INTO fulfillment_events
+                (contract_id, contract_item_id, event_type, event_key, details, created_by_user_id)
+                VALUES (?, ?, ?, ?, ?, ?)');
+            $logReopening = $pdo->prepare("INSERT IGNORE INTO fulfillment_events
+                (contract_id, contract_item_id, event_type, event_key, details, created_by_user_id)
+                VALUES (?, ?, 'obligation_reopened', ?, ?, ?)");
+            $retireFollowups = $pdo->prepare("UPDATE fulfillment_events
+                SET finance_followup_status = 'not_required'
+                WHERE contract_id = ? AND contract_item_id = ?
+                  AND event_type = 'obligation_completed'
+                  AND finance_followup_status = 'pending'");
+
+            foreach ($affected as $item) {
                 $itemId = (int) $item['contract_item_id'];
-                $pdo->prepare('INSERT INTO fulfillment_events
-                    (contract_id, contract_item_id, event_type, event_key, details, created_by_user_id)
-                    VALUES (?, ?, ?, ?, ?, ?)')->execute([
-                        $receipt['contract_id'], $itemId, 'receipt_cancelled',
-                        "receipt-cancelled:{$receiptId}:{$itemId}", $reason, $actorId,
+                $logCancellation->execute([
+                    $receipt['contract_id'], $itemId, 'receipt_cancelled',
+                    "receipt-cancelled:{$receiptId}:{$itemId}", $reason, $actorId,
+                ]);
+                if ($wasComplete[$itemId]
+                    && self::deliveredSaleCount($pdo, $itemId) < (int) $item['quantity']) {
+                    $retireFollowups->execute([$receipt['contract_id'], $itemId]);
+                    $logReopening->execute([
+                        $receipt['contract_id'], $itemId,
+                        "obligation-reopened:{$receiptId}:{$itemId}",
+                        'تعهد پس از ابطال رسید مجدداً باز شد: ' . $reason, $actorId,
                     ]);
+                }
             }
             $pdo->commit();
         } catch (Throwable $error) {
