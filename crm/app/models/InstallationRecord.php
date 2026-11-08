@@ -44,6 +44,9 @@ final class InstallationRecord
         if ($kind !== 'sale' && $replacesId === null) {
             throw new InvalidArgumentException('نصب جایگزین باید به نصب قبلی ارجاع داشته باشد.');
         }
+        if ($kind === 'sale' && $replacesId !== null) {
+            throw new InvalidArgumentException('نصب فروش جدید نمی‌تواند به نصب جایگزین‌شده ارجاع داشته باشد.');
+        }
         if (!in_array($status, ['scheduled', 'in_progress'], true)) {
             throw new InvalidArgumentException('وضعیت اولیه نصب معتبر نیست.');
         }
@@ -51,6 +54,19 @@ final class InstallationRecord
         $pdo->beginTransaction();
         try {
             $item = self::lockInstallableItem($pdo, $contractItemId);
+            if ($replacesId !== null) {
+                $priorStmt = $pdo->prepare('SELECT contract_id, contract_item_id, customer_id, status
+                    FROM installation_records WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+                $priorStmt->execute([$replacesId]);
+                $prior = $priorStmt->fetch();
+                if (!$prior
+                    || (int) $prior['contract_id'] !== (int) $item['contract_id']
+                    || (int) $prior['contract_item_id'] !== $contractItemId
+                    || (int) $prior['customer_id'] !== (int) $item['customer_id']
+                    || !in_array($prior['status'], ['approved', 'failed'], true)) {
+                    throw new DomainException('ارجاع نصب جایگزین باید به سابقه معتبر همان قلم، قرارداد و مشتری باشد.');
+                }
+            }
             $deviceModel = trim((string) ($data['device_model'] ?? $item['item_title']));
             if ($deviceModel === '' || mb_strlen($deviceModel) > 190) {
                 throw new InvalidArgumentException('مدل دستگاه معتبر نیست.');
