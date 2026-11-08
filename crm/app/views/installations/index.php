@@ -20,6 +20,7 @@ $statusLabels = [
     <button class="btn btn-primary">فیلتر</button>
 </form>
 
+<p class="installation-mobile-hint">برای دیدن ستون‌های بیشتر، جدول را به چپ بکشید.</p>
 <div class="table-wrap"><table>
     <thead><tr><th>مشتری</th><th>قرارداد / فروش</th><th>دستگاه</th><th>تعهد</th><th>نصب‌شده</th><th>تأییدشده</th><th>تحویل قطعی</th><th>مانده</th><th>وضعیت</th><th>مسئول اجرا</th><th>آخرین فعالیت</th><th></th></tr></thead>
     <tbody><?php foreach ($obligations as $row): ?><tr>
@@ -37,11 +38,11 @@ $statusLabels = [
 <?php if ($obligation): ?>
 <div class="card" style="margin-top:18px">
     <h3><?= e($obligation['customer_name']) ?> — <?= e($obligation['item_title']) ?></h3>
-    <div class="stats-grid">
-        <div class="stat-card"><span>تعداد تعهد</span><strong><?= e((string) $obligation['committed_quantity']) ?></strong></div>
-        <div class="stat-card"><span>نصب تأییدشده</span><strong><?= e((string) $obligation['approved_quantity']) ?></strong></div>
-        <div class="stat-card"><span>تحویل قطعی</span><strong><?= e((string) $obligation['delivered_quantity']) ?></strong></div>
-        <div class="stat-card"><span>مانده</span><strong><?= e((string) $obligation['remaining_quantity']) ?></strong></div>
+    <div class="installation-stats">
+        <div class="installation-stat"><span>تعداد تعهد</span><strong><?= e((string) $obligation['committed_quantity']) ?></strong></div>
+        <div class="installation-stat"><span>نصب تأییدشده</span><strong><?= e((string) $obligation['approved_quantity']) ?></strong></div>
+        <div class="installation-stat"><span>تحویل قطعی</span><strong><?= e((string) $obligation['delivered_quantity']) ?></strong></div>
+        <div class="installation-stat"><span>مانده</span><strong><?= e((string) $obligation['remaining_quantity']) ?></strong></div>
     </div>
 </div>
 
