@@ -76,6 +76,7 @@ class Ticket
                   AND c.deleted_at IS NULL
                   AND ct.deleted_at IS NULL";
         [$where, $params] = self::filterConditions($filters);
+        self::applyVisibility($where, $params, 't');
         $sql .= $where;
         $sql .= ' ORDER BY t.created_at DESC, t.id DESC';
         $stmt = db()->prepare($sql);
@@ -91,6 +92,7 @@ class Ticket
                 JOIN contacts ct ON ct.id = t.contact_id
                 WHERE t.deleted_at IS NULL AND c.deleted_at IS NULL AND ct.deleted_at IS NULL';
         [$where, $params] = self::filterConditions($filters);
+        self::applyVisibility($where, $params, 't');
         $stmt = db()->prepare($sql . $where . ' ORDER BY t.created_at DESC, t.id DESC');
         $stmt->execute($params);
         return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
@@ -137,7 +139,7 @@ class Ticket
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT t.*, c.customer_name, c.is_vip, ct.contact_name, u.name AS assigned_name
+        $sql = 'SELECT t.*, c.customer_name, c.is_vip, ct.contact_name, u.name AS assigned_name
             FROM tickets t
             JOIN customers c ON c.id = t.customer_id
             JOIN contacts ct ON ct.id = t.contact_id
@@ -145,8 +147,11 @@ class Ticket
             WHERE t.id = ?
               AND t.deleted_at IS NULL
               AND c.deleted_at IS NULL
-              AND ct.deleted_at IS NULL');
-        $stmt->execute([$id]);
+              AND ct.deleted_at IS NULL';
+        $params = [$id];
+        self::applyVisibility($sql, $params, 't');
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetch() ?: null;
     }
 
@@ -196,7 +201,9 @@ class Ticket
                 'category' => self::validCategory($data['category'] ?? 'Support'),
                 'priority' => self::validPriority($data['priority'] ?? 'Normal'),
                 'description' => $message,
-                'assigned_user_id' => !empty($data['assigned_user_id']) ? (int) $data['assigned_user_id'] : $userId,
+                'assigned_user_id' => (function_exists('current_user_role') && current_user_role() === 'support')
+                    ? $userId
+                    : (!empty($data['assigned_user_id']) ? (int) $data['assigned_user_id'] : $userId),
                 'origin_type' => 'user',
             ]);
             $ticketId = (int) $pdo->lastInsertId();
@@ -338,7 +345,8 @@ class Ticket
     {
         if ($newUserId !== null) {
             $target = User::find($newUserId);
-            if (!$target || (int) ($target['is_active'] ?? 0) !== 1) {
+            if (!$target || (int) ($target['is_active'] ?? 0) !== 1
+                || (isset($target['role']) && !in_array((string) $target['role'], ['admin', 'support'], true))) {
                 throw new RuntimeException('کاربر انتخاب‌شده معتبر یا فعال نیست.');
             }
         }
@@ -353,6 +361,10 @@ class Ticket
                 throw new RuntimeException('تیکت پیدا نشد.');
             }
             $fromUserId = $current === null ? null : (int) $current;
+            if (function_exists('current_user_role') && current_user_role() === 'support'
+                && $fromUserId !== null && $fromUserId !== $changedByUserId) {
+                throw new RuntimeException('این تیکت دیگر به شما تخصیص ندارد.');
+            }
             if ($fromUserId === $newUserId) {
                 $pdo->commit();
                 return false;
@@ -458,6 +470,20 @@ class Ticket
         return [$sql, $params];
     }
 
+    private static function applyVisibility(string &$sql, array &$params, string $alias): void
+    {
+        $role = function_exists('current_user_role') ? current_user_role() : 'admin';
+        if ($role === 'admin') {
+            return;
+        }
+        if ($role === 'support') {
+            $sql .= " AND ({$alias}.assigned_user_id = ? OR {$alias}.assigned_user_id IS NULL)";
+            $params[] = current_user_id();
+            return;
+        }
+        $sql .= ' AND 1 = 0';
+    }
+
     private static function validStatus(string $value): string
     {
         return in_array($value, self::statuses(), true) ? $value : (self::statuses()[0] ?? 'Open');
@@ -549,8 +575,14 @@ class Ticket
 
     private static function statusForUpdate(int $id): ?string
     {
-        $stmt = db()->prepare('SELECT status FROM tickets WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
-        $stmt->execute([$id]);
+        $sql = 'SELECT status FROM tickets WHERE id = ? AND deleted_at IS NULL';
+        $params = [$id];
+        if (function_exists('current_user_role') && current_user_role() === 'support') {
+            $sql .= ' AND (assigned_user_id = ? OR assigned_user_id IS NULL)';
+            $params[] = current_user_id();
+        }
+        $stmt = db()->prepare($sql . ' FOR UPDATE');
+        $stmt->execute($params);
         $status = $stmt->fetchColumn();
         return $status === false ? null : (string) $status;
     }

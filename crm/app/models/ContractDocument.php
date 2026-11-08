@@ -19,16 +19,22 @@ class ContractDocument
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare(
-            'SELECT cd.*, ct.contract_number, ct.contract_title, u.name AS uploaded_by_name
+        $sql = 'SELECT cd.*, ct.contract_number, ct.contract_title, u.name AS uploaded_by_name
              FROM contract_documents cd
              JOIN contracts ct ON ct.id = cd.contract_id AND ct.deleted_at IS NULL
              JOIN customers c ON c.id = ct.customer_id AND c.deleted_at IS NULL
              LEFT JOIN users u ON u.id = cd.uploaded_by_user_id
-             WHERE c.id = ? AND cd.deleted_at IS NULL
-             ORDER BY ct.end_date DESC, ct.id DESC, cd.created_at DESC, cd.id DESC'
-        );
-        $stmt->execute([$customerId]);
+             WHERE c.id = ? AND cd.deleted_at IS NULL';
+        $params = [$customerId];
+        $role = function_exists('current_user_role') ? current_user_role() : 'admin';
+        if ($role === 'sales') {
+            $sql .= ' AND ct.owner_user_id = ?';
+            $params[] = current_user_id();
+        } elseif (!in_array($role, ['admin', 'finance'], true)) {
+            $sql .= ' AND 1 = 0';
+        }
+        $stmt = db()->prepare($sql . ' ORDER BY ct.end_date DESC, ct.id DESC, cd.created_at DESC, cd.id DESC');
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
