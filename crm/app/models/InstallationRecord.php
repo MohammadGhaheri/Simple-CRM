@@ -55,6 +55,8 @@ final class InstallationRecord
             throw new InvalidArgumentException('نوع گردش نصب معتبر نیست.');
         }
         $replacesId = self::nullableId($data['replaces_installation_id'] ?? null);
+        $technicianId = self::nullableId($data['technician_user_id'] ?? null);
+        $operationsAssigneeId = self::nullableId($data['assigned_operations_user_id'] ?? null);
         if ($kind !== 'sale' && $replacesId === null) {
             throw new InvalidArgumentException('نصب جایگزین باید به نصب قبلی ارجاع داشته باشد.');
         }
@@ -68,6 +70,8 @@ final class InstallationRecord
         $pdo->beginTransaction();
         try {
             $item = self::lockInstallableItem($pdo, $contractItemId);
+            self::assertActiveOperationsUser($pdo, $technicianId, 'تکنسین');
+            self::assertActiveOperationsUser($pdo, $operationsAssigneeId, 'مسئول اجرا');
             if ($replacesId !== null) {
                 $priorStmt = $pdo->prepare('SELECT contract_id, contract_item_id, customer_id, status
                     FROM installation_records WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
@@ -93,8 +97,8 @@ final class InstallationRecord
             $stmt->execute([
                 $item['contract_id'], $contractItemId, $item['customer_id'], $deviceModel, $kind, $replacesId, $imei, $serial,
                 self::nullableText($data['license_plate'] ?? null, 40), self::nullableText($data['vin'] ?? null, 80),
-                self::nullableText($data['vehicle_type'] ?? null, 120), self::nullableId($data['technician_user_id'] ?? null),
-                self::nullableId($data['assigned_operations_user_id'] ?? null), self::normalizeDateTime($data['scheduled_at'] ?? null),
+                self::nullableText($data['vehicle_type'] ?? null, 120), $technicianId,
+                $operationsAssigneeId, self::normalizeDateTime($data['scheduled_at'] ?? null),
                 $status, self::nullableText($data['technical_result'] ?? null, 500),
                 trim((string) ($data['notes'] ?? '')) ?: null, $actorId,
             ]);
@@ -157,6 +161,20 @@ final class InstallationRecord
                 $pdo->rollBack();
             }
             throw $error;
+        }
+    }
+
+    private static function assertActiveOperationsUser(PDO $pdo, ?int $userId, string $field): void
+    {
+        if ($userId === null) {
+            return;
+        }
+        $stmt = $pdo->prepare('SELECT role, is_active FROM users WHERE id = ? FOR UPDATE');
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch();
+        if (!$user || !(int) $user['is_active']
+            || !in_array($user['role'], ['admin', 'operations'], true)) {
+            throw new InvalidArgumentException($field . ' باید از کاربران فعال تیم عملیات یا مدیران باشد.');
         }
     }
 
