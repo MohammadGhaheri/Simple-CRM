@@ -7,11 +7,16 @@ access a live customer database or perform a deployment.
 
 | Change set | PR / head at review | Base | Required outcome |
 | --- | --- | --- | --- |
-| Generic security + deal history + contracts | #8 / `57f2c94` | `main` | separately reviewed and explicitly approved |
+| Generic security + deal history + contracts | #8 / current GitHub head | `main` | separately reviewed and explicitly approved |
 | Mammut installation/acceptance MVP | #9 / `codex/mammut-installations` | `mammut-connect` | only after generic code is established |
 
-The PR #8 head is an ancestor of the PR #9 development branch. **Do not merge
-PRs #5–#7 independently**: PR #8 already integrates them.
+The original integrated-core commit `57f2c94` is an ancestor of PR #9,
+but the later generic ticket-backup/attachment fixes were committed
+**independently to both PR #8 and PR #9**. Those updated branch heads therefore
+do not have the same ancestry, even though their shared fix files are
+content-identical. Before merging either PR, reconcile Git ancestry using the
+latest actual heads and verify there are no lost/duplicate semantic changes.
+Do not merge PRs #5–#7 independently: PR #8 already integrates them.
 
 **Intended source control sequence**, only after an explicit user approval for
 the named merge action:
