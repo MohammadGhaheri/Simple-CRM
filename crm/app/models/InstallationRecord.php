@@ -5,6 +5,20 @@ declare(strict_types=1);
 final class InstallationRecord
 {
     private const CAPACITY_STATUSES = ['installed', 'pending_approval', 'approved'];
+    private const STATUS_TRANSITIONS = [
+        'scheduled' => ['in_progress', 'cancelled'],
+        'in_progress' => ['installed', 'failed', 'cancelled'],
+        'failed' => ['scheduled', 'cancelled'],
+        'installed' => ['pending_approval', 'failed'],
+        'pending_approval' => ['approved', 'failed'],
+        'approved' => [],
+        'cancelled' => [],
+    ];
+
+    public static function allowedNextStatuses(string $currentStatus): array
+    {
+        return self::STATUS_TRANSITIONS[$currentStatus] ?? [];
+    }
 
     public static function byItem(int $itemId): array
     {
@@ -103,15 +117,6 @@ final class InstallationRecord
         if ($id <= 0 || $actorId <= 0 || $reason === '' || mb_strlen($reason) > 500) {
             throw new InvalidArgumentException('شناسه، وضعیت یا دلیل تغییر معتبر نیست.');
         }
-        $allowed = [
-            'scheduled' => ['in_progress', 'cancelled'],
-            'in_progress' => ['installed', 'failed', 'cancelled'],
-            'failed' => ['scheduled', 'cancelled'],
-            'installed' => ['pending_approval', 'failed'],
-            'pending_approval' => ['approved', 'failed'],
-            'approved' => [],
-            'cancelled' => [],
-        ];
         $pdo = db();
         $pdo->beginTransaction();
         try {
@@ -120,7 +125,7 @@ final class InstallationRecord
                 WHERE ir.id = ? AND ir.deleted_at IS NULL FOR UPDATE');
             $stmt->execute([$id]);
             $record = $stmt->fetch();
-            if (!$record || !in_array($toStatus, $allowed[$record['status']] ?? [], true)) {
+            if (!$record || !in_array($toStatus, self::allowedNextStatuses((string) $record['status']), true)) {
                 throw new DomainException('تغییر وضعیت نصب مجاز نیست.');
             }
             $pdo->prepare('SELECT id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE')
