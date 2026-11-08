@@ -71,7 +71,7 @@ try {
     $pdo->exec("CREATE TABLE users (id INT UNSIGNED PRIMARY KEY, name VARCHAR(120), role VARCHAR(30), is_active TINYINT DEFAULT 1) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE customers (id INT UNSIGNED PRIMARY KEY, customer_name VARCHAR(190), deleted_at DATETIME NULL) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE contracts (id INT UNSIGNED PRIMARY KEY, contract_number VARCHAR(80), contract_title VARCHAR(190), customer_id INT UNSIGNED, owner_user_id INT UNSIGNED, contract_amount DECIMAL(18,2), deleted_at DATETIME NULL) ENGINE=InnoDB");
-    $pdo->exec("INSERT INTO users VALUES (1,'Admin','admin',1),(2,'Sales','sales',1),(3,'Operations','operations',1),(4,'Finance','finance',1),(5,'Support','support',1),(6,'Other Sales','sales',1)");
+    $pdo->exec("INSERT INTO users VALUES (1,'Admin','admin',1),(2,'Sales','sales',1),(3,'Operations','operations',1),(4,'Finance','finance',1),(5,'Support','support',1),(6,'Other Sales','sales',1),(7,'Inactive Operations','operations',0)");
     $pdo->exec("INSERT INTO customers VALUES (1,'Customer A',NULL),(2,'Customer B',NULL),(3,'Legacy Customer',NULL)");
     $pdo->exec("INSERT INTO contracts VALUES (1,'C-1','Device sale',1,2,10000,NULL),(2,'C-2','Other sale',2,2,10000,NULL),(3,'OLD','Legacy sale',3,2,5000,NULL)");
     mammut_apply($pdo, __DIR__ . '/../database/add_contract_items.sql');
@@ -89,6 +89,21 @@ try {
     $obligations = InstallationObligation::search();
     mammut_expect(count($obligations) === 2, 'Service or legacy contract entered the installation queue.');
     mammut_expect(!array_key_exists('contract_amount', $obligations[0]), 'Operations query leaked contract amount.');
+
+    mammut_reject(
+        static fn() => InstallationRecord::create($itemA, [
+            'serial_number' => 'INVALID-TECH-ROLE', 'technician_user_id' => 4,
+        ], 3),
+        'Finance user was accepted as an installation technician.'
+    );
+    mammut_reject(
+        static fn() => InstallationRecord::create($itemA, [
+            'serial_number' => 'INACTIVE-ASSIGNEE', 'assigned_operations_user_id' => 7,
+        ], 3),
+        'Inactive operations user was assigned to an installation.'
+    );
+    mammut_expect((int) $pdo->query('SELECT COUNT(*) FROM installation_records')->fetchColumn() === 0,
+        'Rejected technician or assignee left an installation record.');
 
     $r1 = InstallationRecord::create($itemA, ['imei' => ' 123-456 ', 'device_model' => 'IoTruck 4G'], 3);
     mammut_reject(static fn() => InstallationRecord::create($itemA, ['imei' => '123456'], 3), 'Duplicate active IMEI was accepted.');
