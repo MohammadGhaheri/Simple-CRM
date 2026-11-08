@@ -33,7 +33,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: pdo_mysql, mbstring
+          extensions: pdo_mysql, mbstring, zip
       - name: Report PHP version
         run: php -v
       - name: Lint PHP source
@@ -46,6 +46,8 @@ jobs:
           if [ -f crm/tests/sales_record_authorization_test.php ]; then php crm/tests/sales_record_authorization_test.php; fi
           if [ -f crm/tests/sales_record_authorization_behavior_test.php ]; then php crm/tests/sales_record_authorization_behavior_test.php; fi
           if [ -f crm/tests/ticket_attachment_security_test.php ]; then php crm/tests/ticket_attachment_security_test.php; fi
+      - name: Verify private ticket attachment backups and historical ZIP compatibility
+        run: php crm/tests/private_ticket_backup_test.php
       - name: Run deal-stage MySQL integration tests
         if: hashFiles('crm/tests/deal_stage_history_mysql_test.php') != ''
         env:
