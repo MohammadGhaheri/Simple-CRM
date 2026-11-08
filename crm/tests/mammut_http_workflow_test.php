@@ -150,6 +150,29 @@ try {
     }
     http_expect($ready, 'Local PHP HTTP server did not become ready.');
 
+    // Optional real Chromium visual QA reuses the same disposable database and
+    // synthetic user sessions as the backend HTTP workflow. No live site.
+    if (getenv('MAMMUT_BROWSER_TEST') === '1') {
+        $browserCommand = [
+            'node', __DIR__ . '/mammut_browser_visual_test.cjs',
+            (string) $httpPort, $sessions['operations']['id'],
+            $sessions['sales']['id'], $sessions['finance']['id'],
+        ];
+        $browserProc = proc_open($browserCommand, [
+            0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w'],
+        ], $browserPipes, $root);
+        http_expect(is_resource($browserProc), 'Could not start synthetic browser QA process.');
+        fclose($browserPipes[0]);
+        $browserOutput = (string) stream_get_contents($browserPipes[1]);
+        $browserError = (string) stream_get_contents($browserPipes[2]);
+        fclose($browserPipes[1]);
+        fclose($browserPipes[2]);
+        $browserExit = proc_close($browserProc);
+        http_expect($browserExit === 0,
+            'Chromium visual checks failed: ' . substr($browserOutput . "\n" . $browserError, -4000));
+        echo $browserOutput;
+    }
+
     $get = static fn(string $role, string $query): array =>
         http_request($httpPort, $sessions[$role]['id'], $query);
     $post = static fn(string $role, string $query, array $fields): array =>
