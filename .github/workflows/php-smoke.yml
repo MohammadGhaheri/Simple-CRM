@@ -101,3 +101,23 @@ jobs:
           MYSQL_TEST_USER: root
           MYSQL_TEST_PASSWORD: test_only_password
         run: php crm/tests/mammut_http_workflow_test.php
+      - name: Run Chromium UI/RTL/mobile checks on synthetic Mammut data
+        env:
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: '3306'
+          MYSQL_TEST_USER: root
+          MYSQL_TEST_PASSWORD: test_only_password
+        run: |
+          mkdir -p "$RUNNER_TEMP/mammut-browser"
+          npm install --no-save --prefix "$RUNNER_TEMP/mammut-browser" playwright@1.55.1
+          "$RUNNER_TEMP/mammut-browser/node_modules/.bin/playwright" install --with-deps chromium
+          export NODE_PATH="$RUNNER_TEMP/mammut-browser/node_modules"
+          export MAMMUT_SCREENSHOT_DIR="$RUNNER_TEMP/mammut-screenshots"
+          MAMMUT_BROWSER_TEST=1 php crm/tests/mammut_http_workflow_test.php
+      - name: Upload synthetic desktop/mobile CRM screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mammut-crm-ui-screenshots
+          path: ${{ runner.temp }}/mammut-screenshots
+          if-no-files-found: ignore
