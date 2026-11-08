@@ -43,6 +43,10 @@ Fresh installations use `crm/database/schema.sql`.
 
 `php crm/tests/mammut_installation_mysql_test.php` covers derived obligations, legacy contracts, financial redaction, duplicate IMEI/serial, cross-contract rejection, over-capacity writes, concurrent last-capacity requests, failure status, technical approval, partial/double delivery, receipt cancellation, commitment reduction, role mutations and rollback behavior.
 
+`php crm/tests/mammut_http_workflow_test.php` runs the **real PHP front controller** against an isolated MariaDB database and a temporary local PHP web server. It verifies role-scoped list/detail pages, POST and CSRF rejection, the full scheduled-to-approved transition sequence, receipt create/cancel, Support visibility only after active handover, exact private evidence download authorization, and rejection of forged evidence paths and technician references.
+
+The HTTP smoke test is not a graphical browser/JavaScript regression suite; manual visual, mobile/RTL, accessibility and browser file-upload checks remain a separate release gate. The test refuses to replace an existing local database configuration and cleans up its temporary DB, web server and session/evidence test files.
+
 ## MVP limitations and operational risks
 
 - Receipt confirmation is an internal Admin/Operations approval, not a digital customer signature.
@@ -50,4 +54,7 @@ Fresh installations use `crm/database/schema.sql`.
 - Replacement/reinstallation linkage is modeled, but a full warranty approval workflow and inventory movement are deferred.
 - Finance follow-up is an auditable pending event, not an automatic receivable or payment.
 - Evidence files reuse the private contract-document storage controls; Nginx/private-storage verification remains a release gate.
+- Receipt listing and evidence retrieval are role-scoped in the model, including support's active-delivery-only visibility. A cancelled receipt is accessible only to authorized admin/operations/finance or its owning Sales role.
+- The installation form only lists permitted next statuses; disabled/finished installations cannot be changed by selecting an obsolete UI option.
+- The backend rejects inactive technician/operations assignees and IDs belonging to Finance/Sales/Support, even if injected through POST.
 - Existing legacy contracts without item rows are intentionally not inferred or placed in the installation queue.
