@@ -189,6 +189,16 @@ class ContractItem
             if ($newQuantity < (int) $assigned->fetchColumn()) {
                 throw new DomainException('تعداد جدید کمتر از تعداد تخصیص‌یافته به فاکتورها است.');
             }
+            if (self::tableExists($pdo, 'installation_records')) {
+                $installed = $pdo->prepare("SELECT COUNT(*) FROM installation_records
+                    WHERE contract_id = ? AND contract_item_id = ? AND deleted_at IS NULL
+                      AND installation_kind = 'sale'
+                      AND status IN ('installed','pending_approval','approved')");
+                $installed->execute([$contractId, $itemId]);
+                if ($newQuantity < (int) $installed->fetchColumn()) {
+                    throw new DomainException('تعداد جدید کمتر از نصب‌های معتبر ثبت‌شده است.');
+                }
+            }
             $newAmount = self::lineAmount((string) $old['unit_amount'], $newQuantity);
             self::assertTotalFits($contractId, $newAmount, (string) $contractAmount, $pdo, $itemId);
             $pdo->prepare('UPDATE contract_items SET quantity = ?, line_amount = ? WHERE id = ? AND contract_id = ?')
@@ -363,5 +373,13 @@ class ContractItem
             return;
         }
         $sql .= ' AND 1 = 0';
+    }
+
+    private static function tableExists(PDO $pdo, string $table): bool
+    {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_schema = DATABASE() AND table_name = ?');
+        $stmt->execute([$table]);
+        return (int) $stmt->fetchColumn() === 1;
     }
 }
