@@ -8,6 +8,7 @@ class Deal
     {
         $sql = 'SELECT d.*, c.customer_name, u.name AS owner_name FROM deals d JOIN customers c ON c.id = d.customer_id LEFT JOIN users u ON u.id = d.owner_user_id WHERE d.deleted_at IS NULL AND c.deleted_at IS NULL';
         $params = [];
+        self::applyVisibility($sql, $params, 'd');
         if (!empty($filters['q'])) {
             $sql .= ' AND (d.deal_name LIKE ? OR c.customer_name LIKE ?)';
             $q = '%' . $filters['q'] . '%';
@@ -27,8 +28,11 @@ class Deal
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT * FROM deals WHERE customer_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC');
-        $stmt->execute([$customerId]);
+        $sql = 'SELECT * FROM deals d WHERE customer_id = ? AND deleted_at IS NULL';
+        $params = [$customerId];
+        self::applyVisibility($sql, $params, 'd');
+        $stmt = db()->prepare($sql . ' ORDER BY updated_at DESC');
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
@@ -37,23 +41,43 @@ class Deal
         if ($id <= 0) {
             return true;
         }
-        $stmt = db()->prepare('SELECT COUNT(*) FROM deals WHERE id = ? AND customer_id = ? AND deleted_at IS NULL');
-        $stmt->execute([$id, $customerId]);
+        $sql = 'SELECT COUNT(*) FROM deals d WHERE id = ? AND customer_id = ? AND deleted_at IS NULL';
+        $params = [$id, $customerId];
+        self::applyVisibility($sql, $params, 'd');
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
         return (int) $stmt->fetchColumn() > 0;
     }
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT d.*, c.customer_name, u.name AS owner_name FROM deals d JOIN customers c ON c.id = d.customer_id LEFT JOIN users u ON u.id = d.owner_user_id WHERE d.id = ? AND d.deleted_at IS NULL AND c.deleted_at IS NULL');
-        $stmt->execute([$id]);
+        $sql = 'SELECT d.*, c.customer_name, u.name AS owner_name FROM deals d JOIN customers c ON c.id = d.customer_id LEFT JOIN users u ON u.id = d.owner_user_id WHERE d.id = ? AND d.deleted_at IS NULL AND c.deleted_at IS NULL';
+        $params = [$id];
+        self::applyVisibility($sql, $params, 'd');
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetch() ?: null;
     }
 
     public static function create(array $data): int
     {
         $sql = 'INSERT INTO deals (deal_name, customer_id, product, vehicle_count, estimated_amount, probability, weighted_amount, deal_stage, expected_close_date, owner_user_id, win_loss_reason, notes) VALUES (:deal_name, :customer_id, :product, :vehicle_count, :estimated_amount, :probability, :weighted_amount, :deal_stage, :expected_close_date, :owner_user_id, :win_loss_reason, :notes)';
-        db()->prepare($sql)->execute(self::payload($data));
-        return (int) db()->lastInsertId();
+        $payload = self::payload($data);
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare($sql)->execute($payload);
+            $id = (int) $pdo->lastInsertId();
+            $pdo->prepare('INSERT INTO deal_stage_events (deal_id, from_stage, to_stage, changed_by_user_id) VALUES (?, NULL, ?, ?)')
+                ->execute([$id, $payload['deal_stage'], current_user_id()]);
+            $pdo->commit();
+            return $id;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     public static function update(int $id, array $data): void
@@ -61,7 +85,34 @@ class Deal
         $sql = 'UPDATE deals SET deal_name=:deal_name, customer_id=:customer_id, product=:product, vehicle_count=:vehicle_count, estimated_amount=:estimated_amount, probability=:probability, weighted_amount=:weighted_amount, deal_stage=:deal_stage, expected_close_date=:expected_close_date, owner_user_id=:owner_user_id, win_loss_reason=:win_loss_reason, notes=:notes WHERE id=:id';
         $payload = self::payload($data);
         $payload['id'] = $id;
-        db()->prepare($sql)->execute($payload);
+        $expectedStage = array_key_exists('expected_stage', $data)
+            ? trim((string) $data['expected_stage'])
+            : null;
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            // Lock the current stage so concurrent edits cannot corrupt the transition history.
+            $current = $pdo->prepare('SELECT deal_stage FROM deals WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+            $current->execute([$id]);
+            $previousStage = $current->fetchColumn();
+            if ($previousStage === false) {
+                throw new RuntimeException('فرصت فروش پیدا نشد.');
+            }
+            if ($expectedStage !== null && (string) $previousStage !== $expectedStage) {
+                throw new DomainException('مرحله فرصت پس از باز شدن فرم تغییر کرده است. صفحه را تازه‌سازی و دوباره تلاش کنید.');
+            }
+            $pdo->prepare($sql)->execute($payload);
+            if ((string) $previousStage !== (string) $payload['deal_stage']) {
+                $pdo->prepare('INSERT INTO deal_stage_events (deal_id, from_stage, to_stage, changed_by_user_id) VALUES (?, ?, ?, ?)')
+                    ->execute([$id, $previousStage, $payload['deal_stage'], current_user_id()]);
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     public static function delete(int $id): void
@@ -83,10 +134,41 @@ class Deal
             'weighted_amount' => $estimated * $probability / 100,
             'deal_stage' => $data['deal_stage'] ?? 'Lead',
             'expected_close_date' => db_date($data['expected_close_date'] ?? null),
-            'owner_user_id' => (int) ($data['owner_user_id'] ?? current_user_id()),
+            'owner_user_id' => self::currentRole() === 'sales'
+                ? current_user_id()
+                : (int) ($data['owner_user_id'] ?? current_user_id()),
             'win_loss_reason' => trim($data['win_loss_reason'] ?? ''),
             'notes' => trim($data['notes'] ?? ''),
         ];
+    }
+
+    public static function stageHistory(int $dealId): array
+    {
+        $stmt = db()->prepare('SELECT e.id, e.deal_id, e.from_stage, e.to_stage, e.changed_by_user_id, e.created_at, u.name AS changed_by_name
+            FROM deal_stage_events e
+            LEFT JOIN users u ON u.id = e.changed_by_user_id
+            WHERE e.deal_id = ?
+            ORDER BY e.created_at ASC, e.id ASC');
+        $stmt->execute([$dealId]);
+        return $stmt->fetchAll();
+    }
+
+    private static function applyVisibility(string &$sql, array &$params, string $alias): void
+    {
+        if (self::currentRole() === 'admin') {
+            return;
+        }
+        if (self::currentRole() === 'sales') {
+            $sql .= " AND {$alias}.owner_user_id = ?";
+            $params[] = current_user_id();
+            return;
+        }
+        $sql .= ' AND 1 = 0';
+    }
+
+    private static function currentRole(): string
+    {
+        return function_exists('current_user_role') ? current_user_role() : 'admin';
     }
 
     public static function statsByStage(): array

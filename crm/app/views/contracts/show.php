@@ -26,6 +26,8 @@
     <?php if ($contract['notes']): ?><p class="muted"><?= nl2br(e($contract['notes'])) ?></p><?php endif; ?>
 </div>
 
+<?php require __DIR__ . '/_items.php'; ?>
+
 <?php if (can_view_finance()): ?>
 <div class="card" style="margin-top:16px">
     <h3><?= ($contract['contract_type'] ?? 'formal') === 'direct_sale' ? 'وضعیت مالی فروش' : 'وضعیت مالی قرارداد' ?></h3>

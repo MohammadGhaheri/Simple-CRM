@@ -13,6 +13,7 @@ class Contract
                 LEFT JOIN users u ON u.id = ct.owner_user_id
                 WHERE ct.deleted_at IS NULL AND c.deleted_at IS NULL';
         $params = [];
+        self::applyVisibility($sql, $params, 'ct');
 
         if (!empty($filters['q'])) {
             $sql .= ' AND (ct.contract_title LIKE ? OR ct.contract_number LIKE ? OR c.customer_name LIKE ?)';
@@ -37,8 +38,11 @@ class Contract
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT ct.*, d.deal_name, u.name AS owner_name FROM contracts ct LEFT JOIN deals d ON d.id = ct.deal_id LEFT JOIN users u ON u.id = ct.owner_user_id WHERE ct.customer_id = ? AND ct.deleted_at IS NULL ORDER BY ct.end_date IS NULL ASC, ct.end_date DESC, ct.id DESC');
-        $stmt->execute([$customerId]);
+        $sql = 'SELECT ct.*, d.deal_name, u.name AS owner_name FROM contracts ct LEFT JOIN deals d ON d.id = ct.deal_id LEFT JOIN users u ON u.id = ct.owner_user_id WHERE ct.customer_id = ? AND ct.deleted_at IS NULL';
+        $params = [$customerId];
+        self::applyVisibility($sql, $params, 'ct');
+        $stmt = db()->prepare($sql . ' ORDER BY ct.end_date IS NULL ASC, ct.end_date DESC, ct.id DESC');
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
@@ -47,27 +51,36 @@ class Contract
         if ($id <= 0) {
             return true;
         }
-        $stmt = db()->prepare('SELECT COUNT(*) FROM contracts WHERE id = ? AND customer_id = ? AND deleted_at IS NULL');
-        $stmt->execute([$id, $customerId]);
+        $sql = 'SELECT COUNT(*) FROM contracts ct WHERE id = ? AND customer_id = ? AND deleted_at IS NULL';
+        $params = [$id, $customerId];
+        self::applyVisibility($sql, $params, 'ct');
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
         return (int) $stmt->fetchColumn() > 0;
     }
 
     public static function byDeal(int $dealId): array
     {
-        $stmt = db()->prepare('SELECT ct.*, c.customer_name, u.name AS owner_name FROM contracts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.owner_user_id WHERE ct.deal_id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL ORDER BY ct.end_date IS NULL ASC, ct.end_date DESC, ct.id DESC');
-        $stmt->execute([$dealId]);
+        $sql = 'SELECT ct.*, c.customer_name, u.name AS owner_name FROM contracts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.owner_user_id WHERE ct.deal_id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL';
+        $params = [$dealId];
+        self::applyVisibility($sql, $params, 'ct');
+        $stmt = db()->prepare($sql . ' ORDER BY ct.end_date IS NULL ASC, ct.end_date DESC, ct.id DESC');
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT ct.*, c.customer_name, d.deal_name, u.name AS owner_name
+        $sql = 'SELECT ct.*, c.customer_name, d.deal_name, u.name AS owner_name
             FROM contracts ct
             JOIN customers c ON c.id = ct.customer_id
             LEFT JOIN deals d ON d.id = ct.deal_id
             LEFT JOIN users u ON u.id = ct.owner_user_id
-            WHERE ct.id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL');
-        $stmt->execute([$id]);
+            WHERE ct.id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL';
+        $params = [$id];
+        self::applyVisibility($sql, $params, 'ct');
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetch() ?: null;
     }
 
@@ -92,12 +105,23 @@ class Contract
         $pdo = db();
         $pdo->beginTransaction();
         try {
-            $lock = $pdo->prepare('SELECT id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+            $lock = $pdo->prepare('SELECT id, owner_user_id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
             $lock->execute([$id]);
-            if (!$lock->fetchColumn()) {
+            $lockedContract = $lock->fetch();
+            if (!$lockedContract) {
                 throw new RuntimeException('قرارداد پیدا نشد.');
             }
+            self::assertMutationAuthorized((int) $lockedContract['owner_user_id']);
+            self::assertParentReferencesAuthorized(
+                $pdo,
+                (int) $payload['customer_id'],
+                $payload['deal_id'] === null ? null : (int) $payload['deal_id']
+            );
             self::assertAmountCoversPayments($id, $newAmount, $pdo);
+            // A contract with itemized lines cannot be reduced below their total.
+            if (class_exists('ContractItem')) {
+                ContractItem::assertAmountCoversItems($id, $newAmount, $pdo);
+            }
             $pdo->prepare($sql)->execute($payload);
             $pdo->commit();
         } catch (Throwable $e) {
@@ -114,7 +138,25 @@ class Contract
 
     public static function delete(int $id): void
     {
-        db()->prepare('UPDATE contracts SET deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP) WHERE id = ?')->execute([$id]);
+        $pdo = db();
+        $pdo->beginTransaction();
+        try {
+            $lock = $pdo->prepare('SELECT owner_user_id FROM contracts WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+            $lock->execute([$id]);
+            $ownerUserId = $lock->fetchColumn();
+            if ($ownerUserId === false) {
+                throw new RuntimeException('قرارداد پیدا نشد.');
+            }
+            self::assertMutationAuthorized((int) $ownerUserId);
+            $pdo->prepare('UPDATE contracts SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL')
+                ->execute([$id]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     public static function transferOwner(int $fromUserId, int $toUserId): int
@@ -204,9 +246,81 @@ class Contract
             'start_date' => db_date($data['start_date'] ?? null),
             'end_date' => $endDate,
             'renewal_reminder_date' => $reminderDate,
-            'owner_user_id' => (int) ($data['owner_user_id'] ?? current_user_id()),
+            'owner_user_id' => self::currentRole() === 'sales'
+                ? current_user_id()
+                : (int) ($data['owner_user_id'] ?? current_user_id()),
             'status' => $status,
             'notes' => trim($data['notes'] ?? ''),
         ];
+    }
+
+    private static function applyVisibility(string &$sql, array &$params, string $alias): void
+    {
+        if (in_array(self::currentRole(), ['admin', 'finance'], true)) {
+            return;
+        }
+        if (self::currentRole() === 'sales') {
+            $sql .= " AND {$alias}.owner_user_id = ?";
+            $params[] = current_user_id();
+            return;
+        }
+        $sql .= ' AND 1 = 0';
+    }
+
+    private static function currentRole(): string
+    {
+        return function_exists('current_user_role') ? current_user_role() : 'admin';
+    }
+
+    private static function assertMutationAuthorized(int $ownerUserId): void
+    {
+        $role = self::currentRole();
+        if ($role === 'admin') {
+            return;
+        }
+        if ($role === 'sales' && $ownerUserId === current_user_id()) {
+            return;
+        }
+        throw new RuntimeException('اجازه تغییر این قرارداد را ندارید.');
+    }
+
+    /**
+     * Lock and validate proposed parent references in the same transaction as
+     * the contract update. This closes the edit-time IDOR/TOCTOU window and
+     * guarantees that a deal cannot be linked to a different customer.
+     */
+    private static function assertParentReferencesAuthorized(PDO $pdo, int $customerId, ?int $dealId): void
+    {
+        if ($customerId <= 0) {
+            throw new InvalidArgumentException('مشتری انتخاب‌شده معتبر نیست.');
+        }
+
+        $customerStmt = $pdo->prepare('SELECT id, owner_user_id FROM customers
+            WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+        $customerStmt->execute([$customerId]);
+        $customer = $customerStmt->fetch();
+        if (!$customer) {
+            throw new RuntimeException('مشتری مقصد پیدا نشد یا حذف شده است.');
+        }
+
+        $role = self::currentRole();
+        if ($role === 'sales' && (int) $customer['owner_user_id'] !== current_user_id()) {
+            throw new RuntimeException('اجازه اتصال قرارداد به این مشتری را ندارید.');
+        }
+
+        if ($dealId === null) {
+            return;
+        }
+
+        $dealStmt = $pdo->prepare('SELECT id, customer_id, owner_user_id FROM deals
+            WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+        $dealStmt->execute([$dealId]);
+        $deal = $dealStmt->fetch();
+        if (!$deal || (int) $deal['customer_id'] !== $customerId) {
+            throw new RuntimeException('فرصت فروش مقصد به مشتری انتخاب‌شده تعلق ندارد.');
+        }
+        if ($role === 'sales' && (int) $deal['owner_user_id'] !== current_user_id()) {
+            throw new RuntimeException('اجازه اتصال قرارداد به این فرصت فروش را ندارید.');
+        }
     }
 }
