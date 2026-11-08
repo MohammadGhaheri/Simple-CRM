@@ -95,6 +95,23 @@ try {
     $r2 = InstallationRecord::create($itemA, ['serial_number' => 'SER-001'], 3);
     mammut_reject(static fn() => InstallationRecord::create($itemB, ['serial_number' => 'SER001'], 3), 'Duplicate active serial was accepted across contracts.');
     mammut_expect((int) $pdo->query("SELECT contract_id FROM installation_records WHERE id={$r1}")->fetchColumn() === 1, 'Installation crossed its contract item boundary.');
+    // A replacement reference must never point to another contract/customer.
+    mammut_reject(
+        static fn() => InstallationRecord::create($itemB, [
+            'serial_number' => 'CROSS-REPLACEMENT',
+            'installation_kind' => 'warranty_replacement',
+            'replaces_installation_id' => $r1,
+        ], 3),
+        'Replacement accepted installation from a different contract.'
+    );
+    mammut_reject(
+        static fn() => InstallationRecord::create($itemA, [
+            'serial_number' => 'BAD-SALE-REFERENCE',
+            'installation_kind' => 'sale',
+            'replaces_installation_id' => $r1,
+        ], 3),
+        'Fresh sale installation incorrectly accepted replacement pointer.'
+    );
 
     foreach ([$r1, $r2] as $recordId) {
         InstallationRecord::transition($recordId, 'in_progress', 'start', 3);
@@ -122,6 +139,11 @@ try {
     mammut_expect((int) InstallationObligation::find($itemA)['remaining_quantity'] === 1, 'Receipt cancellation did not reopen remaining quantity.');
     $_SESSION['user'] = ['id' => 1, 'role' => 'admin'];
     mammut_reject(static fn() => ContractItem::amendQuantity(1, $itemA, 1, 'invalid reduction', 1), 'Commitment was reduced below active installations.');
+    mammut_reject(static fn() => ContractItem::cancel(1, $itemA, 'invalid cancellation with installs', 1),
+        'Contract item with installation records was soft-deleted.');
+    mammut_expect(InstallationObligation::find($itemA) !== null,
+        'Obligation disappeared after a rejected cancellation.');
+
 
     $_SESSION['user'] = ['id' => 2, 'role' => 'sales'];
     mammut_reject(static fn() => InstallationRecord::create($itemA, ['serial_number' => 'ROLE-SALES'], 2), 'Sales mutated installation records.');
