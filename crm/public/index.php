@@ -151,6 +151,9 @@ try {
                         current_user_id()
                     );
                 } elseif ($action === 'delivery_create') {
+                    // Never accept a client-submitted private file path. Only
+                    // the server upload helper may populate these fields.
+                    unset($_POST['evidence_path'], $_POST['evidence_name']);
                     $uploaded = null;
                     if ((int) ($_FILES['evidence_file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
                         $uploaded = upload_contract_document('evidence_file');
