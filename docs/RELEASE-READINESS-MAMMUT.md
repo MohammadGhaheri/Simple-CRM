@@ -69,6 +69,33 @@ historical references, not guaranteed current heads.
 schema differs from rehearsed production copy, migration step 4 appears already
 applied or half-applied, or private attachments remain reachable directly.
 
+## 2A. Full backup coverage — private ticket evidence
+
+The release review uncovered two related preexisting defects in the generic
+CRM backup and attachment layers:
+
+- `ticket_attachment_root()` referred to an undefined
+  `private_storage_root()` helper, preventing new private ticket uploads.
+  It now resolves to `crm/storage/ticket-attachments`, outside the public root.
+- Full ZIP backups omitted that private ticket directory. Backups created with
+  the corrected code use archive format **v2** and include
+  `files/private/ticket-attachments` plus SHA-256 file metadata. The restore
+  validator still accepts historical **v1** archives with the original four
+  roots; it rejects incomplete v2 archives lacking the ticket root.
+
+`php crm/tests/private_ticket_backup_test.php` exercises real ZIP creation,
+validation, checksum preservation, historical v1 compatibility and v2
+incompleteness rejection using **synthetic files only**. This checks archive
+integrity, not a live system recovery.
+
+**Release gate:** take a fresh full v2 backup after deployment, verify the ZIP
+manifest includes private ticket evidence, and perform a **controlled restore
+rehearsal** on staging. Historical v1 backups cannot contain newly uploaded
+private ticket files; an old ZIP alone may therefore be insufficient to
+recover the current site. Preserve current private storage in the backup
+inventory alongside existing public attachments until a new v2 archive and
+its restore are verified.
+
 ## 3. Read-only schema preflight (copy of the deployed database)
 
 A read-only utility now exists at
@@ -128,9 +155,7 @@ an already-cancelled receipt.
 Verify the following separately: no autofilled invented legacy item details;
 finance amounts never appear in the Operations page or HTTP responses; Finance
 may read appropriate delivery status but cannot mutate installation; only the
-owning Sales user may read the relevant commitments. Validate upload using a
-real PDF/image browser interaction, not just the current synthetic HTTP route
-tests.
+owning Sales user may read the relevant commitments. CI now includes a real multipart PDF upload through the PHP web front controller,\nincluding MIME rejection and private download authorization. A separate\n**interactive browser upload acceptance** on staging is still required.
 
 ## 6. Exit criteria / rollback
 
