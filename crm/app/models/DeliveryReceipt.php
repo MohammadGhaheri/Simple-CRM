@@ -6,15 +6,63 @@ final class DeliveryReceipt
 {
     public static function byContractItem(int $itemId): array
     {
-        $stmt = db()->prepare('SELECT DISTINCT dr.*, creator.name AS creator_name, approver.name AS approver_name
+        $sql = 'SELECT DISTINCT dr.*, creator.name AS creator_name, approver.name AS approver_name
             FROM delivery_receipts dr
             JOIN delivery_receipt_items dri ON dri.delivery_receipt_id = dr.id AND dri.contract_id = dr.contract_id
             JOIN installation_records ir ON ir.id = dri.installation_record_id AND ir.contract_id = dr.contract_id
+            JOIN contract_items ci ON ci.id = ir.contract_item_id AND ci.contract_id = ir.contract_id AND ci.deleted_at IS NULL
+            JOIN contracts ct ON ct.id = dr.contract_id AND ct.deleted_at IS NULL
             LEFT JOIN users creator ON creator.id = dr.created_by_user_id
             LEFT JOIN users approver ON approver.id = dr.approved_by_user_id
-            WHERE ir.contract_item_id = ? ORDER BY dr.created_at DESC, dr.id DESC');
-        $stmt->execute([$itemId]);
+            WHERE ir.contract_item_id = ?';
+        $params = [$itemId];
+        self::applyReadVisibility($sql, $params);
+        $stmt = db()->prepare($sql . ' ORDER BY dr.created_at DESC, dr.id DESC');
+        $stmt->execute($params);
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Resolve the receipt document only if the current role may see this exact
+     * receipt. Unlike checking any arbitrary item in a receipt, this also
+     * prevents Support from seeing cancelled or revoked customer handovers.
+     */
+    public static function evidenceForViewer(int $receiptId): ?array
+    {
+        if ($receiptId <= 0) {
+            return null;
+        }
+        $sql = 'SELECT DISTINCT dr.id, dr.evidence_path, dr.evidence_name
+            FROM delivery_receipts dr
+            JOIN contracts ct ON ct.id = dr.contract_id AND ct.deleted_at IS NULL
+            JOIN delivery_receipt_items dri ON dri.delivery_receipt_id = dr.id AND dri.contract_id = dr.contract_id
+            JOIN installation_records ir ON ir.id = dri.installation_record_id AND ir.contract_id = dr.contract_id AND ir.deleted_at IS NULL
+            JOIN contract_items ci ON ci.id = ir.contract_item_id AND ci.contract_id = dr.contract_id AND ci.deleted_at IS NULL
+            WHERE dr.id = ? AND dr.evidence_path IS NOT NULL';
+        $params = [$receiptId];
+        self::applyReadVisibility($sql, $params);
+        $stmt = db()->prepare($sql . ' LIMIT 1');
+        $stmt->execute($params);
+        return $stmt->fetch() ?: null;
+    }
+
+    private static function applyReadVisibility(string &$sql, array &$params): void
+    {
+        $role = current_user_role();
+        if (in_array($role, ['admin', 'operations', 'finance'], true)) {
+            return;
+        }
+        if ($role === 'sales') {
+            $sql .= ' AND ct.owner_user_id = ?';
+            $params[] = current_user_id();
+            return;
+        }
+        if ($role === 'support') {
+            $sql .= " AND dr.status = 'approved' AND dri.revoked_at IS NULL
+                AND ir.deleted_at IS NULL AND ir.status = 'approved'";
+            return;
+        }
+        $sql .= ' AND 1 = 0';
     }
 
     public static function createApproved(array $installationIds, array $data, int $actorId): int
