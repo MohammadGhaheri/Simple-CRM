@@ -15,6 +15,9 @@ require __DIR__ . '/../app/models/Deal.php';
 require __DIR__ . '/../app/models/Contract.php';
 require __DIR__ . '/../app/models/ContractPayment.php';
 require __DIR__ . '/../app/models/ContractDocument.php';
+require __DIR__ . '/../app/models/ContractItem.php';
+require __DIR__ . '/../app/models/ContractInvoiceRef.php';
+require __DIR__ . '/../app/models/ContractSaleService.php';
 require __DIR__ . '/../app/models/Activity.php';
 require __DIR__ . '/../app/models/Ticket.php';
 require __DIR__ . '/../app/models/TicketMessage.php';
@@ -24,6 +27,7 @@ require __DIR__ . '/../app/models/Setting.php';
 require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/models/PerformanceAnalytics.php';
 require __DIR__ . '/../app/models/PerformanceReport.php';
+require __DIR__ . '/../app/models/RoleDashboard.php';
 require __DIR__ . '/../app/services/SmsService.php';
 require __DIR__ . '/../app/services/EmailService.php';
 require __DIR__ . '/../app/services/BackupService.php';
@@ -517,6 +521,14 @@ try {
     }
 
     if ($page === 'dashboard') {
+        if (!is_admin()) {
+            $dashboard = RoleDashboard::build(current_user_role(), current_user_id());
+            render('dashboard/role', [
+                'title' => $dashboard['title'],
+                'dashboard' => $dashboard,
+            ]);
+            exit;
+        }
         $stats = [
             'customers' => (int) db()->query('SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL')->fetchColumn(),
             'open_deals' => (int) db()->query("SELECT COUNT(*) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage NOT IN ('Won','Lost') AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
@@ -540,11 +552,13 @@ try {
     }
 
     if ($page === 'customers') {
+        require_roles(['admin', 'sales', 'support', 'operations', 'finance']);
         if ($action === 'delete' && is_post()) {
             require_admin();
             delete_action(fn() => Customer::delete($id), url('customers'));
         }
         if ($action === 'create') {
+            require_customer_manage();
             $customer = [];
             if (is_post()) {
                 verify_csrf();
@@ -563,6 +577,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_customer_manage();
             $customer = Customer::find($id);
             if (!$customer) {
                 redirect(url('customers'));
@@ -599,6 +614,7 @@ try {
             exit;
         }
         if ($action === 'invite_contacts') {
+            require_customer_manage();
             $customer = Customer::find($id);
             if (!$customer) {
                 redirect(url('customers'));
@@ -638,16 +654,21 @@ try {
     }
 
     if ($page === 'contacts') {
+        require_roles(['admin', 'sales', 'support']);
         if ($action === 'delete' && is_post()) {
             require_admin();
             $contact = Contact::find($id);
             delete_action(fn() => Contact::delete($id), url('customers', ['action' => 'show', 'id' => (int) ($contact['customer_id'] ?? 0)]));
         }
         if ($action === 'create') {
+            require_customer_manage();
             $contact = ['customer_id' => (int) ($_GET['customer_id'] ?? 0)];
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'contact_name' => 'نام مخاطب']);
+                if (!Customer::find((int) ($_POST['customer_id'] ?? 0))) {
+                    $errors[] = 'مشتری انتخاب‌شده مجاز یا معتبر نیست.';
+                }
                 if (!empty($_POST['portal_enabled']) && trim((string) ($_POST['portal_password'] ?? '')) === '') {
                     $errors[] = 'برای فعال کردن پرتال، رمز عبور مخاطب الزامی است.';
                 }
@@ -698,6 +719,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_customer_manage();
             $contact = Contact::find($id);
             if (!$contact) {
                 redirect(url('customers'));
@@ -705,6 +727,9 @@ try {
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['customer_id' => 'مشتری', 'contact_name' => 'نام مخاطب']);
+                if (!Customer::find((int) ($_POST['customer_id'] ?? 0))) {
+                    $errors[] = 'مشتری انتخاب‌شده مجاز یا معتبر نیست.';
+                }
                 if (!empty($_POST['portal_enabled']) && empty($contact['password_hash']) && trim((string) ($_POST['portal_password'] ?? '')) === '') {
                     $errors[] = 'برای فعال کردن پرتال، رمز عبور مخاطب الزامی است.';
                 }
@@ -784,6 +809,22 @@ try {
     }
 
     if ($page === 'tickets') {
+        require_ticket_access();
+        if ($action === 'attachment') {
+            $message = TicketMessage::attachment((int) ($_GET['message_id'] ?? 0));
+            $ticket = $message ? Ticket::find((int) $message['ticket_id']) : null;
+            $file = $message ? ticket_attachment_path((string) $message['attachment_path']) : null;
+            if (!$message || !$ticket || !$file) {
+                http_response_code(404);
+                exit('File not found.');
+            }
+            header('Content-Type: ' . ($message['attachment_mime'] ?: 'application/octet-stream'));
+            header('Content-Length: ' . filesize($file));
+            header("Content-Disposition: inline; filename*=UTF-8''" . rawurlencode((string) ($message['attachment_name'] ?: basename($file))));
+            header('X-Content-Type-Options: nosniff');
+            readfile($file);
+            exit;
+        }
         if ($action === 'contacts_by_customer') {
             $customerId = (int) ($_GET['customer_id'] ?? 0);
             header('Content-Type: application/json; charset=UTF-8');
@@ -962,11 +1003,13 @@ try {
     }
 
     if ($page === 'deals') {
+        require_roles(['admin', 'sales']);
         if ($action === 'delete' && is_post()) {
             require_admin();
             delete_action(fn() => Deal::delete($id), url('deals'));
         }
         if ($action === 'create') {
+            require_sales_manage();
             $deal = ['customer_id' => (int) ($_GET['customer_id'] ?? 0), 'probability' => 20];
             if (is_post()) {
                 verify_csrf();
@@ -981,6 +1024,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_sales_manage();
             $deal = Deal::find($id);
             if (!$deal) {
                 redirect(url('deals'));
@@ -989,8 +1033,12 @@ try {
                 verify_csrf();
                 $errors = required_fields($_POST, ['deal_name' => 'نام فرصت', 'customer_id' => 'مشتری']);
                 if (!$errors) {
-                    Deal::update($id, $_POST);
-                    redirect(url('deals', ['action' => 'show', 'id' => $id]));
+                    try {
+                        Deal::update($id, $_POST);
+                        redirect(url('deals', ['action' => 'show', 'id' => $id]));
+                    } catch (DomainException $e) {
+                        $errors[] = $e->getMessage();
+                    }
                 }
                 $deal = array_merge($deal, $_POST);
             }
@@ -1013,6 +1061,101 @@ try {
     }
 
     if ($page === 'contracts') {
+        require_roles(['admin', 'sales', 'finance']);
+        $itemActions = [
+            'item_add' => 'item_saved',
+            'item_amend' => 'item_amended',
+            'item_identity_amend' => 'item_amended',
+            'item_cancel' => 'item_cancelled',
+            'invoice_add' => 'invoice_saved',
+            'invoice_edit' => 'invoice_saved',
+            'invoice_allocate' => 'invoice_allocated',
+            'invoice_reverse' => 'invoice_reversed',
+        ];
+        if (isset($itemActions[$action])) {
+            if (!is_post()) {
+                http_response_code(405);
+                exit('Method not allowed.');
+            }
+            verify_csrf();
+            // Authorization precedes looking up or mutating any item/invoice ID.
+            $role = current_user_role();
+            if (!in_array($role, ['admin', 'sales'], true)) {
+                http_response_code(403);
+                exit('شما اجازه مدیریت اقلام فروش را ندارید.');
+            }
+            $parentContract = Contract::find($id);
+            if (!$parentContract || ($role === 'sales' && (int) $parentContract['owner_user_id'] !== current_user_id())) {
+                http_response_code(404);
+                exit('قرارداد مجاز پیدا نشد.');
+            }
+            try {
+                if ($action === 'item_add') {
+                    ContractItem::add(array_merge($_POST, ['contract_id' => $id]));
+                } elseif ($action === 'item_amend') {
+                    ContractItem::amendQuantity(
+                        $id,
+                        (int) ($_POST['item_id'] ?? 0),
+                        (int) ($_POST['new_quantity'] ?? 0),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
+                } elseif ($action === 'item_identity_amend') {
+                    ContractItem::amendIdentity(
+                        $id,
+                        (int) ($_POST['item_id'] ?? 0),
+                        $_POST,
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
+                } elseif ($action === 'item_cancel') {
+                    ContractItem::cancel(
+                        $id,
+                        (int) ($_POST['item_id'] ?? 0),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
+                } elseif ($action === 'invoice_add') {
+                    ContractInvoiceRef::create(
+                        $id,
+                        (string) ($_POST['invoice_number'] ?? ''),
+                        trim((string) ($_POST['invoice_date'] ?? ''))
+                    );
+                } elseif ($action === 'invoice_edit') {
+                    ContractInvoiceRef::update(
+                        $id,
+                        (int) ($_POST['invoice_ref_id'] ?? 0),
+                        (string) ($_POST['invoice_number'] ?? ''),
+                        trim((string) ($_POST['invoice_date'] ?? '')),
+                        (string) ($_POST['note'] ?? ''),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
+                } elseif ($action === 'invoice_allocate') {
+                    ContractInvoiceRef::allocate(
+                        $id,
+                        (int) ($_POST['invoice_ref_id'] ?? 0),
+                        (int) ($_POST['contract_item_id'] ?? 0),
+                        (int) ($_POST['invoiced_quantity'] ?? 0)
+                    );
+                } else {
+                    ContractInvoiceRef::reverseAllocation(
+                        $id,
+                        (int) ($_POST['allocation_id'] ?? 0),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
+                }
+                redirect(url('contracts', [
+                    'action' => 'show', 'id' => $id, $itemActions[$action] => 1,
+                ]));
+            } catch (PDOException $error) {
+                $_SESSION['contract_items_error'] = 'ثبت اطلاعات به دلیل خطا یا تکراری‌بودن اطلاعات انجام نشد.';
+            } catch (DomainException | InvalidArgumentException | RuntimeException $error) {
+                $_SESSION['contract_items_error'] = $error->getMessage();
+            }
+            redirect(url('contracts', ['action' => 'show', 'id' => $id]));
+        }
         if ($action === 'payment_create' && is_post()) {
             require_finance_manage();
             verify_csrf();
@@ -1067,8 +1210,9 @@ try {
         }
         if ($action === 'document_download') {
             $document = ContractDocument::find((int) ($_GET['document_id'] ?? 0));
+            $authorizedContract = $document ? Contract::find((int) $document['contract_id']) : null;
             $file = $document ? contract_document_path((string) $document['file_path']) : null;
-            if (!$document || $file === null) {
+            if (!$document || !$authorizedContract || $file === null) {
                 http_response_code(404);
                 exit('File not found.');
             }
@@ -1092,6 +1236,7 @@ try {
             redirect(url('contracts', ['action' => 'show', 'id' => (int) $document['contract_id'], 'document_deleted' => 1]));
         }
         if ($action === 'document_upload' && is_post()) {
+            require_sales_manage();
             verify_csrf();
             $contract = Contract::find($id);
             if (!$contract) {
@@ -1148,6 +1293,7 @@ try {
             delete_action(fn() => Contract::delete($id), url('contracts'));
         }
         if ($action === 'create') {
+            require_sales_manage();
             $dealId = (int) ($_GET['deal_id'] ?? 0);
             $deal = $dealId > 0 ? Deal::find($dealId) : null;
             $contract = [
@@ -1163,9 +1309,30 @@ try {
             if (is_post()) {
                 verify_csrf();
                 $errors = required_fields($_POST, ['contract_title' => 'عنوان ثبت', 'customer_id' => 'مشتری']);
+                $customerId = (int) ($_POST['customer_id'] ?? 0);
+                $selectedCustomer = $customerId > 0 ? Customer::find($customerId) : null;
+                if (!$selectedCustomer || (current_user_role() === 'sales'
+                    && (int) ($selectedCustomer['owner_user_id'] ?? 0) !== current_user_id())) {
+                    $errors[] = 'مشتری انتخاب‌شده مجاز یا معتبر نیست.';
+                }
+                $relatedDealId = (int) ($_POST['deal_id'] ?? 0);
+                if ($relatedDealId > 0) {
+                    $relatedDeal = Deal::find($relatedDealId);
+                    if (!$relatedDeal || (int) $relatedDeal['customer_id'] !== $customerId
+                        || (current_user_role() === 'sales'
+                            && (int) $relatedDeal['owner_user_id'] !== current_user_id())) {
+                        $errors[] = 'فرصت فروش به این مشتری یا کاربر تعلق ندارد.';
+                    }
+                }
+                if (current_user_role() === 'sales') {
+                    $_POST['owner_user_id'] = current_user_id();
+                }
                 if (!$errors) {
                     try {
-                        $newId = Contract::create($_POST);
+                        if (isset($_POST['items']) && !is_array($_POST['items'])) {
+                            throw new InvalidArgumentException('قالب اقلام قرارداد معتبر نیست.');
+                        }
+                        $newId = ContractSaleService::create($_POST, $_POST['items'] ?? []);
                         redirect(url('contracts', ['action' => 'show', 'id' => $newId]));
                     } catch (Throwable $e) {
                         $errors[] = $e->getMessage();
@@ -1177,6 +1344,7 @@ try {
             exit;
         }
         if ($action === 'edit') {
+            require_sales_manage();
             $contract = Contract::find($id);
             if (!$contract) {
                 redirect(url('contracts'));
@@ -1235,6 +1403,7 @@ try {
     }
 
     if ($page === 'activities') {
+        require_activity_access();
         if ($action === 'customer_lookup') {
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(Customer::autocomplete((string) ($_GET['q'] ?? '')), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -1269,6 +1438,10 @@ try {
             exit;
         }
         if ($action === 'delete' && is_post()) {
+            if (!Activity::find($id)) {
+                http_response_code(404);
+                exit('Activity not found.');
+            }
             delete_action(fn() => Activity::delete($id), url('activities'));
         }
         if ($action === 'create') {

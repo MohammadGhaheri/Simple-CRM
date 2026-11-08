@@ -9,6 +9,12 @@ USE simple_crm;
 DROP TABLE IF EXISTS activities;
 DROP TABLE IF EXISTS contract_documents;
 DROP TABLE IF EXISTS contract_payments;
+DROP TABLE IF EXISTS contract_item_amendments;
+DROP TABLE IF EXISTS contract_item_change_events;
+DROP TABLE IF EXISTS contract_invoice_ref_events;
+DROP TABLE IF EXISTS contract_invoice_lines;
+DROP TABLE IF EXISTS contract_invoice_refs;
+DROP TABLE IF EXISTS contract_items;
 DROP TABLE IF EXISTS contracts;
 DROP TABLE IF EXISTS ticket_status_events;
 DROP TABLE IF EXISTS ticket_assignment_events;
@@ -20,6 +26,7 @@ DROP TABLE IF EXISTS login_events;
 DROP TABLE IF EXISTS record_view_events;
 DROP TABLE IF EXISTS user_sessions;
 DROP TABLE IF EXISTS tickets;
+DROP TABLE IF EXISTS deal_stage_events;
 DROP TABLE IF EXISTS deals;
 DROP TABLE IF EXISTS contacts;
 DROP TABLE IF EXISTS customers;
@@ -311,6 +318,23 @@ CREATE TABLE deals (
   CONSTRAINT fk_deals_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+
+CREATE TABLE deal_stage_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  deal_id INT UNSIGNED NOT NULL,
+  from_stage VARCHAR(80) NULL,
+  to_stage VARCHAR(80) NOT NULL,
+  changed_by_user_id INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_deal_stage_events_deal_time (deal_id, created_at, id),
+  INDEX idx_deal_stage_events_time (created_at, to_stage),
+  INDEX idx_deal_stage_events_actor (changed_by_user_id, created_at),
+  CONSTRAINT fk_deal_stage_events_deal
+    FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE CASCADE,
+  CONSTRAINT fk_deal_stage_events_actor
+    FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
 CREATE TABLE contracts (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   contract_type VARCHAR(40) NOT NULL DEFAULT 'formal',
@@ -333,6 +357,116 @@ CREATE TABLE contracts (
   CONSTRAINT fk_contracts_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
   CONSTRAINT fk_contracts_deal FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE SET NULL,
   CONSTRAINT fk_contracts_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE contract_items (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  contract_id INT UNSIGNED NOT NULL,
+  line_number INT UNSIGNED NOT NULL,
+  item_type ENUM('device','product','service') NOT NULL DEFAULT 'product',
+  product VARCHAR(120) NOT NULL DEFAULT 'Other',
+  sku VARCHAR(120) NULL,
+  item_title VARCHAR(190) NOT NULL,
+  quantity INT UNSIGNED NOT NULL,
+  unit_amount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+  line_amount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+  requires_installation TINYINT(1) NOT NULL DEFAULT 0,
+  notes TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at DATETIME NULL,
+  UNIQUE KEY uq_contract_items_line (contract_id, line_number),
+  UNIQUE KEY uq_contract_items_parent (contract_id, id),
+  INDEX idx_contract_items_type (item_type, requires_installation),
+  CONSTRAINT fk_contract_items_contract FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE contract_item_amendments (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  contract_item_id BIGINT UNSIGNED NOT NULL,
+  old_quantity INT UNSIGNED NOT NULL,
+  new_quantity INT UNSIGNED NOT NULL,
+  old_line_amount DECIMAL(18,2) NOT NULL,
+  new_line_amount DECIMAL(18,2) NOT NULL,
+  reason VARCHAR(500) NOT NULL,
+  changed_by_user_id INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_contract_item_amendments_item_time (contract_item_id, created_at, id),
+  CONSTRAINT fk_contract_item_amendment_item FOREIGN KEY (contract_item_id) REFERENCES contract_items(id) ON DELETE CASCADE,
+  CONSTRAINT fk_contract_item_amendment_actor FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE contract_invoice_refs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  contract_id INT UNSIGNED NOT NULL,
+  invoice_number VARCHAR(120) NOT NULL,
+  invoice_date DATE NULL,
+  note TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at DATETIME NULL,
+  UNIQUE KEY uq_contract_invoice_refs_number (contract_id, invoice_number),
+  UNIQUE KEY uq_contract_invoice_refs_parent (contract_id, id),
+  CONSTRAINT fk_contract_invoice_refs_contract FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE contract_invoice_lines (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  contract_id INT UNSIGNED NOT NULL,
+  invoice_ref_id BIGINT UNSIGNED NOT NULL,
+  contract_item_id BIGINT UNSIGNED NOT NULL,
+  invoiced_quantity INT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reversed_at DATETIME NULL,
+  reversed_by_user_id INT UNSIGNED NULL,
+  reversal_reason VARCHAR(500) NULL,
+  INDEX idx_invoice_lines_ref_item (invoice_ref_id, contract_item_id),
+  INDEX idx_invoice_line_item (contract_id, contract_item_id),
+  INDEX idx_invoice_lines_reversal (contract_id, reversed_at),
+  CONSTRAINT fk_invoice_line_ref FOREIGN KEY (contract_id, invoice_ref_id)
+    REFERENCES contract_invoice_refs(contract_id, id) ON DELETE CASCADE,
+  CONSTRAINT fk_invoice_line_item FOREIGN KEY (contract_id, contract_item_id)
+    REFERENCES contract_items(contract_id, id) ON DELETE CASCADE,
+  CONSTRAINT fk_invoice_line_reversed_by FOREIGN KEY (reversed_by_user_id)
+    REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE contract_item_change_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  contract_id INT UNSIGNED NOT NULL,
+  contract_item_id BIGINT UNSIGNED NOT NULL,
+  event_type ENUM('identity_amended','cancelled') NOT NULL,
+  old_item_title VARCHAR(190) NULL,
+  new_item_title VARCHAR(190) NULL,
+  old_product VARCHAR(120) NULL,
+  new_product VARCHAR(120) NULL,
+  old_sku VARCHAR(120) NULL,
+  new_sku VARCHAR(120) NULL,
+  reason VARCHAR(500) NOT NULL,
+  changed_by_user_id INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_contract_item_events_contract_time (contract_id, created_at, id),
+  CONSTRAINT fk_contract_item_event_contract FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_contract_item_event_item FOREIGN KEY (contract_item_id) REFERENCES contract_items(id) ON DELETE CASCADE,
+  CONSTRAINT fk_contract_item_event_actor FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE contract_invoice_ref_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  contract_id INT UNSIGNED NOT NULL,
+  invoice_ref_id BIGINT UNSIGNED NOT NULL,
+  old_invoice_number VARCHAR(120) NULL,
+  new_invoice_number VARCHAR(120) NULL,
+  old_invoice_date DATE NULL,
+  new_invoice_date DATE NULL,
+  old_note TEXT NULL,
+  new_note TEXT NULL,
+  reason VARCHAR(500) NOT NULL,
+  changed_by_user_id INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_contract_invoice_events_contract_time (contract_id, created_at, id),
+  CONSTRAINT fk_contract_invoice_event_contract FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_contract_invoice_event_ref FOREIGN KEY (invoice_ref_id) REFERENCES contract_invoice_refs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_contract_invoice_event_actor FOREIGN KEY (changed_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE contract_payments (

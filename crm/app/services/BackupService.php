@@ -5,7 +5,8 @@ declare(strict_types=1);
 class BackupService
 {
     public const FORMAT = 'elm-simple-crm-full-backup';
-    public const FORMAT_VERSION = 1;
+    // v2 adds the private ticket-attachment root; v1 archives remain restorable.
+    public const FORMAT_VERSION = 2;
     public const MAX_ENTRIES = 10000;
     public const MAX_TOTAL_SIZE = 1073741824;
     public const MAX_FILE_SIZE = 104857600;
@@ -18,6 +19,7 @@ class BackupService
             'activity-attachments' => ['path' => activity_attachment_root(), 'prefix' => 'files/private/activity-attachments'],
             'announcement-attachments' => ['path' => announcement_attachment_root(), 'prefix' => 'files/private/announcement-attachments'],
             'contract-documents' => ['path' => contract_document_root(), 'prefix' => 'files/private/contract-documents'],
+            'ticket-attachments' => ['path' => ticket_attachment_root(), 'prefix' => 'files/private/ticket-attachments'],
             'public-uploads' => ['path' => public_upload_root() . '/uploads', 'prefix' => 'files/public/uploads'],
         ];
     }
@@ -471,7 +473,10 @@ class BackupService
 
     private static function validateManifestShape(array $manifest): void
     {
-        if (($manifest['format'] ?? '') !== self::FORMAT || (int) ($manifest['format_version'] ?? 0) !== self::FORMAT_VERSION) {
+        $formatVersion = $manifest['format_version'] ?? null;
+        if (($manifest['format'] ?? '') !== self::FORMAT
+            || !is_int($formatVersion)
+            || !in_array($formatVersion, [1, self::FORMAT_VERSION], true)) {
             throw new RuntimeException('فرمت یا نسخه manifest این بکاپ پشتیبانی نمی‌شود.');
         }
         if (!is_string($manifest['generated_at'] ?? null) || !is_string($manifest['app_version'] ?? null)) {
@@ -485,6 +490,11 @@ class BackupService
         }
         $allowedRoots = [];
         foreach (self::managedRoots() as $key => $root) {
+            // Existing v1 archives predate private ticket attachments.
+            // Do not reject their restores, but require the new root in v2.
+            if ($formatVersion === 1 && $key === 'ticket-attachments') {
+                continue;
+            }
             $allowedRoots[(string) $key] = $root['prefix'];
         }
         $seenRoots = [];

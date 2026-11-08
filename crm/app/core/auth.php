@@ -44,6 +44,42 @@ function require_admin(): void
     }
 }
 
+function require_roles(array $roles): void
+{
+    if (!in_array(current_user_role(), $roles, true)) {
+        http_response_code(403);
+        exit('شما اجازه دسترسی به این بخش را ندارید.');
+    }
+}
+
+function can_manage_sales_records(): bool
+{
+    return in_array(current_user_role(), ['admin', 'sales'], true);
+}
+
+function require_sales_manage(): void
+{
+    if (!can_manage_sales_records()) {
+        http_response_code(403);
+        exit('شما اجازه ایجاد یا ویرایش اطلاعات فروش را ندارید.');
+    }
+}
+
+function require_customer_manage(): void
+{
+    require_roles(['admin', 'sales']);
+}
+
+function require_activity_access(): void
+{
+    require_roles(['admin', 'sales', 'support', 'operations']);
+}
+
+function require_ticket_access(): void
+{
+    require_roles(['admin', 'support']);
+}
+
 function can_view_finance(): bool
 {
     return in_array(current_user_role(), ['admin', 'finance', 'sales'], true);

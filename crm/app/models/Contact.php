@@ -8,6 +8,7 @@ class Contact
     {
         $sql = 'SELECT ct.*, c.customer_name, u.name AS default_support_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.deleted_at IS NULL AND c.deleted_at IS NULL';
         $params = [];
+        self::applyVisibility($sql, $params, 'c');
         if (!empty($filters['q'])) {
             $sql .= ' AND (ct.contact_name LIKE ? OR ct.mobile LIKE ? OR ct.email LIKE ? OR c.customer_name LIKE ?)';
             $q = '%' . $filters['q'] . '%';
@@ -29,24 +30,28 @@ class Contact
 
     public static function byCustomer(int $customerId): array
     {
-        $stmt = db()->prepare('SELECT ct.*, u.name AS default_support_name FROM contacts ct LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.customer_id = ? AND ct.deleted_at IS NULL ORDER BY ct.is_primary DESC, ct.id DESC');
-        $stmt->execute([$customerId]);
+        $sql = 'SELECT ct.*, u.name AS default_support_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.customer_id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL';
+        $params = [$customerId];
+        self::applyVisibility($sql, $params, 'c');
+        $stmt = db()->prepare($sql . ' ORDER BY ct.is_primary DESC, ct.id DESC');
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
     public static function findForCustomer(int $id, int $customerId): ?array
     {
-        $stmt = db()->prepare('
+        $sql = '
             SELECT ct.*, c.customer_name, c.is_vip
             FROM contacts ct
             JOIN customers c ON c.id = ct.customer_id
             WHERE ct.id = ?
               AND ct.customer_id = ?
               AND ct.deleted_at IS NULL
-              AND c.deleted_at IS NULL
-            LIMIT 1
-        ');
-        $stmt->execute([$id, $customerId]);
+              AND c.deleted_at IS NULL';
+        $params = [$id, $customerId];
+        self::applyVisibility($sql, $params, 'c');
+        $stmt = db()->prepare($sql . ' LIMIT 1');
+        $stmt->execute($params);
         return $stmt->fetch() ?: null;
     }
 
@@ -59,8 +64,11 @@ class Contact
 
     public static function find(int $id): ?array
     {
-        $stmt = db()->prepare('SELECT ct.*, c.customer_name, u.name AS default_support_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL');
-        $stmt->execute([$id]);
+        $sql = 'SELECT ct.*, c.customer_name, u.name AS default_support_name FROM contacts ct JOIN customers c ON c.id = ct.customer_id LEFT JOIN users u ON u.id = ct.default_support_user_id WHERE ct.id = ? AND ct.deleted_at IS NULL AND c.deleted_at IS NULL';
+        $params = [$id];
+        self::applyVisibility($sql, $params, 'c');
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetch() ?: null;
     }
 
@@ -183,5 +191,19 @@ class Contact
     private static function validApprovalStatus(string $status): string
     {
         return array_key_exists($status, self::approvalStatuses()) ? $status : 'approved';
+    }
+
+    private static function applyVisibility(string &$sql, array &$params, string $customerAlias): void
+    {
+        $role = function_exists('current_user_role') ? current_user_role() : 'admin';
+        if (in_array($role, ['admin', 'support'], true)) {
+            return;
+        }
+        if ($role === 'sales') {
+            $sql .= " AND {$customerAlias}.owner_user_id = ?";
+            $params[] = current_user_id();
+            return;
+        }
+        $sql .= ' AND 1 = 0';
     }
 }
