@@ -194,6 +194,14 @@ try {
         'Unauthorized or CSRF-rejected request still mutated DB.');
 
     [$status] = $post('operations', $createRoute, [
+        'contract_item_id' => '1', 'serial_number' => 'HTTP-BAD-ASSIGN',
+        'technician_user_id' => '4', 'status' => 'scheduled',
+    ]);
+    http_expect($status === 302, 'Invalid technician assignment should return to form.');
+    http_expect((int) $pdo->query('SELECT COUNT(*) FROM installation_records')->fetchColumn() === 0,
+        'Forged Finance technician ID created an installation.');
+
+    [$status] = $post('operations', $createRoute, [
         'contract_item_id' => '1', 'imei' => 'HTTP-VALID-DEVICE',
         'device_model' => 'IoTruck 4G', 'status' => 'scheduled',
     ]);
