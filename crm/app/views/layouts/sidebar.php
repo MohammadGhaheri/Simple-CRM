@@ -18,6 +18,9 @@
         <a class="<?= ($page ?? '') === 'contacts' ? 'active' : '' ?>" href="<?= e(url('contacts')) ?>">مخاطبین</a>
         <a class="<?= ($page ?? '') === 'deals' ? 'active' : '' ?>" href="<?= e(url('deals')) ?>">فرصت‌ها</a>
         <a class="<?= ($page ?? '') === 'contracts' ? 'active' : '' ?>" href="<?= e(url('contracts')) ?>">قراردادها و فروش‌ها</a>
+        <?php if (in_array(current_user_role(), ['admin', 'sales', 'operations', 'support', 'finance'], true)): ?>
+            <a class="<?= ($page ?? '') === 'installations' ? 'active' : '' ?>" href="<?= e(url('installations')) ?>">تعهدات نصب</a>
+        <?php endif; ?>
         <?php if (can_view_finance()): ?><a class="<?= ($page ?? '') === 'finance' ? 'active' : '' ?>" href="<?= e(url('finance')) ?>">مالی</a><?php endif; ?>
         <a class="<?= ($page ?? '') === 'activities' ? 'active' : '' ?>" href="<?= e(url('activities')) ?>">فعالیت‌ها</a>
         <?php $ticketNeedsReview = class_exists('Ticket') ? Ticket::attentionCountForUser(current_user_id()) : 0; ?>
