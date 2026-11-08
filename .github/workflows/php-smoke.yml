@@ -85,3 +85,10 @@ jobs:
           MYSQL_TEST_USER: root
           MYSQL_TEST_PASSWORD: test_only_password
         run: php crm/tests/mammut_installation_mysql_test.php
+      - name: Test real Mammut HTTP workflows, CSRF and receipt permissions
+        env:
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: '3306'
+          MYSQL_TEST_USER: root
+          MYSQL_TEST_PASSWORD: test_only_password
+        run: php crm/tests/mammut_http_workflow_test.php
