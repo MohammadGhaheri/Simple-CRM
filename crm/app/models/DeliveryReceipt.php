@@ -72,7 +72,7 @@ final class DeliveryReceipt
             foreach ($records as $record) {
                 $insert->execute([$contractId, $receiptId, $record['id']]);
             }
-            self::recordCompletions($pdo, $contractId, $actorId);
+            self::recordCompletions($pdo, $contractId, $receiptId, $actorId);
             $pdo->commit();
             return $receiptId;
         } catch (Throwable $error) {
@@ -126,28 +126,61 @@ final class DeliveryReceipt
         }
     }
 
-    private static function recordCompletions(PDO $pdo, int $contractId, int $actorId): void
+    /**
+     * Each fulfillment cycle generates a distinct completion marker. A receipt
+     * can complete more than one item; unrelated already-complete items must
+     * not receive another event when another receipt is created.
+     */
+    private static function recordCompletions(PDO $pdo, int $contractId, int $receiptId, int $actorId): void
     {
         $stmt = $pdo->prepare("SELECT i.id, i.quantity,
-                COUNT(DISTINCT CASE WHEN ir.installation_kind = 'sale' AND dr.status = 'approved' AND dri.revoked_at IS NULL THEN ir.id END) delivered
+                COUNT(DISTINCT CASE WHEN ir.installation_kind = 'sale'
+                    AND dr.status = 'approved' AND dri.revoked_at IS NULL THEN ir.id END) delivered
             FROM contract_items i
-            LEFT JOIN installation_records ir ON ir.contract_item_id = i.id AND ir.contract_id = i.contract_id
-            LEFT JOIN delivery_receipt_items dri ON dri.installation_record_id = ir.id AND dri.revoked_at IS NULL
-            LEFT JOIN delivery_receipts dr ON dr.id = dri.delivery_receipt_id AND dr.status = 'approved'
-            WHERE i.contract_id = ? AND i.item_type = 'device' AND i.requires_installation = 1 AND i.deleted_at IS NULL
+            LEFT JOIN installation_records ir ON ir.contract_item_id = i.id
+                AND ir.contract_id = i.contract_id AND ir.deleted_at IS NULL
+            LEFT JOIN delivery_receipt_items dri ON dri.installation_record_id = ir.id
+                AND dri.revoked_at IS NULL
+            LEFT JOIN delivery_receipts dr ON dr.id = dri.delivery_receipt_id
+                AND dr.status = 'approved'
+            WHERE i.contract_id = ? AND i.item_type = 'device'
+                AND i.requires_installation = 1 AND i.deleted_at IS NULL
+                AND EXISTS (
+                    SELECT 1 FROM delivery_receipt_items current_link
+                    JOIN installation_records current_ir
+                        ON current_ir.id = current_link.installation_record_id
+                    WHERE current_link.delivery_receipt_id = ?
+                        AND current_ir.contract_item_id = i.id
+                        AND current_ir.installation_kind = 'sale'
+                )
             GROUP BY i.id, i.quantity");
-        $stmt->execute([$contractId]);
+        $stmt->execute([$contractId, $receiptId]);
         $insert = $pdo->prepare("INSERT IGNORE INTO fulfillment_events
             (contract_id, contract_item_id, event_type, event_key, finance_followup_status, details, created_by_user_id)
             VALUES (?, ?, 'obligation_completed', ?, 'pending', ?, ?)");
         foreach ($stmt->fetchAll() as $row) {
             if ((int) $row['delivered'] >= (int) $row['quantity']) {
                 $insert->execute([
-                    $contractId, $row['id'], 'obligation-completed:' . $row['id'],
+                    $contractId, $row['id'],
+                    'obligation-completed:' . $row['id'] . ':receipt:' . $receiptId,
                     'تعهد تحویل تکمیل شد؛ بررسی مالی لازم است.', $actorId,
                 ]);
             }
         }
+    }
+
+    private static function deliveredSaleCount(PDO $pdo, int $contractItemId): int
+    {
+        $stmt = $pdo->prepare("SELECT COUNT(DISTINCT ir.id)
+            FROM installation_records ir
+            JOIN delivery_receipt_items dri ON dri.installation_record_id = ir.id
+                AND dri.revoked_at IS NULL
+            JOIN delivery_receipts dr ON dr.id = dri.delivery_receipt_id
+                AND dr.status = 'approved'
+            WHERE ir.contract_item_id = ? AND ir.installation_kind = 'sale'
+                AND ir.deleted_at IS NULL");
+        $stmt->execute([$contractItemId]);
+        return (int) $stmt->fetchColumn();
     }
 
     private static function assertOperationsMutation(): void
