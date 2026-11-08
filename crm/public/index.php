@@ -28,6 +28,9 @@ require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/models/PerformanceAnalytics.php';
 require __DIR__ . '/../app/models/PerformanceReport.php';
 require __DIR__ . '/../app/models/RoleDashboard.php';
+require __DIR__ . '/../app/models/InstallationObligation.php';
+require __DIR__ . '/../app/models/InstallationRecord.php';
+require __DIR__ . '/../app/models/DeliveryReceipt.php';
 require __DIR__ . '/../app/services/SmsService.php';
 require __DIR__ . '/../app/services/EmailService.php';
 require __DIR__ . '/../app/services/BackupService.php';
@@ -127,6 +130,98 @@ function ticket_after_action(): string
 try {
     PerformanceAnalytics::touchUserSession(current_user_id());
     UsageReport::logUsage('user', current_user_id(), $page, $action);
+
+    if ($page === 'installations') {
+        require_roles(['admin', 'sales', 'operations', 'support', 'finance']);
+        $canMutateInstallations = in_array(current_user_role(), ['admin', 'operations'], true);
+        if (in_array($action, ['record_create', 'transition', 'delivery_create', 'delivery_cancel'], true)) {
+            if (!is_post()) {
+                http_response_code(405);
+                exit('Method not allowed.');
+            }
+            verify_csrf();
+            if (!$canMutateInstallations) {
+                http_response_code(403);
+                exit('شما اجازه تغییر اطلاعات نصب و تحویل را ندارید.');
+            }
+            try {
+                if ($action === 'record_create') {
+                    InstallationRecord::create((int) ($_POST['contract_item_id'] ?? 0), $_POST, current_user_id());
+                } elseif ($action === 'transition') {
+                    InstallationRecord::transition(
+                        (int) ($_POST['installation_id'] ?? 0),
+                        (string) ($_POST['to_status'] ?? ''),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
+                } elseif ($action === 'delivery_create') {
+                    // Never accept a client-submitted private file path. Only
+                    // the server upload helper may populate these fields.
+                    unset($_POST['evidence_path'], $_POST['evidence_name']);
+                    $uploaded = null;
+                    if ((int) ($_FILES['evidence_file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                        $uploaded = upload_contract_document('evidence_file');
+                        $_POST['evidence_path'] = $uploaded['path'];
+                        $_POST['evidence_name'] = $uploaded['name'];
+                    }
+                    try {
+                        DeliveryReceipt::createApproved((array) ($_POST['installation_ids'] ?? []), $_POST, current_user_id());
+                    } catch (Throwable $error) {
+                        if ($uploaded) {
+                            delete_contract_document_file((string) $uploaded['path']);
+                        }
+                        throw $error;
+                    }
+                } else {
+                    DeliveryReceipt::cancel(
+                        (int) ($_POST['receipt_id'] ?? 0),
+                        (string) ($_POST['reason'] ?? ''),
+                        current_user_id()
+                    );
+                }
+                redirect(url('installations', ['action' => 'show', 'id' => (int) ($_POST['contract_item_id'] ?? $id), 'saved' => 1]));
+            } catch (Throwable $error) {
+                $_SESSION['installation_error'] = $error instanceof PDOException
+                    ? 'ثبت اطلاعات عملیاتی به دلیل تعارض یا تکرار داده انجام نشد.'
+                    : $error->getMessage();
+                redirect(url('installations', ['action' => 'show', 'id' => (int) ($_POST['contract_item_id'] ?? $id)]));
+            }
+        }
+        if ($action === 'evidence_download') {
+            $receipt = DeliveryReceipt::evidenceForViewer((int) ($_GET['receipt_id'] ?? 0));
+            $file = $receipt ? contract_document_path((string) $receipt['evidence_path']) : null;
+            if (!$receipt || $file === null) {
+                http_response_code(404);
+                exit('File not found.');
+            }
+            header('Content-Type: application/octet-stream');
+            header('Content-Length: ' . filesize($file));
+            header("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode(sanitize_uploaded_filename((string) ($receipt['evidence_name'] ?: 'delivery-receipt'))));
+            header('Cache-Control: private, no-store');
+            header('X-Content-Type-Options: nosniff');
+            readfile($file);
+            exit;
+        }
+        $obligation = $action === 'show' ? InstallationObligation::find($id) : null;
+        if ($action === 'show' && !$obligation) {
+            http_response_code(404);
+            exit('تعهد نصب مجاز پیدا نشد.');
+        }
+        $operationsUsers = array_values(array_filter($users, static fn(array $user): bool =>
+            in_array($user['role'], ['admin', 'operations'], true) && !empty($user['is_active'])
+        ));
+        render('installations/index', [
+            'title' => 'تعهدات نصب',
+            'obligations' => InstallationObligation::search($_GET),
+            'obligation' => $obligation,
+            'installationRows' => $obligation ? InstallationRecord::byItem((int) $obligation['contract_item_id']) : [],
+            'deliveryReceipts' => $obligation ? DeliveryReceipt::byContractItem((int) $obligation['contract_item_id']) : [],
+            'operationsUsers' => $operationsUsers,
+            'canMutateInstallations' => $canMutateInstallations,
+            'filters' => $_GET,
+        ]);
+        exit;
+    }
 
     if ($page === 'reports') {
         require_admin();

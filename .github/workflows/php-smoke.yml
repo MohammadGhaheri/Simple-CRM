@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   php-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned for Playwright Chromium dependency compatibility
     services:
       mysql:
         image: mariadb:10.11
@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout pull-request code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # required for pre-PR8 upgrade rehearsal from real Git schema
       - name: Set up PHP and MySQL driver
         uses: shivammathur/setup-php@v2
         with:
@@ -44,7 +46,7 @@ jobs:
           if [ -f crm/tests/sales_record_authorization_test.php ]; then php crm/tests/sales_record_authorization_test.php; fi
           if [ -f crm/tests/sales_record_authorization_behavior_test.php ]; then php crm/tests/sales_record_authorization_behavior_test.php; fi
           if [ -f crm/tests/ticket_attachment_security_test.php ]; then php crm/tests/ticket_attachment_security_test.php; fi
-      - name: Verify private ticket backups and legacy ZIP compatibility
+      - name: Verify private ticket attachment backups and historical ZIP compatibility
         run: php crm/tests/private_ticket_backup_test.php
       - name: Run deal-stage MySQL integration tests
         if: hashFiles('crm/tests/deal_stage_history_mysql_test.php') != ''
@@ -80,3 +82,44 @@ jobs:
           MYSQL_TEST_USER: root
           MYSQL_TEST_PASSWORD: test_only_password
         run: php crm/tests/full_schema_contract_mysql_test.php
+      - name: Rehearse ordered core and Mammut migrations against the old CRM schema
+        env:
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: '3306'
+          MYSQL_TEST_USER: root
+          MYSQL_TEST_PASSWORD: test_only_password
+        run: php crm/tests/mammut_legacy_upgrade_mysql_test.php
+      - name: Test Mammut installation and delivery fulfillment
+        env:
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: '3306'
+          MYSQL_TEST_USER: root
+          MYSQL_TEST_PASSWORD: test_only_password
+        run: php crm/tests/mammut_installation_mysql_test.php
+      - name: Test real Mammut HTTP workflows, CSRF and receipt permissions
+        env:
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: '3306'
+          MYSQL_TEST_USER: root
+          MYSQL_TEST_PASSWORD: test_only_password
+        run: php crm/tests/mammut_http_workflow_test.php
+      - name: Run Chromium UI/RTL/mobile checks on synthetic Mammut data
+        env:
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: '3306'
+          MYSQL_TEST_USER: root
+          MYSQL_TEST_PASSWORD: test_only_password
+        run: |
+          mkdir -p "$RUNNER_TEMP/mammut-browser"
+          npm install --no-save --prefix "$RUNNER_TEMP/mammut-browser" playwright@1.55.1
+          "$RUNNER_TEMP/mammut-browser/node_modules/.bin/playwright" install --with-deps chromium
+          export NODE_PATH="$RUNNER_TEMP/mammut-browser/node_modules"
+          export MAMMUT_SCREENSHOT_DIR="$RUNNER_TEMP/mammut-screenshots"
+          MAMMUT_BROWSER_TEST=1 php crm/tests/mammut_http_workflow_test.php
+      - name: Upload synthetic desktop/mobile CRM screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mammut-crm-ui-screenshots
+          path: ${{ runner.temp }}/mammut-screenshots
+          if-no-files-found: ignore

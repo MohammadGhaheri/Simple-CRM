@@ -29,7 +29,9 @@ try {
     }
 
     foreach (['contracts', 'contract_items', 'contract_item_amendments', 'contract_item_change_events',
-        'contract_invoice_refs', 'contract_invoice_lines', 'contract_invoice_ref_events'] as $table) {
+        'contract_invoice_refs', 'contract_invoice_lines', 'contract_invoice_ref_events',
+        'installation_records', 'installation_status_events', 'delivery_receipts',
+        'delivery_receipt_items', 'fulfillment_events'] as $table) {
         $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = ?');
         $stmt->execute([$database, $table]);
         if ((int) $stmt->fetchColumn() !== 1) {
