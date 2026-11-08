@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout pull-request code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # required for pre-PR8 upgrade rehearsal from real Git schema
       - name: Set up PHP and MySQL driver
         uses: shivammathur/setup-php@v2
         with:
@@ -78,6 +80,13 @@ jobs:
           MYSQL_TEST_USER: root
           MYSQL_TEST_PASSWORD: test_only_password
         run: php crm/tests/full_schema_contract_mysql_test.php
+      - name: Rehearse ordered core and Mammut migrations against the old CRM schema
+        env:
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: '3306'
+          MYSQL_TEST_USER: root
+          MYSQL_TEST_PASSWORD: test_only_password
+        run: php crm/tests/mammut_legacy_upgrade_mysql_test.php
       - name: Test Mammut installation and delivery fulfillment
         env:
           MYSQL_TEST_HOST: 127.0.0.1
