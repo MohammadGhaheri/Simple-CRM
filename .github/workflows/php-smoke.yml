@@ -32,7 +32,7 @@ jobs:
       - name: Set up PHP and MySQL driver
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.1' # Production LiteSpeed PHP 8.1.34 compatibility check
           extensions: pdo_mysql, mbstring, zip
       - name: Report PHP version
         run: php -v
