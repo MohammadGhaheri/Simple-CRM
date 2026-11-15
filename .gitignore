@@ -28,3 +28,10 @@ sess_*
 
 # Installer runtime lock
 crm/database/install.lock
+
+# MSI/Windows local release state — never commit customer backups or secrets
+/release-artifacts/
+/.crm-local/
+*.dpapi
+*.clixml
+*.pfx
