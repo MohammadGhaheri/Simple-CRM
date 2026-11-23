@@ -124,7 +124,8 @@ function mc_crm_payload(array $posted, $submission): array {
     $service = $inferred !== 'other' ? $inferred : mc_crm_code($serviceLabel, 'service');
     $count = mc_crm_posted($posted, 'vehicle-count');
     $count = strtr($count, ['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9']);
-    $count = preg_replace('/[^0-9]/', '', $count);
+    preg_match('/[0-9]+/', $count, $countMatches);
+    $count = $countMatches[0] ?? '';
     return [
         'request_id' => 'mc-' . wp_generate_uuid4(),
         'source' => 'mammutconnect.com',
