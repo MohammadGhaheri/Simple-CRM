@@ -19,7 +19,8 @@ jobs:
       mariadb:
         image: mariadb:10.11
         env:
-          MARIADB_ROOT_PASSWORD: [REDACTED]        ports:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
           - 3306:3306
         options: >-
           --health-cmd="healthcheck.sh --connect --innodb_initialized"
@@ -54,4 +55,5 @@ jobs:
         env:
           CRM_TEST_DSN: mysql:host=127.0.0.1;port=3306;dbname=simple_crm;charset=utf8mb4
           CRM_TEST_USER: root
-          CRM_TEST_PASSWORD: [REDACTED]        run: php crm/tests/website_leads_integration_test.php
+          CRM_TEST_PASSWORD: root
+        run: php crm/tests/website_leads_integration_test.php

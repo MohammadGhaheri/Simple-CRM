@@ -29,11 +29,11 @@ if ($body === false || strlen($body) > 16384) respond(413, ['error'=>'payload_to
 require __DIR__ . '/../../../../app/core/helpers.php';
 require __DIR__ . '/../../../../app/models/Setting.php';
 require __DIR__ . '/../../../../app/models/WebsiteLead.php';
-$secret = [REDACTED] getenv('MAMMUT_WEBSITE_HMAC_SECRET');
+$secret = (string) getenv('MAMMUT_WEBSITE_HMAC_SECRET');
 $ts = (string) ($_SERVER['HTTP_X_MC_TIMESTAMP'] ?? '');
 $nonce = (string) ($_SERVER['HTTP_X_MC_NONCE'] ?? '');
 $sig = (string) ($_SERVER['HTTP_X_MC_SIGNATURE'] ?? '');
-if ($secret =[REDACTED] '') respond(503, ['error'=>'integration_not_configured']);
+if ($secret === '') respond(503, ['error'=>'integration_not_configured']);
 if (!WebsiteLead::authenticate($ts, $nonce, $sig, $body, $secret, time())) {
     respond(401, ['error'=>'invalid_signature_or_timestamp']);
 }

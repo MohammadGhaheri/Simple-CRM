@@ -102,7 +102,7 @@ final class WebsiteLead
 
     public static function authenticate(string $timestamp, string $nonce, string $signature, string $body, string $secret, int $now): bool
     {
-        if ($secret =[REDACTED] '' || strlen($secret) < 32 || !ctype_digit($timestamp) || abs($now - (int) $timestamp) > 300 ||
+        if ($secret === '' || strlen($secret) < 32 || !ctype_digit($timestamp) || abs($now - (int) $timestamp) > 300 ||
             !preg_match('/^[a-f0-9]{32,64}$/D', $nonce) || !preg_match('/^sha256=[a-f0-9]{64}$/D', $signature)) {
             return false;
         }

@@ -271,8 +271,8 @@ function mc_crm_admin(): void {
         if (wp_parse_url($endpoint, PHP_URL_SCHEME) !== 'https') {
             echo '<div class="notice notice-error"><p>نشانی API باید HTTPS باشد.</p></div>';
         } else {
-            $secret = [REDACTED] wp_unslash($_POST['secret'] ?? '');
-            update_option('mc_crm_settings', ['endpoint'=>$endpoint,'secret'=>$secret !== '' ? $secret : [REDACTED] ($old['secret'] ?? '')], false);
+            $secret = (string) wp_unslash($_POST['secret'] ?? '');
+            update_option('mc_crm_settings', ['endpoint'=>$endpoint,'secret'=>$secret !== '' ? $secret : (string) ($old['secret'] ?? '')], false);
             echo '<div class="notice notice-success"><p>تنظیمات ذخیره شد.</p></div>';
         }
     }

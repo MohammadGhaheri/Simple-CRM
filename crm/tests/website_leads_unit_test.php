@@ -32,7 +32,7 @@ foreach ([
 ] as $invalid) {
     bad(static fn()=>WebsiteLead::validate(array_replace($p, $invalid)));
 }
-$secret = [REDACTED] 64);
+$secret = str_repeat('s', 64);
 $body = json_encode($p, JSON_UNESCAPED_UNICODE);
 $time=(string)time();
 $nonce=bin2hex(random_bytes(16));

@@ -776,7 +776,7 @@ try {
                 Customer::regenerateInviteToken($id);
                 redirect(url('customers', ['action' => 'invite_contacts', 'id' => $id]));
             }
-            $token = [REDACTED];
+            $token = Customer::ensureInviteToken($id);
             $settings = Setting::all();
             $inviteUrl = absolute_public_url('portal.php', ['action' => 'contact_invite', 'token' => $token]);
             $template = trim((string) ($settings['contact_invite_message_template'] ?? ''));
