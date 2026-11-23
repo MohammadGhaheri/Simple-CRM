@@ -14,7 +14,7 @@ $services = ['ifms'=>'iFMS','iotruck'=>'IoTruck','iotrailer'=>'IoTrailer','dsp'=
             <p><b>شرکت:</b> <?= e($lead['company'] ?: '—') ?></p>
             <p><b>موبایل:</b> <?= e($lead['mobile']) ?></p>
             <p><b>ایمیل:</b> <?= e($lead['email'] ?: '—') ?></p>
-            <p><b>منبع:</b> <?= e($lead['source']) ?></p>
+            <p><b>منبع:</b> <?= e($lead['source']) ?> <?= e($lead['lead_source_detail'] ?: '') ?></p>
             <p><b>محصول:</b> <?= e($services[$lead['service_code']] ?? $lead['service_code']) ?> (<?= e($lead['service_label']) ?>)</p>
             <p><b>ناوگان:</b> <?= e($lead['fleet_type_label'] ?: $lead['fleet_type']) ?></p>
             <p><b>تعداد خودرو:</b> <?= (int) $lead['vehicle_count'] ?></p>

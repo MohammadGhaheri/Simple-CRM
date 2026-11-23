@@ -22,7 +22,7 @@ $GLOBALS['test_user_id'] = (int)$db->lastInsertId();
 $GLOBALS['test_role'] = 'sales';
 $p = [
  'request_id'=>'TEST-20261123-abcdefgh',
- 'source'=>'mammutconnect.com','submitted_at'=>'2026-11-23T11:00:00Z',
+ 'source'=>'mammutconnect.com','lead_source_detail'=>'فرم دمو TEST','submitted_at'=>'2026-11-23T11:00:00Z',
  'name'=>'تماس‌گیرنده آزمایشی TEST','mobile'=>'09120000123','email'=>'test-website@example.org',
  'company'=>'شرکت ساختگی TEST','fleet_type'=>'truck','fleet_type_label'=>'کشنده',
  'service'=>'ifms','service_label'=>'مدیریت ناوگان',

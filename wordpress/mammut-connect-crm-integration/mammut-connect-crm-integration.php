@@ -128,6 +128,7 @@ function mc_crm_payload(array $posted, $submission): array {
     return [
         'request_id' => 'mc-' . wp_generate_uuid4(),
         'source' => 'mammutconnect.com',
+        'lead_source_detail' => mc_crm_posted($posted, 'lead-source'),
         'submitted_at' => gmdate('Y-m-d\TH:i:s\Z'),
         'name' => mc_crm_posted($posted, 'your-name'),
         'mobile' => mc_crm_posted($posted, 'your-phone'),

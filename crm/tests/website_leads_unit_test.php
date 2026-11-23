@@ -10,7 +10,7 @@ function bad(callable $f): void {
 }
 $p = [
  'request_id'=>'TEST-20261123-11111111',
- 'source'=>'mammutconnect.com',
+ 'source'=>'mammutconnect.com', 'lead_source_detail'=>'درخواست تست دمو',
  'submitted_at'=>'2026-11-23T10:30:00Z',
  'name'=>'تست توسعه ماموت کانکت',
  'mobile'=>'۰۹۱۲۳۴۵۶۷۸۹',

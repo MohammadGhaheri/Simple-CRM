@@ -81,6 +81,7 @@ final class WebsiteLead
         return [
             'request_id' => $request,
             'source' => 'mammutconnect.com',
+            'lead_source_detail' => $str('lead_source_detail', 160) ?: null,
             'submitted_at' => $date->format('Y-m-d H:i:s'),
             'contact_name' => $name,
             'mobile' => $mobile,

@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS website_leads (
  request_id VARCHAR(100) NOT NULL,
  payload_sha256 CHAR(64) NOT NULL,
  source VARCHAR(120) NOT NULL,
+ lead_source_detail VARCHAR(160) NULL,
  submitted_at DATETIME NOT NULL,
  contact_name VARCHAR(160) NOT NULL,
  mobile VARCHAR(20) NOT NULL,
