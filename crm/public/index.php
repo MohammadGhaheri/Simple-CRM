@@ -28,6 +28,7 @@ require __DIR__ . '/../app/models/UsageReport.php';
 require __DIR__ . '/../app/models/PerformanceAnalytics.php';
 require __DIR__ . '/../app/models/PerformanceReport.php';
 require __DIR__ . '/../app/models/RoleDashboard.php';
+require __DIR__ . '/../app/models/WebsiteLead.php';
 require __DIR__ . '/../app/models/InstallationObligation.php';
 require __DIR__ . '/../app/models/InstallationRecord.php';
 require __DIR__ . '/../app/models/DeliveryReceipt.php';
@@ -615,9 +616,63 @@ try {
         exit;
     }
 
+    if ($page === 'website_leads') {
+        require_roles(['admin', 'sales']);
+        $salesUsers = array_values(array_filter($users, static fn(array $u): bool => !empty($u['is_active']) && in_array($u['role'], ['admin','sales'], true)));
+        $defaultOwner = (int) Setting::get('website_lead_default_owner_user_id');
+        if (is_post()) {
+            verify_csrf();
+            try {
+                if ($action === 'default_owner') {
+                    require_admin();
+                    $newOwner = (int) ($_POST['default_owner_user_id'] ?? 0);
+                    if ($newOwner) {
+                        $match = array_values(array_filter($salesUsers, static fn(array $u): bool => (int)$u['id'] === $newOwner && $u['role'] === 'sales'));
+                        if (!$match) throw new InvalidArgumentException('مسئول پیش‌فرض نامعتبر است.');
+                    }
+                    Setting::saveMany(['website_lead_default_owner_user_id'=>(string)$newOwner]);
+                    redirect(url('website_leads'));
+                }
+                if ($id <= 0) throw new DomainException('شناسه درخواست نامعتبر است.');
+                if ($action === 'save') {
+                    WebsiteLead::updateFollowup($id, $_POST, current_user_role(), current_user_id());
+                    redirect(url('website_leads', ['action'=>'show','id'=>$id]));
+                }
+                if ($action === 'convert') {
+                    WebsiteLead::convert($id, (int)($_POST['customer_id']??0), isset($_POST['create_deal']), current_user_role(), current_user_id());
+                    redirect(url('website_leads', ['action'=>'show','id'=>$id]));
+                }
+                http_response_code(405);
+                exit('Method not allowed.');
+            } catch (InvalidArgumentException | DomainException $e) {
+                $errors[] = $e->getMessage();
+            }
+        }
+        $lead = ($action === 'show' && $id > 0) ? WebsiteLead::findVisible($id, current_user_role(), current_user_id()) : null;
+        if ($action === 'show' && !$lead) {
+            http_response_code(404);
+            exit('درخواست یافت نشد.');
+        }
+        render('website_leads/index', [
+            'title'=>'درخواست‌های وب‌سایت',
+            'lead'=>$lead,
+            'leads'=>$action === 'show' ? [] : WebsiteLead::search($_GET, current_user_role(), current_user_id()),
+            'leadCounts'=>WebsiteLead::counts(current_user_role(), current_user_id()),
+            'possibleCustomers'=>$lead ? WebsiteLead::possibleCustomers($lead, current_user_role(), current_user_id()) : [],
+            'salesUsers'=>$salesUsers,'defaultOwner'=>$defaultOwner,
+            'filters'=>$_GET,'errors'=>$errors,
+        ]);
+        exit;
+    }
+
     if ($page === 'dashboard') {
         if (!is_admin()) {
             $dashboard = RoleDashboard::build(current_user_role(), current_user_id());
+            if (current_user_role() === 'sales') {
+                $websiteCounts = WebsiteLead::counts('sales', current_user_id());
+                $dashboard['metrics'][] = ['label'=>'درخواست‌های جدید وب‌سایت', 'value'=>$websiteCounts['new'], 'money'=>false];
+                $dashboard['metrics'][] = ['label'=>'درخواست‌های وب‌سایت منتظر پیگیری', 'value'=>$websiteCounts['due'], 'money'=>false];
+            }
             render('dashboard/role', [
                 'title' => $dashboard['title'],
                 'dashboard' => $dashboard,
@@ -626,6 +681,8 @@ try {
         }
         $stats = [
             'customers' => (int) db()->query('SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL')->fetchColumn(),
+            'website_leads_new' => WebsiteLead::counts('admin', current_user_id())['new'],
+            'website_leads_due' => WebsiteLead::counts('admin', current_user_id())['due'],
             'open_deals' => (int) db()->query("SELECT COUNT(*) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage NOT IN ('Won','Lost') AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
             'pipeline' => (float) db()->query("SELECT COALESCE(SUM(d.estimated_amount),0) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage NOT IN ('Won','Lost') AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
             'weighted' => (float) db()->query("SELECT COALESCE(SUM(d.weighted_amount),0) FROM deals d JOIN customers c ON c.id = d.customer_id WHERE d.deal_stage NOT IN ('Won','Lost') AND d.deleted_at IS NULL AND c.deleted_at IS NULL")->fetchColumn(),
@@ -719,7 +776,7 @@ try {
                 Customer::regenerateInviteToken($id);
                 redirect(url('customers', ['action' => 'invite_contacts', 'id' => $id]));
             }
-            $token = Customer::ensureInviteToken($id);
+            $token = [REDACTED];
             $settings = Setting::all();
             $inviteUrl = absolute_public_url('portal.php', ['action' => 'contact_invite', 'token' => $token]);
             $template = trim((string) ($settings['contact_invite_message_template'] ?? ''));

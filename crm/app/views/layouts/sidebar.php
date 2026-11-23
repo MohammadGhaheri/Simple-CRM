@@ -17,6 +17,9 @@
         <a class="<?= ($page ?? '') === 'customers' ? 'active' : '' ?>" href="<?= e(url('customers')) ?>">مشتریان</a>
         <a class="<?= ($page ?? '') === 'contacts' ? 'active' : '' ?>" href="<?= e(url('contacts')) ?>">مخاطبین</a>
         <a class="<?= ($page ?? '') === 'deals' ? 'active' : '' ?>" href="<?= e(url('deals')) ?>">فرصت‌ها</a>
+        <?php if (in_array(current_user_role(), ['admin','sales'], true)): ?>
+            <a class="<?= ($page ?? '') === 'website_leads' ? 'active' : '' ?>" href="<?= e(url('website_leads')) ?>">درخواست‌های وب‌سایت</a>
+        <?php endif; ?>
         <a class="<?= ($page ?? '') === 'contracts' ? 'active' : '' ?>" href="<?= e(url('contracts')) ?>">قراردادها و فروش‌ها</a>
         <?php if (in_array(current_user_role(), ['admin', 'sales', 'operations', 'support', 'finance'], true)): ?>
             <a class="<?= ($page ?? '') === 'installations' ? 'active' : '' ?>" href="<?= e(url('installations')) ?>">تعهدات نصب</a>

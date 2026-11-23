@@ -1,4 +1,6 @@
 <div class="grid grid-4">
+    <div class="card stat"><span>درخواست‌های جدید وب‌سایت</span><strong><?= (int)($stats['website_leads_new'] ?? 0) ?></strong></div>
+    <div class="card stat"><span>درخواست‌های وب‌سایت منتظر پیگیری</span><strong><?= (int)($stats['website_leads_due'] ?? 0) ?></strong></div>
     <div class="card stat"><span>کل مشتریان</span><strong><?= e((string) $stats['customers']) ?></strong></div>
     <div class="card stat"><span>فرصت‌های باز</span><strong><?= e((string) $stats['open_deals']) ?></strong></div>
     <div class="card stat"><span>ارزش پایپ‌لاین</span><strong><?= e(format_money($stats['pipeline'])) ?></strong></div>

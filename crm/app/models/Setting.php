@@ -58,6 +58,7 @@ class Setting
             'currency_unit' => 'ریال',
             'customer_code_mode' => 'manual',
             'customer_code_format' => 'CUS-{YYYY}-{SEQ4}',
+            'website_lead_default_owner_user_id' => '0',
             'contract_renewal_reminder_days' => '30',
             'backup_auto_enabled' => '0',
             'backup_auto_type' => 'full',

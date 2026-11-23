@@ -1,0 +1,57 @@
+name: Website leads integration tests
+on:
+  pull_request:
+    paths:
+      - 'crm/app/models/WebsiteLead.php'
+      - 'crm/app/models/Setting.php'
+      - 'crm/public/index.php'
+      - 'crm/public/api/**'
+      - 'crm/database/add_website_leads.sql'
+      - 'crm/tests/website_leads_*.php'
+      - 'wordpress/**'
+      - '.github/workflows/website-leads.yml'
+  workflow_dispatch:
+
+jobs:
+  php-and-mariadb:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: [REDACTED]        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring
+          coverage: none
+      - name: Lint edited PHP files
+        run: |
+          for f in \
+            crm/app/models/WebsiteLead.php \
+            crm/app/models/Setting.php \
+            crm/public/index.php \
+            crm/public/api/v1/website-leads/index.php \
+            crm/app/views/website_leads/index.php \
+            wordpress/mammut-connect-crm-integration/mammut-connect-crm-integration.php \
+            crm/tests/website_leads_unit_test.php \
+            crm/tests/website_leads_integration_test.php; do php -l "$f"; done
+      - name: Unit tests
+        run: php crm/tests/website_leads_unit_test.php
+      - name: Install MariaDB client
+        run: sudo apt-get update -qq && sudo apt-get install -y mariadb-client
+      - name: Load disposable synthetic MariaDB schema
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot < crm/database/schema.sql
+          mysql -h 127.0.0.1 -uroot -proot simple_crm < crm/database/add_website_leads.sql
+      - name: Database integration tests
+        env:
+          CRM_TEST_DSN: mysql:host=127.0.0.1;port=3306;dbname=simple_crm;charset=utf8mb4
+          CRM_TEST_USER: root
+          CRM_TEST_PASSWORD: [REDACTED]        run: php crm/tests/website_leads_integration_test.php
