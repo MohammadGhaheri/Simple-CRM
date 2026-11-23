@@ -30,6 +30,13 @@ require __DIR__ . '/../../../../app/core/helpers.php';
 require __DIR__ . '/../../../../app/models/Setting.php';
 require __DIR__ . '/../../../../app/models/WebsiteLead.php';
 $secret = (string) getenv('MAMMUT_WEBSITE_HMAC_SECRET');
+if ($secret === '') {
+    // Private server-only configuration: never place secrets in Git, logs or public_html.
+    $privateConfig = __DIR__ . '/../../../../app/config/website-leads-hmac.php';
+    if (is_file($privateConfig) && !is_link($privateConfig)) {
+        $secret = (string) require $privateConfig;
+    }
+}
 $ts = (string) ($_SERVER['HTTP_X_MC_TIMESTAMP'] ?? '');
 $nonce = (string) ($_SERVER['HTTP_X_MC_NONCE'] ?? '');
 $sig = (string) ($_SERVER['HTTP_X_MC_SIGNATURE'] ?? '');

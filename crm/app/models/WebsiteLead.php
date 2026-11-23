@@ -304,7 +304,9 @@ final class WebsiteLead
             $owner = $role === 'sales' ? $userId : ((int) $w['assigned_user_id'] ?: $userId);
             if ($selectedCustomerId > 0) {
                 $customer = Customer::find($selectedCustomerId);
-                if (!$customer) throw new DomainException('مشتری انتخاب‌شده در دسترس نیست.');
+                if (!$customer || ($role === 'sales' && (int) $customer['owner_user_id'] !== $userId)) {
+                    throw new DomainException('مشتری انتخاب‌شده در دسترس نیست.');
+                }
                 $customerId = $selectedCustomerId;
             } else {
                 $q = $db->prepare('SELECT DISTINCT c.id FROM customers c LEFT JOIN contacts ct ON ct.customer_id=c.id AND ct.deleted_at IS NULL WHERE c.deleted_at IS NULL AND ((? <> "" AND c.customer_name = ?) OR ct.mobile = ? OR (? IS NOT NULL AND ? <> "" AND ct.email = ?)) LIMIT 6');
