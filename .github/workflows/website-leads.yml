@@ -49,8 +49,8 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y mariadb-client
       - name: Load disposable synthetic MariaDB schema
         run: |
-          mysql -h 127.0.0.1 -uroot -proot < crm/database/schema.sql
-          mysql -h 127.0.0.1 -uroot -proot simple_crm < crm/database/add_website_leads.sql
+          mariadb --skip-ssl -h 127.0.0.1 -uroot -proot < crm/database/schema.sql
+          mariadb --skip-ssl -h 127.0.0.1 -uroot -proot simple_crm < crm/database/add_website_leads.sql
       - name: Database integration tests
         env:
           CRM_TEST_DSN: mysql:host=127.0.0.1;port=3306;dbname=simple_crm;charset=utf8mb4
