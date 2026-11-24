@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Mammut Connect CRM Integration
  * Description: Reliable server-to-server Contact Form 7 website lead intake with HMAC, idempotency and a durable retry queue.
- * Version: 0.1.2
+ * Version: 0.1.3
  * Requires PHP: 8.1
  * Text Domain: mammut-connect-crm
  */
@@ -320,16 +320,15 @@ function mc_crm_admin(): void {
         if ($current && $current['state'] === 'pending'
             && $current['last_error'] === 'crm_http_422_check_configuration'
             && is_array($p)
-            && mc_crm_is_synthetic_test($p)
             && mc_crm_payload_validation_hint($current['payload']) === 'invalid_mobile') {
             $wpdb->update($table, [
                 'state'=>'blocked',
-                'last_error'=>'invalid_test_mobile_422_preserved',
+                'last_error'=>'invalid_mobile_422_manual_review',
                 'updated_at'=>gmdate('Y-m-d H:i:s')
             ], ['id'=>$id, 'state'=>'pending']);
-            echo '<div class="notice notice-success"><p>درخواست تست نامعتبر بدون حذف اطلاعات و بدون ارسال دوباره از صف Retry خارج شد.</p></div>';
+            echo '<div class="notice notice-success"><p>درخواست دارای شماره نامعتبر، بدون حذف اطلاعات و بدون ارسال مجدد، برای اصلاح دستی نگهداری شد.</p></div>';
         } else {
-            echo '<div class="notice notice-error"><p>الگوی دقیق رکورد تست تأیید نشد؛ هیچ تغییری انجام نشد.</p></div>';
+            echo '<div class="notice notice-error"><p>شرایط ایمن برای توقف Retry تأیید نشد؛ هیچ تغییری انجام نشد.</p></div>';
         }
     }
     if (isset($_POST['mc_crm_retry'])) {
@@ -358,10 +357,10 @@ function mc_crm_admin(): void {
         '</td><td>' . esc_html(mc_crm_payload_validation_hint($r['payload'])) . '</td><td>';
         if ($r['state'] === 'pending' && $r['last_error'] === 'crm_http_422_check_configuration') {
             $p = json_decode((string)$r['payload'], true);
-            if (is_array($p) && mc_crm_is_synthetic_test($p)
+            if (is_array($p)
                 && mc_crm_payload_validation_hint($r['payload']) === 'invalid_mobile') {
                 echo '<form method="post">'; wp_nonce_field('mc_crm_quarantine_test');
-                echo '<input type="hidden" name="id" value="' . (int)$r['id'] . '"><button class="button" name="mc_crm_quarantine_test" value="1">بایگانی تست نامعتبر</button></form>';
+                echo '<input type="hidden" name="id" value="' . (int)$r['id'] . '"><button class="button" name="mc_crm_quarantine_test" value="1">توقف Retry تا اصلاح شماره</button></form>';
             }
         } elseif ($r['state'] === 'pending' || $r['state'] === 'blocked') {
             echo '<form method="post">'; wp_nonce_field('mc_crm_retry');
