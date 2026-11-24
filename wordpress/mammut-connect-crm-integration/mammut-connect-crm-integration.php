@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Mammut Connect CRM Integration
  * Description: Reliable server-to-server Contact Form 7 website lead intake with HMAC, idempotency and a durable retry queue.
- * Version: 0.1.1
+ * Version: 0.1.2
  * Requires PHP: 8.1
  * Text Domain: mammut-connect-crm
  */
@@ -126,6 +126,15 @@ function mc_crm_payload_validation_hint($json): string {
     if (!preg_match('/^09[0-9]{9}$/D', $v)) return 'invalid_mobile';
     if (($p['consent'] ?? false) !== true) return 'invalid_consent';
     return 'inspect_other_fields';
+}
+function mc_crm_is_synthetic_test($p): bool {
+    if (!is_array($p)) return false;
+    $name = strtoupper(trim((string)($p['name'] ?? '')));
+    $company = strtoupper(trim((string)($p['company'] ?? '')));
+    $message = strtoupper(trim((string)($p['message'] ?? '')));
+    return str_starts_with($name, 'QA TEST')
+        || str_contains($name, 'NOT A REAL CUSTOMER')
+        || (str_contains($company, 'TEST ONLY') && str_contains($message, 'TEST ONLY'));
 }
 function mc_crm_consent($value): bool {
     if (is_array($value)) return count(array_filter($value, static fn($x) => trim((string) $x) !== '')) > 0;
@@ -311,7 +320,7 @@ function mc_crm_admin(): void {
         if ($current && $current['state'] === 'pending'
             && $current['last_error'] === 'crm_http_422_check_configuration'
             && is_array($p)
-            && ($p['name'] ?? '') === 'QA TEST - NOT A REAL CUSTOMER'
+            && mc_crm_is_synthetic_test($p)
             && mc_crm_payload_validation_hint($current['payload']) === 'invalid_mobile') {
             $wpdb->update($table, [
                 'state'=>'blocked',
@@ -349,7 +358,7 @@ function mc_crm_admin(): void {
         '</td><td>' . esc_html(mc_crm_payload_validation_hint($r['payload'])) . '</td><td>';
         if ($r['state'] === 'pending' && $r['last_error'] === 'crm_http_422_check_configuration') {
             $p = json_decode((string)$r['payload'], true);
-            if (is_array($p) && ($p['name'] ?? '') === 'QA TEST - NOT A REAL CUSTOMER'
+            if (is_array($p) && mc_crm_is_synthetic_test($p)
                 && mc_crm_payload_validation_hint($r['payload']) === 'invalid_mobile') {
                 echo '<form method="post">'; wp_nonce_field('mc_crm_quarantine_test');
                 echo '<input type="hidden" name="id" value="' . (int)$r['id'] . '"><button class="button" name="mc_crm_quarantine_test" value="1">بایگانی تست نامعتبر</button></form>';
