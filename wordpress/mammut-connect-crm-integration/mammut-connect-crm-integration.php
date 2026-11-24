@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Mammut Connect CRM Integration
  * Description: Reliable server-to-server Contact Form 7 website lead intake with HMAC, idempotency and a durable retry queue.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Requires PHP: 8.1
  * Text Domain: mammut-connect-crm
  */
@@ -105,6 +105,28 @@ function mc_crm_code(string $text, string $category): string {
 function mc_crm_posted($posted, string $name): string {
     return mc_crm_clean_text($posted[$name] ?? '');
 }
+// Reject malformed mobiles at the form boundary, before a permanent CRM 422 is queued.
+add_filter('wpcf7_validate_tel*', 'mc_crm_validate_lead_mobile', 20, 2);
+add_filter('wpcf7_validate_tel', 'mc_crm_validate_lead_mobile', 20, 2);
+function mc_crm_validate_lead_mobile($result, $tag) {
+    if (($tag->name ?? '') !== 'your-phone') return $result;
+    $v = trim((string) wp_unslash($_POST['your-phone'] ?? ''));
+    $v = strtr($v, ['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9','٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9']);
+    if (preg_match('/^\+989[0-9]{9}$/D', $v)) $v = '0' . substr($v, 3);
+    if (!preg_match('/^09[0-9]{9}$/D', $v)) {
+        $result->invalidate($tag, 'شماره موبایل معتبر وارد کنید (مانند 09120000000).');
+    }
+    return $result;
+}
+function mc_crm_payload_validation_hint($json): string {
+    $p = json_decode((string)$json, true);
+    if (!is_array($p)) return 'invalid_json';
+    $v = strtr(trim((string)($p['mobile'] ?? '')), ['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9']);
+    if (preg_match('/^\+989[0-9]{9}$/D', $v)) $v = '0' . substr($v, 3);
+    if (!preg_match('/^09[0-9]{9}$/D', $v)) return 'invalid_mobile';
+    if (($p['consent'] ?? false) !== true) return 'invalid_consent';
+    return 'inspect_other_fields';
+}
 function mc_crm_consent($value): bool {
     if (is_array($value)) return count(array_filter($value, static fn($x) => trim((string) $x) !== '')) > 0;
     $t = trim((string) $value);
@@ -202,6 +224,7 @@ function mc_crm_send_row(int $id): bool {
     $config = mc_crm_settings();
     $url = esc_url_raw($config['endpoint']);
     $error = '';
+    $permanent = false;
     if (strlen($config['secret']) < 32 || wp_parse_url($url, PHP_URL_SCHEME) !== 'https') {
         $error = 'integration_not_configured';
     } else {
@@ -233,14 +256,15 @@ function mc_crm_send_row(int $id): bool {
                 return true;
             }
             $error = 'crm_http_' . $code;
-            // Permanent validation/signature problems still remain visible, recoverable via admin retry.
-            if (in_array($code, [401,403,409,413,415,422], true)) $error .= '_check_configuration';
+            // Permanent remote rejections are retained as blocked, not retried forever.
+            $permanent = in_array($code, [401,403,409,413,415,422], true);
+            if ($permanent) $error .= '_check_configuration';
         }
     }
     $attempts = (int) $row['attempts'] + 1;
     $delay = min(43200, 300 * (2 ** min(7, max(0, $attempts - 1))));
     $wpdb->update($table, [
-        'state'=>'pending','attempts'=>$attempts,
+        'state'=>$permanent ? 'blocked' : 'pending','attempts'=>$attempts,
         'next_attempt_at'=>gmdate('Y-m-d H:i:s', time()+$delay),
         'last_error'=>$error,'locked_until'=>null,'updated_at'=>gmdate('Y-m-d H:i:s')
     ], ['id'=>$id]);
@@ -273,19 +297,40 @@ function mc_crm_admin(): void {
         if (wp_parse_url($endpoint, PHP_URL_SCHEME) !== 'https') {
             echo '<div class="notice notice-error"><p>نشانی API باید HTTPS باشد.</p></div>';
         } else {
-            $secret = (string) wp_unslash($_POST['secret'] ?? '');
-            update_option('mc_crm_settings', ['endpoint'=>$endpoint,'secret'=>$secret !== '' ? $secret : (string) ($old['secret'] ?? '')], false);
+            $secret = [REDACTED] wp_unslash($_POST['secret'] ?? '');
+            update_option('mc_crm_settings', ['endpoint'=>$endpoint,'secret'=>$secret !== '' ? $secret : [REDACTED] ($old['secret'] ?? '')], false);
             echo '<div class="notice notice-success"><p>تنظیمات ذخیره شد.</p></div>';
+        }
+    }
+    if (isset($_POST['mc_crm_quarantine_test'])) {
+        check_admin_referer('mc_crm_quarantine_test');
+        $id = absint($_POST['id'] ?? 0);
+        $current = $wpdb->get_row($wpdb->prepare(
+            "SELECT id,payload,state,last_error FROM $table WHERE id=%d", $id), ARRAY_A);
+        $p = is_array($current) ? json_decode((string)$current['payload'], true) : null;
+        if ($current && $current['state'] === 'pending'
+            && $current['last_error'] === 'crm_http_422_check_configuration'
+            && is_array($p)
+            && ($p['name'] ?? '') === 'QA TEST - NOT A REAL CUSTOMER'
+            && mc_crm_payload_validation_hint($current['payload']) === 'invalid_mobile') {
+            $wpdb->update($table, [
+                'state'=>'blocked',
+                'last_error'=>'invalid_test_mobile_422_preserved',
+                'updated_at'=>gmdate('Y-m-d H:i:s')
+            ], ['id'=>$id, 'state'=>'pending']);
+            echo '<div class="notice notice-success"><p>درخواست تست نامعتبر بدون حذف اطلاعات و بدون ارسال دوباره از صف Retry خارج شد.</p></div>';
+        } else {
+            echo '<div class="notice notice-error"><p>الگوی دقیق رکورد تست تأیید نشد؛ هیچ تغییری انجام نشد.</p></div>';
         }
     }
     if (isset($_POST['mc_crm_retry'])) {
         check_admin_referer('mc_crm_retry');
         $id = absint($_POST['id'] ?? 0);
-        $wpdb->query($wpdb->prepare("UPDATE $table SET state='pending',next_attempt_at=UTC_TIMESTAMP() WHERE id=%d AND state='pending'", $id));
+        $wpdb->query($wpdb->prepare("UPDATE $table SET state='pending',next_attempt_at=UTC_TIMESTAMP() WHERE id=%d AND state IN ('pending','blocked')", $id));
         mc_crm_send_row($id);
     }
     $settings = mc_crm_settings();
-    $records = $wpdb->get_results("SELECT id,request_id,state,email_status,flamingo_status,attempts,crm_lead_id,last_error,created_at FROM $table ORDER BY id DESC LIMIT 50", ARRAY_A);
+    $records = $wpdb->get_results("SELECT id,request_id,payload,state,email_status,flamingo_status,attempts,crm_lead_id,last_error,created_at FROM $table ORDER BY id DESC LIMIT 50", ARRAY_A);
     $counts = $wpdb->get_results("SELECT state,COUNT(*) AS total FROM $table GROUP BY state", ARRAY_A);
     echo '<div class="wrap"><h1>اتصال ماموت کانکت به CRM</h1><p>وضعیت Flamingo باید در صندوق دریافتی Flamingo بررسی شود؛ unverified به‌معنای تأییدنشده است.</p>';
     echo '<h2>وضعیت صف</h2><pre>' . esc_html(wp_json_encode($counts, JSON_UNESCAPED_UNICODE)) . '</pre>';
@@ -295,16 +340,23 @@ function mc_crm_admin(): void {
     echo '<p><label>HMAC shared secret (leave blank to retain) <input type="password" name="secret" value="" autocomplete="new-password"></label></p>';
     if (defined('MC_CRM_HMAC_SECRET') || defined('MC_CRM_ENDPOINT')) echo '<p>مقادیر wp-config.php بر تنظیمات اینجا اولویت دارند.</p>';
     echo '<p><button class="button button-primary" name="mc_crm_save" value="1">ذخیره</button></p></form>';
-    echo '<h2>۵۰ ارسال آخر</h2><table class="widefat striped"><thead><tr><th>شناسه</th><th>زمان</th><th>CRM</th><th>ایمیل</th><th>Flamingo</th><th>تلاش‌ها</th><th>خطا</th><th>اقدام</th></tr></thead><tbody>';
+    echo '<h2>۵۰ ارسال آخر</h2><table class="widefat striped"><thead><tr><th>شناسه</th><th>زمان</th><th>CRM</th><th>ایمیل</th><th>Flamingo</th><th>تلاش‌ها</th><th>خطا</th><th>تشخیص</th><th>اقدام</th></tr></thead><tbody>';
     foreach ($records as $r) {
         echo '<tr><td>' . esc_html($r['request_id']) . '</td><td>' . esc_html($r['created_at']) .
         '</td><td>' . esc_html($r['state'] . ($r['crm_lead_id'] ? ' #' . $r['crm_lead_id'] : '')) . '</td><td>' .
         esc_html($r['email_status']) . '</td><td>' . esc_html($r['flamingo_status']) . '</td><td>' .
         (int)$r['attempts'] . '</td><td>' . esc_html($r['last_error'] ?: '-') .
-        '</td><td>';
-        if ($r['state'] !== 'sent') {
+        '</td><td>' . esc_html(mc_crm_payload_validation_hint($r['payload'])) . '</td><td>';
+        if ($r['state'] === 'pending' && $r['last_error'] === 'crm_http_422_check_configuration') {
+            $p = json_decode((string)$r['payload'], true);
+            if (is_array($p) && ($p['name'] ?? '') === 'QA TEST - NOT A REAL CUSTOMER'
+                && mc_crm_payload_validation_hint($r['payload']) === 'invalid_mobile') {
+                echo '<form method="post">'; wp_nonce_field('mc_crm_quarantine_test');
+                echo '<input type="hidden" name="id" value="' . (int)$r['id'] . '"><button class="button" name="mc_crm_quarantine_test" value="1">بایگانی تست نامعتبر</button></form>';
+            }
+        } elseif ($r['state'] === 'pending' || $r['state'] === 'blocked') {
             echo '<form method="post">'; wp_nonce_field('mc_crm_retry');
-            echo '<input type="hidden" name="id" value="' . (int)$r['id'] . '"><button class="button" name="mc_crm_retry" value="1">تلاش مجدد</button></form>';
+            echo '<input type="hidden" name="id" value="' . (int)$r['id'] . '"><button class="button" name="mc_crm_retry" value="1">تلاش مجدد دستی</button></form>';
         }
         echo '</td></tr>';
     }
